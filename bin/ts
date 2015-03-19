@@ -1,0 +1,22 @@
+#!/usr/bin/env babel-node
+
+var terastash = require('..');
+
+var argv = require('yargs')
+	.usage('Usage: $0 <command> [options]')
+	.command('add', 'Add files to the database')
+	.demand(1)
+	.example('$0 add file1', 'Add file1 to database')
+	.command('rm', 'Remove files to the database')
+	.demand(1)
+	.example('$0 rm file1', 'Remove file1 from the database')
+	.argv;
+
+switch(argv._[0]) {
+	case 'add':
+		terastash.addFile(argv._.slice(1));
+		break;
+	case 'rm':
+		terastash.removeFile(argv._.slice(1));
+		break;
+}

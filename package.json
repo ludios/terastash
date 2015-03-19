@@ -6,9 +6,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "bin": {
+    "ts": "./bin/ts"
+  },
   "author": "Ivan Kozik",
   "dependencies": {
     "babel": "^4.7.16",
-    "cassandra-driver": "^2.0.0"
+    "cassandra-driver": "^2.0.0",
+    "yargs": "^3.5.4"
   }
 }
