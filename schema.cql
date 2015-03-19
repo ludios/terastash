@@ -8,3 +8,5 @@ CREATE TABLE IF NOT EXISTS fs (
 	content blob,
 	sha256sum blob
 );
+
+CREATE INDEX IF NOT EXISTS fs_parent ON fs (parent);
