@@ -1,7 +1,10 @@
 import fs from 'fs';
 import assert from 'assert';
 import path from 'path';
+import cassandra from 'cassandra-driver';
 import { sync as findParentDir } from 'find-parent-dir';
+
+export const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
 function getStashInfo(stashPath) {
 	try {
@@ -44,6 +47,27 @@ export function addFiles(pathnames) {
 	}
 }
 
+function getNewClient() {
+	return new cassandra.Client({contactPoints: ['localhost']});
+}
+
+/**
+ * List all terastash keyspaces in Cassandra
+ */
+export function listKeyspaces() {
+	const client = getNewClient();
+	client.execute(`SELECT keyspace_name FROM System.schema_keyspaces;`, [], function(err, result) {
+		client.shutdown();
+		assert.ifError(err);
+		for(let row of result.rows) {
+			const name = row.keyspace_name;
+			if(name.startsWith(CASSANDRA_KEYSPACE_PREFIX)) {
+				console.log(name.replace(CASSANDRA_KEYSPACE_PREFIX, ""));
+			}
+		}
+	});
+}
+
 /**
  * Initialize a new stash
  */
@@ -54,6 +78,14 @@ export function initStash(stashPath, name) {
 	if(getStashInfo(stashPath)) {
 		throw new Error(`${stashPath} already contains a .terastash.json`);
 	}
+
+	const client = getNewClient();
+	client.execute(`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX}${name}" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, [], function(err, result) {
+		client.shutdown();
+		assert.ifError(err);
+		console.log(result);
+	});
+
 	fs.writeFileSync(
 		`${stashPath}/.terastash.json`,
 		JSON.stringify({name: name}, null, 2));
