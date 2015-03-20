@@ -56,6 +56,7 @@ function getNewClient() {
  */
 export function listKeyspaces() {
 	const client = getNewClient();
+	// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 	client.execute(`SELECT keyspace_name FROM System.schema_keyspaces;`, [], function(err, result) {
 		client.shutdown();
 		assert.ifError(err);
@@ -80,13 +81,16 @@ export function initStash(stashPath, name) {
 	}
 
 	const client = getNewClient();
-	client.execute(`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX}${name}" WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, [], function(err, result) {
+	client.execute(
+	`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX}${name}"
+	WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, [], function(err, result) {
 		client.shutdown();
 		assert.ifError(err);
-		console.log(result);
-	});
 
-	fs.writeFileSync(
-		`${stashPath}/.terastash.json`,
-		JSON.stringify({name: name}, null, 2));
+		fs.writeFileSync(
+			`${stashPath}/.terastash.json`,
+			JSON.stringify({name: name}, null, 2));
+
+		console.log("Created .terastash.json and Cassandra keyspace.");
+	});
 }
