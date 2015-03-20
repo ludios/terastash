@@ -70,6 +70,13 @@ export function listKeyspaces() {
 }
 
 /**
+ * Convert string with newlines and tabs to one without.
+ */
+export function ol(s) {
+	return s.replace(/[\n\t]+/g, " ");
+}
+
+/**
  * Initialize a new stash
  */
 export function initStash(stashPath, name) {
@@ -89,7 +96,11 @@ export function initStash(stashPath, name) {
 
 		fs.writeFileSync(
 			`${stashPath}/.terastash.json`,
-			JSON.stringify({name: name}, null, 2));
+			JSON.stringify({
+				name: name,
+				_comment: ol(`You cannot change the name because it must match the
+					Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
+			}, null, 2));
 
 		console.log("Created .terastash.json and Cassandra keyspace.");
 	});
