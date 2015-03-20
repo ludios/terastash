@@ -11,6 +11,10 @@ program
 		Name cannot be changed later.`));
 
 program
+	.command('destroy <name>')
+	.description(`Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`);
+
+program
 	.command('add <file...>')
 	.description('adds file(s) to database')
 
@@ -28,6 +32,9 @@ program.parse(process.argv);
 switch(program.args[0]) {
 	case 'init':
 		terastash.initStash(process.cwd(), program.args[1]);
+		break;
+	case 'destroy':
+		terastash.destroyKeyspace(program.args[1]);
 		break;
 	case 'add':
 		terastash.addFiles(program.args.slice(1));

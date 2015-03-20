@@ -69,6 +69,24 @@ export function listKeyspaces() {
 	});
 }
 
+function assertName(name) {
+	assert(name, "Name must not be empty");
+	assert(typeof name == 'string', `Name must be string, got ${typeof name}`);
+}
+
+export function destroyKeyspace(name) {
+	assertName(name);
+	const client = getNewClient();
+	client.execute(`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`, [], function(err, result) {
+		client.shutdown();
+		assert.ifError(err);
+		console.log(`Destroyed keyspace ${CASSANDRA_KEYSPACE_PREFIX + name}.`);
+	});
+}
+
+// TODO: function to destroy all keyspaces that no longer have a matching .terastash.json file
+// TODO: need to store path to terastash base in a cassandra table
+
 /**
  * Convert string with newlines and tabs to one without.
  */
@@ -80,8 +98,7 @@ export function ol(s) {
  * Initialize a new stash
  */
 export function initStash(stashPath, name) {
-	assert(name, "Name must not be empty");
-	assert(typeof name == 'string', `Name must be string, got ${typeof name}`);
+	assertName(name);
 
 	if(getStashInfo(stashPath)) {
 		throw new Error(`${stashPath} already contains a .terastash.json`);
