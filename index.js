@@ -6,6 +6,10 @@ import { sync as findParentDir } from 'find-parent-dir';
 
 export const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
+function getNewClient() {
+	return new cassandra.Client({contactPoints: ['localhost']});
+}
+
 function getStashInfo(stashPath) {
 	try {
 		return JSON.parse(fs.readFileSync(`${stashPath}/.terastash.json`));
@@ -25,17 +29,31 @@ function findStashBase(pathname) {
 	return findParentDir(path.dirname(path.resolve(pathname)), ".terastash.json");
 }
 
+function getParentPath(path) {
+	const parts = path.split('/');
+	parts.pop();
+	return parts.join('/');
+}
+
 /**
  * Add a file into the Cassandra database.
  */
 export function addFile(pathname) {
 	const content = fs.readFileSync(pathname);
 	const stashBase = findStashBase(pathname);
+	const stashInfo = getStashInfo(stashBase);
 	if(!stashBase) {
 		throw new Error(`File ${pathname} is not inside a stash: could not find a .terastash.json in any parent directories.`);
 	}
-	const dbPath = pathname.replace(stashBase, "");
+	const dbPath = pathname.replace(stashBase, "").replace(/\\/g, "/");
 	//console.log({stashBase, dbPath});
+
+	const client = getNewClient();
+	// TODO: validate stashInfo.name - it may contain injection
+	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs (pathname, parent, content) VALUES (?, ?, ?);`, [dbPath, getParentPath(dbPath), content], function(err, result) {
+		client.shutdown();
+		assert.ifError(err);
+	});
 }
 
 /**
@@ -45,10 +63,6 @@ export function addFiles(pathnames) {
 	for(let p of pathnames) {
 		addFile(p);
 	}
-}
-
-function getNewClient() {
-	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
 /**
@@ -106,19 +120,29 @@ export function initStash(stashPath, name) {
 
 	const client = getNewClient();
 	client.execute(
-	`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX}${name}"
+	`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
 	WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, [], function(err, result) {
 		client.shutdown();
 		assert.ifError(err);
 
-		fs.writeFileSync(
-			`${stashPath}/.terastash.json`,
-			JSON.stringify({
-				name: name,
-				_comment: ol(`You cannot change the name because it must match the
-					Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
-			}, null, 2));
+		client.execute(`CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+			pathname text PRIMARY KEY,
+			parent text,
+			content blob,
+			sha256sum blob
+		);`, [], function(err, result) {
+			client.shutdown();
+			assert.ifError(err);
 
-		console.log("Created .terastash.json and Cassandra keyspace.");
+			fs.writeFileSync(
+				`${stashPath}/.terastash.json`,
+				JSON.stringify({
+					name: name,
+					_comment: ol(`You cannot change the name because it must match the
+						Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
+				}, null, 2));
+
+			console.log("Created .terastash.json and Cassandra keyspace.");
+		});
 	});
 }
