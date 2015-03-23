@@ -23,6 +23,10 @@ program
 	.description('removes file(s) from database')
 
 program
+	.command('ls <name> <dir...>')
+	.description('list directory in the database')
+
+program
 	.command('list-keyspaces')
 	.description('list all terastash keyspaces in Cassandra')
 
@@ -41,6 +45,9 @@ switch(program.args[0]) {
 		break;
 	case 'rm':
 		terastash.removeFiles(program.args.slice(1));
+		break;
+	case 'ls':
+		terastash.lsPath(program.args[1], program.args[2]);
 		break;
 	case 'list-keyspaces':
 		terastash.listKeyspaces();

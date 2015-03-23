@@ -26,6 +26,9 @@ function getStashInfo(stashPath) {
  * base, or `null` if there is no terastash base.
  */
 function findStashBase(pathname) {
+	// TODO: Don't use dotfile-in-directory approach: we have the same
+	// vulnerability as git did.  Instead, read from a global configuration
+	// file listing all stashes.  Or read from Cassandra DB.
 	return findParentDir(path.dirname(path.resolve(pathname)), ".terastash.json");
 }
 
@@ -35,25 +38,41 @@ function getParentPath(path) {
 	return parts.join('/');
 }
 
+export function lsPath(stashName, pathname) {
+	const client = getNewClient();
+	client.execute(`SELECT * from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
+		WHERE parent = ?`,
+		[pathname],
+		function(err, result) {
+			client.shutdown();
+			assert.ifError(err);
+			console.log(result.rows);
+		})
+}
+
 /**
  * Add a file into the Cassandra database.
  */
 export function addFile(pathname) {
 	const content = fs.readFileSync(pathname);
 	const stashBase = findStashBase(pathname);
-	const stashInfo = getStashInfo(stashBase);
 	if(!stashBase) {
 		throw new Error(`File ${pathname} is not inside a stash: could not find a .terastash.json in any parent directories.`);
 	}
+	const stashInfo = getStashInfo(stashBase);
 	const dbPath = pathname.replace(stashBase, "").replace(/\\/g, "/");
 	//console.log({stashBase, dbPath});
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
-	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs (pathname, parent, content) VALUES (?, ?, ?);`, [dbPath, getParentPath(dbPath), content], function(err, result) {
-		client.shutdown();
-		assert.ifError(err);
-	});
+	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		(pathname, parent, content) VALUES (?, ?, ?);`,
+		[dbPath, getParentPath(dbPath), content],
+		function(err, result) {
+			client.shutdown();
+			assert.ifError(err);
+		}
+	);
 }
 
 /**
