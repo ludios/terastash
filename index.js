@@ -55,14 +55,15 @@ export function lsPath(stashName, pathname) {
  * Add a file into the Cassandra database.
  */
 export function addFile(pathname) {
+	const resolvedPathname = path.resolve(pathname);
 	const content = fs.readFileSync(pathname);
-	const stashBase = findStashBase(pathname);
+	const stashBase = findStashBase(resolvedPathname);
 	if(!stashBase) {
 		throw new Error(`File ${pathname} is not inside a stash: could not find a .terastash.json in any parent directories.`);
 	}
 	const stashInfo = getStashInfo(stashBase);
-	const dbPath = pathname.replace(stashBase, "").replace(/\\/g, "/");
-	//console.log({stashBase, dbPath});
+	const dbPath = resolvedPathname.replace(stashBase, "").replace(/\\/g, "/");
+	//console.log({stashBase, dbPath, parent: getParentPath(dbPath)});
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
