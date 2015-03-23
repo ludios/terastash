@@ -33,7 +33,7 @@ function findStashBase(pathname) {
 	return findParentDir(path.dirname(path.resolve(pathname)), ".terastash.json");
 }
 
-function getParentPath(path) {
+export function getParentPath(path) {
 	const parts = path.split('/');
 	parts.pop();
 	return parts.join('/');
@@ -162,6 +162,9 @@ export function initStash(stashPath, name) {
 			content blob,
 			sha256sum blob
 		);`, []);
+
+		yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
+			ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
 		fs.writeFileSync(
 			`${stashPath}/.terastash.json`,
