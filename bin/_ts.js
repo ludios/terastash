@@ -2,7 +2,8 @@ import * as terastash from '..';
 import { ol } from '..';
 import program from 'commander';
 
-program.version('0.0.1');
+program
+	.version('0.0.1');
 
 program
 	.command('init <name>')
@@ -16,22 +17,26 @@ program
 
 program
 	.command('add <file...>')
-	.description('adds file(s) to database')
+	.description('adds file(s) to database');
 
 program
 	.command('rm <file...>')
-	.description('removes file(s) from database')
+	.description('removes file(s) from database');
 
 program
-	.command('ls <name> <dir...>')
+	.command('ls <dir...>')
 	.description('list directory in the database')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.action(function(cmd, options) {
+		//console.log({cmd, options}); throw new Error()
+		terastash.lsPath(options.name, cmd[0]);
+	});
 
 program
 	.command('list-keyspaces')
-	.description('list all terastash keyspaces in Cassandra')
+	.description('list all terastash keyspaces in Cassandra');
 
 program.parse(process.argv);
-//console.log(program);
 
 switch(program.args[0]) {
 	case 'init':
@@ -45,9 +50,6 @@ switch(program.args[0]) {
 		break;
 	case 'rm':
 		terastash.removeFiles(program.args.slice(1));
-		break;
-	case 'ls':
-		terastash.lsPath(program.args[1], program.args[2]);
 		break;
 	case 'list-keyspaces':
 		terastash.listKeyspaces();
