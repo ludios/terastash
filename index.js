@@ -3,6 +3,7 @@ import assert from 'assert';
 import path from 'path';
 import cassandra from 'cassandra-driver';
 import { sync as findParentDir } from 'find-parent-dir';
+import co from 'co';
 
 export const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
@@ -127,6 +128,18 @@ export function ol(s) {
 	return s.replace(/[\n\t]+/g, " ");
 }
 
+function executeWithPromise(client, statement, args) {
+	return new Promise(function(resolve, reject) {
+		client.execute(statement, args, function(err, result) {
+			if(err) {
+				reject(err);
+			} else {
+				resolve(result);
+			}
+		});
+	});
+}
+
 /**
  * Initialize a new stash
  */
@@ -138,30 +151,31 @@ export function initStash(stashPath, name) {
 	}
 
 	const client = getNewClient();
-	client.execute(
-	`CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
-	WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, [], function(err, result) {
-		client.shutdown();
-		assert.ifError(err);
 
-		client.execute(`CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+	co(function*(){
+		yield executeWithPromise(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
+			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
+
+		yield executeWithPromise(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
 			pathname text PRIMARY KEY,
 			parent text,
 			content blob,
 			sha256sum blob
-		);`, [], function(err, result) {
-			client.shutdown();
-			assert.ifError(err);
+		);`, []);
 
-			fs.writeFileSync(
-				`${stashPath}/.terastash.json`,
-				JSON.stringify({
-					name: name,
-					_comment: ol(`You cannot change the name because it must match the
-						Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
-				}, null, 2));
+		fs.writeFileSync(
+			`${stashPath}/.terastash.json`,
+			JSON.stringify({
+				name: name,
+				_comment: ol(`You cannot change the name because it must match the
+					Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
+			}, null, 2)
+		);
 
-			console.log("Created .terastash.json and Cassandra keyspace.");
-		});
+		console.log("Created .terastash.json and Cassandra keyspace.");
+		client.shutdown();
+	}).catch(function(err) {
+		console.error(err);
+		client.shutdown();
 	});
 }
