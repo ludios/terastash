@@ -11,6 +11,11 @@ function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
+function writeTerastashConfig(config) {
+	const configPath = basedir.configPath("terastash.json");
+	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+}
+
 function getTerastashConfig() {
 	const configPath = basedir.configPath("terastash.json");
 	try {
@@ -19,8 +24,12 @@ function getTerastashConfig() {
 		if(e.code != 'ENOENT') {
 			throw e;
 		}
-		const config = {stashes: []};
-		fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+		// If there is no config file, write one.
+		const config = {
+			stashes: [],
+			_comment: ol(`You cannot change the name of a stash because it must match
+				the Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)};
+		writeTerastashConfig(config);
 		return config;
 	}
 }
@@ -37,7 +46,7 @@ function findStashInfo(pathname) {
 
 	const resolvedPathname = path.resolve(pathname);
 	for(let stash of config.stashes) {
-		console.log(resolvedPathname, stash.path);
+		//console.log(resolvedPathname, stash.path);
 		if(resolvedPathname.startsWith(stash.path)) {
 			return stash;
 		}
@@ -51,7 +60,20 @@ export function getParentPath(path) {
 	return parts.join('/');
 }
 
+export function canonicalizePathname(pathname) {
+	if(!pathname.startsWith('/')) {
+		pathname = '/' + pathname;
+	}
+	pathname = pathname.replace(/\/+/g, "/");
+	pathname = pathname.replace(/\/$/g, "");
+	return pathname;
+}
+
 export function lsPath(stashName, pathname) {
+	if(!stashName) {
+		stashName = findStashInfo(pathname).name;
+	}
+	pathname = canonicalizePathname(pathname);
 	const client = getNewClient();
 	client.execute(`SELECT * from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ?`,
@@ -75,12 +97,15 @@ export function addFile(pathname) {
 		throw new Error(`File ${pathname} is not inside a stash; edit terastash.json and add a stash`);
 	}
 	const dbPath = resolvedPathname.replace(stashInfo.path, "").replace(/\\/g, "/");
+	assert(dbPath.startsWith('/'), dbPath);
+	const parentPath = getParentPath(dbPath);
+	assert(parentPath.startsWith('/'), parentPath);
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
 	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 		(pathname, parent, content) VALUES (?, ?, ?);`,
-		[dbPath, getParentPath(dbPath), content],
+		[dbPath, parentPath, content],
 		function(err, result) {
 			client.shutdown();
 			assert.ifError(err);
@@ -158,8 +183,8 @@ function executeWithPromise(client, statement, args) {
 export function initStash(stashPath, name) {
 	assertName(name);
 
-	if(getStashInfo(stashPath)) {
-		throw new Error(`${stashPath} already contains a .terastash.json`);
+	if(findStashInfo(stashPath)) {
+		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
 	const client = getNewClient();
@@ -178,16 +203,11 @@ export function initStash(stashPath, name) {
 		yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
 			ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
-		fs.writeFileSync(
-			`${stashPath}/.terastash.json`,
-			JSON.stringify({
-				name: name,
-				_comment: ol(`You cannot change the name because it must match the
-					Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
-			}, null, 2)
-		);
+		const config = getTerastashConfig();
+		config['stashes'].push({name, path: path.resolve(stashPath)});
+		writeTerastashConfig(config);
 
-		console.log("Created .terastash.json and Cassandra keyspace.");
+		console.log("Created Cassandra keyspace and updated terastash.json.");
 		client.shutdown();
 	}).catch(function(err) {
 		console.error(err);

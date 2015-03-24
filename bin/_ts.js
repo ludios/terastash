@@ -2,6 +2,11 @@ import * as terastash from '..';
 import { ol } from '..';
 import program from 'commander';
 
+// Ugly hack to avoid getting Function
+function stringOrNull(o) {
+	return typeof o == "string" ? o : null;
+}
+
 program
 	.version('0.0.1');
 
@@ -29,7 +34,7 @@ program
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.action(function(cmd, options) {
 		//console.log({cmd, options}); throw new Error()
-		terastash.lsPath(options.name, cmd[0]);
+		terastash.lsPath(stringOrNull(options.name), cmd[0]);
 	});
 
 program
