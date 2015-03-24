@@ -2,8 +2,8 @@ import fs from 'fs';
 import assert from 'assert';
 import path from 'path';
 import cassandra from 'cassandra-driver';
-import { sync as findParentDir } from 'find-parent-dir';
 import co from 'co';
+import { basedir } from 'xdg';
 
 export const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
@@ -11,26 +11,38 @@ function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
-function getStashInfo(stashPath) {
+function getTerastashConfig() {
+	const configPath = basedir.configPath("terastash.json");
 	try {
-		return JSON.parse(fs.readFileSync(`${stashPath}/.terastash.json`));
+		return JSON.parse(fs.readFileSync(configPath));
 	} catch(e) {
 		if(e.code != 'ENOENT') {
 			throw e;
 		}
+		const config = {stashes: []};
+		fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+		return config;
 	}
-	return null;
 }
 
 /**
- * For a given pathname, return which directory is the terastash
- * base, or `null` if there is no terastash base.
+ * For a given pathname, return a stash that contains the file,
+ * or `null` if there is no terastash base.
  */
-function findStashBase(pathname) {
-	// TODO: Don't use dotfile-in-directory approach: we have the same
-	// vulnerability as git did.  Instead, read from a global configuration
-	// file listing all stashes.  Or read from Cassandra DB.
-	return findParentDir(path.dirname(path.resolve(pathname)), ".terastash.json");
+function findStashInfo(pathname) {
+	const config = getTerastashConfig();
+	if(!config.stashes || !Array.isArray(config.stashes)) {
+		throw new Error(`terastash config has no "stashes" or not an Array`)
+	}
+
+	const resolvedPathname = path.resolve(pathname);
+	for(let stash of config.stashes) {
+		console.log(resolvedPathname, stash.path);
+		if(resolvedPathname.startsWith(stash.path)) {
+			return stash;
+		}
+	}
+	return null;
 }
 
 export function getParentPath(path) {
@@ -48,7 +60,8 @@ export function lsPath(stashName, pathname) {
 			client.shutdown();
 			assert.ifError(err);
 			console.log(result.rows);
-		})
+		}
+	);
 }
 
 /**
@@ -57,13 +70,11 @@ export function lsPath(stashName, pathname) {
 export function addFile(pathname) {
 	const resolvedPathname = path.resolve(pathname);
 	const content = fs.readFileSync(pathname);
-	const stashBase = findStashBase(resolvedPathname);
-	if(!stashBase) {
-		throw new Error(`File ${pathname} is not inside a stash: could not find a .terastash.json in any parent directories.`);
+	const stashInfo = findStashInfo(resolvedPathname);
+	if(!stashInfo) {
+		throw new Error(`File ${pathname} is not inside a stash; edit terastash.json and add a stash`);
 	}
-	const stashInfo = getStashInfo(stashBase);
-	const dbPath = resolvedPathname.replace(stashBase, "").replace(/\\/g, "/");
-	//console.log({stashBase, dbPath, parent: getParentPath(dbPath)});
+	const dbPath = resolvedPathname.replace(stashInfo.path, "").replace(/\\/g, "/");
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
