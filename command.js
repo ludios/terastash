@@ -31,12 +31,12 @@ program
 	.description('removes file(s) from database');
 
 program
-	.command('ls <dir...>')
+	.command('ls [dir...]')
 	.description('list directory in the database')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.action(function(cmd, options) {
 		//console.log({cmd, options}); throw new Error()
-		terastash.lsPath(stringOrNull(options.name), cmd[0]);
+		terastash.lsPath(stringOrNull(options.name), cmd[0] || ".");
 	});
 
 program

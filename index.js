@@ -68,15 +68,37 @@ function canonicalizePathname(pathname) {
 	return pathname;
 }
 
-function lsPath(stashName, pathname) {
-	if(!stashName) {
-		stashName = findStashInfo(pathname).name;
+/**
+ * For any given relative user path, which may include ../, return
+ * the corresponding path that should be used in the Cassandra
+ * database.
+ */
+function userPathToDatabasePath(base, p) {
+	const resolved = path.resolve(p);
+	if(resolved == base) {
+		return "";
+	} else {
+		const dbPath = resolved.replace(base + "/", "").replace(/\\/g, "/");
+		assert(!dbPath.startsWith('/'), dbPath);
+		return dbPath;
 	}
-	pathname = canonicalizePathname(pathname);
+}
+
+function lsPath(stashName, p) {
+	let dbPath;
+	if(stashName) { // Explicit stash name provided
+		dbPath = p;
+		p = canonicalizePathname(p);
+	} else {
+		const stashInfo = findStashInfo(p);
+		stashName = stashInfo.name;
+		dbPath = userPathToDatabasePath(stashInfo.path, p);
+	}
+	//console.log({stashName, dbPath})
 	const client = getNewClient();
 	client.execute(`SELECT * from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ?`,
-		[pathname],
+		[dbPath],
 		function(err, result) {
 			client.shutdown();
 			assert.ifError(err);
@@ -88,15 +110,14 @@ function lsPath(stashName, pathname) {
 /**
  * Add a file into the Cassandra database.
  */
-function addFile(pathname) {
-	const resolvedPathname = path.resolve(pathname);
-	const content = fs.readFileSync(pathname);
+function addFile(p) {
+	const resolvedPathname = path.resolve(p);
+	const content = fs.readFileSync(p);
 	const stashInfo = findStashInfo(resolvedPathname);
 	if(!stashInfo) {
-		throw new Error(`File ${pathname} is not inside a stash; edit terastash.json and add a stash`);
+		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
 	}
-	const dbPath = resolvedPathname.replace(stashInfo.path + "/", "").replace(/\\/g, "/");
-	assert(!dbPath.startsWith('/'), dbPath);
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const parentPath = getParentPath(dbPath);
 	assert(!parentPath.startsWith('/'), parentPath);
 
