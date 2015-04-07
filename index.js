@@ -214,4 +214,6 @@ function initStash(stashPath, name) {
 	});
 }
 
-module.exports = {initStash, ol, destroyKeyspace, listKeyspaces, addFiles, addFile, lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}
+module.exports = {
+	initStash, ol, destroyKeyspace, listKeyspaces, addFiles, addFile,
+	lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}
