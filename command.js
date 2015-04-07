@@ -1,6 +1,6 @@
 "use strict";
 
-const terastash = require('..');
+const terastash = require('.');
 const ol = terastash.ol;
 let program = require('commander');
 

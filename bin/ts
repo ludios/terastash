@@ -1,3 +1,4 @@
 #!/bin/bash
 
-iojs --es_staging ./bin/_ts "$@"
+export NODE_PATH="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+iojs --es_staging "$NODE_PATH/command.js" "$@"
