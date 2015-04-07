@@ -1,11 +1,13 @@
-import fs from 'fs';
-import assert from 'assert';
-import path from 'path';
-import cassandra from 'cassandra-driver';
-import co from 'co';
-import { basedir } from 'xdg';
+"use strict";
 
-export const CASSANDRA_KEYSPACE_PREFIX = "ts_";
+const fs = require('fs');
+const assert = require('assert');
+const path = require('path');
+const cassandra = require('cassandra-driver');
+const co = require('co');
+const basedir = require('xdg').basedir;
+
+const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
 function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
@@ -54,13 +56,13 @@ function findStashInfo(pathname) {
 	return null;
 }
 
-export function getParentPath(path) {
+function getParentPath(path) {
 	const parts = path.split('/');
 	parts.pop();
 	return parts.join('/');
 }
 
-export function canonicalizePathname(pathname) {
+function canonicalizePathname(pathname) {
 	if(!pathname.startsWith('/')) {
 		pathname = '/' + pathname;
 	}
@@ -69,7 +71,7 @@ export function canonicalizePathname(pathname) {
 	return pathname;
 }
 
-export function lsPath(stashName, pathname) {
+function lsPath(stashName, pathname) {
 	if(!stashName) {
 		stashName = findStashInfo(pathname).name;
 	}
@@ -89,7 +91,7 @@ export function lsPath(stashName, pathname) {
 /**
  * Add a file into the Cassandra database.
  */
-export function addFile(pathname) {
+function addFile(pathname) {
 	const resolvedPathname = path.resolve(pathname);
 	const content = fs.readFileSync(pathname);
 	const stashInfo = findStashInfo(resolvedPathname);
@@ -116,7 +118,7 @@ export function addFile(pathname) {
 /**
  * Add files into the Cassandra database.
  */
-export function addFiles(pathnames) {
+function addFiles(pathnames) {
 	for(let p of pathnames) {
 		addFile(p);
 	}
@@ -125,7 +127,7 @@ export function addFiles(pathnames) {
 /**
  * List all terastash keyspaces in Cassandra
  */
-export function listKeyspaces() {
+function listKeyspaces() {
 	const client = getNewClient();
 	// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 	client.execute(`SELECT keyspace_name FROM System.schema_keyspaces;`, [], function(err, result) {
@@ -145,7 +147,7 @@ function assertName(name) {
 	assert(typeof name == 'string', `Name must be string, got ${typeof name}`);
 }
 
-export function destroyKeyspace(name) {
+function destroyKeyspace(name) {
 	assertName(name);
 	const client = getNewClient();
 	client.execute(`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`, [], function(err, result) {
@@ -161,7 +163,7 @@ export function destroyKeyspace(name) {
 /**
  * Convert string with newlines and tabs to one without.
  */
-export function ol(s) {
+function ol(s) {
 	return s.replace(/[\n\t]+/g, " ");
 }
 
@@ -180,7 +182,7 @@ function executeWithPromise(client, statement, args) {
 /**
  * Initialize a new stash
  */
-export function initStash(stashPath, name) {
+function initStash(stashPath, name) {
 	assertName(name);
 
 	if(findStashInfo(stashPath)) {
@@ -214,3 +216,5 @@ export function initStash(stashPath, name) {
 		client.shutdown();
 	});
 }
+
+module.exports = {initStash, ol, destroyKeyspace, listKeyspaces, addFiles, addFile, lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}

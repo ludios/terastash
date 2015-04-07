@@ -1,6 +1,8 @@
-import * as terastash from '..';
-import { ol } from '..';
-import program from 'commander';
+"use strict";
+
+const terastash = require('..');
+const ol = terastash.ol;
+let program = require('commander');
 
 // Ugly hack to avoid getting Function
 function stringOrNull(o) {
