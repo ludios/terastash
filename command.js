@@ -35,8 +35,13 @@ program
 	.description('list directory in the database')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.action(function(cmd, options) {
-		//console.log({cmd, options}); throw new Error()
-		terastash.lsPath(stringOrNull(options.name), cmd[0] || ".");
+		//console.log({cmd, options}); process.exit();
+		const name = stringOrNull(options.name);
+		if(name != null && cmd[0] == null) {
+			console.error("When using -n/--name, a path is required");
+			process.exit(1);
+		}
+		terastash.lsPath(name, cmd[0] || '.');
 	});
 
 program
