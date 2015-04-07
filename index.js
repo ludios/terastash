@@ -63,9 +63,6 @@ function getParentPath(path) {
 }
 
 function canonicalizePathname(pathname) {
-	if(!pathname.startsWith('/')) {
-		pathname = '/' + pathname;
-	}
 	pathname = pathname.replace(/\/+/g, "/");
 	pathname = pathname.replace(/\/$/g, "");
 	return pathname;
@@ -98,10 +95,10 @@ function addFile(pathname) {
 	if(!stashInfo) {
 		throw new Error(`File ${pathname} is not inside a stash; edit terastash.json and add a stash`);
 	}
-	const dbPath = resolvedPathname.replace(stashInfo.path, "").replace(/\\/g, "/");
-	assert(dbPath.startsWith('/'), dbPath);
+	const dbPath = resolvedPathname.replace(stashInfo.path + "/", "").replace(/\\/g, "/");
+	assert(!dbPath.startsWith('/'), dbPath);
 	const parentPath = getParentPath(dbPath);
-	assert(parentPath.startsWith('/'), parentPath);
+	assert(!parentPath.startsWith('/'), parentPath);
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
