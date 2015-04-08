@@ -61,14 +61,6 @@ program
 	});
 
 program
-	.command('help')
-	.description(d(`
-		Output usage information`))
-	.action(function() {
-		program.help();
-	});
-
-program
 	.command('ls [path...]')
 	.description(d(`
 		List directory in the database`))
@@ -89,6 +81,14 @@ program
 		List all terastash keyspaces in Cassandra`))
 	.action(function(cmd, options) {
 		terastash.listKeyspaces();
+	});
+
+program
+	.command('help')
+	.description(d(`
+		Output usage information`))
+	.action(function() {
+		program.help();
 	});
 
 program.parse(process.argv);
