@@ -15,7 +15,7 @@ program
 
 program
 	.command('init <name>')
-	.description(ol(`initializes a stash in this directory and creates corresponding Cassandra
+	.description(ol(`Initializes a stash in this directory and creates corresponding Cassandra
 		keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>.
 		Name cannot be changed later.`))
 	.action(function(name) {
@@ -33,21 +33,30 @@ program
 
 program
 	.command('add <file...>')
-	.description('adds file(s) to database')
+	.description('Adds file(s) to database')
 	.action(function(files) {
+		// TODO: support -n
 		terastash.addFiles(files);
 	});
 
 program
-	.command('rm <file...>')
-	.description('removes file(s) from database')
+	.command('nuke <file...>')
+	.description('Removes file(s) from database and their corresponding chunks, if any. Does not remove corresponding local checkout of the file.')
 	.action(function(files) {
-		terastash.removeFiles(files);
+		// TODO: support -n
+		terastash.nukeFiles(files);
+	});
+
+program
+	.command('help')
+	.description('Output usage information')
+	.action(function() {
+		program.help();
 	});
 
 program
 	.command('ls [path...]')
-	.description('list directory in the database')
+	.description('List directory in the database')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.action(function(paths, options) {
 		//console.log({cmd, options}); process.exit();
@@ -61,9 +70,12 @@ program
 
 program
 	.command('list-keyspaces')
-	.description('list all terastash keyspaces in Cassandra')
+	.description('List all terastash keyspaces in Cassandra')
 	.action(function(cmd, options) {
 		terastash.listKeyspaces();
 	});
 
 program.parse(process.argv);
+
+console.log(`Invalid arguments: ${JSON.stringify(program.args)}`);
+program.help();

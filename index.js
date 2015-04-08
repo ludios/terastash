@@ -123,6 +123,7 @@ function addFile(p) {
 
 	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
+	// TODO: make sure it does not already exist? require additional flag to update?
 	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 		(pathname, parent, content) VALUES (?, ?, ?);`,
 		[dbPath, parentPath, content],
@@ -139,6 +140,35 @@ function addFile(p) {
 function addFiles(pathnames) {
 	for(let p of pathnames) {
 		addFile(p);
+	}
+}
+
+function nukeFile(p) {
+	const resolvedPathname = path.resolve(p);
+	const stashInfo = findStashInfo(resolvedPathname);
+	if(!stashInfo) {
+		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
+	}
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+
+	const client = getNewClient();
+	// TODO: validate stashInfo.name - it may contain injection
+	client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		WHERE pathname = ?;`,
+		[dbPath],
+		function(err, result) {
+			client.shutdown();
+			assert.ifError(err);
+		}
+	);
+}
+
+/**
+ * Remove files from the Cassandra database and their corresponding chunks.
+ */
+function nukeFiles(pathnames) {
+	for(let p of pathnames) {
+		nukeFile(p);
 	}
 }
 
@@ -236,5 +266,5 @@ function initStash(stashPath, name) {
 }
 
 module.exports = {
-	initStash, ol, destroyKeyspace, listKeyspaces, addFiles, addFile,
+	initStash, ol, destroyKeyspace, listKeyspaces, addFile, addFiles, nukeFile, nukeFiles,
 	lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}
