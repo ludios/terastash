@@ -41,7 +41,8 @@ program
 
 program
 	.command('nuke <file...>')
-	.description('Removes file(s) from database and their corresponding chunks, if any. Does not remove corresponding local checkout of the file.')
+	.description(ol(`Removes file(s) from database and their corresponding chunks, if any.
+		Does not remove corresponding local checkout of the file.`))
 	.action(function(files) {
 		// TODO: support -n
 		terastash.nukeFiles(files);
