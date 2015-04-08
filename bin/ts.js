@@ -12,10 +12,25 @@ function stringOrNull(o) {
 /**
  * Replace repeating tabs and add trailing newline.
  *
- * This is our dumb hack to work around commander's lack of proper wrapping.
+ * This is our dumb hack to work around commander's lack of wrapping.
  */
 function d(s) {
 	return s.replace(/\t+/g, "\t") + "\n";
+}
+
+/**
+ * Commander doesn't detect invalid commands for us, so
+ * track if one of our actions was called   We print an error
+ * later if one wasn't.
+ *
+ * https://github.com/tj/commander.js/issues/338
+ */
+let ranCommand = false;
+function a(f) {
+	return function() {
+		ranCommand = true;
+		f.apply(this, arguments);
+	};
 }
 
 program
@@ -26,28 +41,28 @@ program
 	.description(d(`
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
-	.action(function(name) {
+	.action(a(function(name) {
 		assert(typeof name == "string", name);
 		terastash.initStash(process.cwd(), name);
-	});
+	}));
 
 program
 	.command('destroy <name>')
 	.description(d(`
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`))
-	.action(function(name) {
+	.action(a(function(name) {
 		assert(typeof name == "string", name);
 		terastash.destroyKeyspace(name);
-	});
+	}));
 
 program
 	.command('add <file...>')
 	.description(d(`
 		Adds file(s) to database`))
-	.action(function(files) {
+	.action(a(function(files) {
 		// TODO: support -n
 		terastash.addFiles(files);
-	});
+	}));
 
 program
 	.command('nuke <file...>')
@@ -55,17 +70,17 @@ program
 		Removes file(s) from database and their corresponding chunks, if any.
 		Does not emit error or warning if specified files are not in the database.
 		Does not remove corresponding local checkout of the file.`))
-	.action(function(files) {
+	.action(a(function(files) {
 		// TODO: support -n
 		terastash.nukeFiles(files);
-	});
+	}));
 
 program
 	.command('ls [path...]')
 	.description(d(`
 		List directory in the database`))
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
-	.action(function(paths, options) {
+	.action(a(function(paths, options) {
 		//console.log({cmd, options}); process.exit();
 		const name = stringOrNull(options.name);
 		if(name != null && !paths.length) {
@@ -73,25 +88,27 @@ program
 			process.exit(1);
 		}
 		terastash.lsPath(name, paths[0] || '.');
-	});
+	}));
 
 program
 	.command('list-keyspaces')
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
-	.action(function(cmd, options) {
+	.action(a(function(cmd, options) {
 		terastash.listKeyspaces();
-	});
+	}));
 
 program
 	.command('help')
 	.description(d(`
 		Output usage information`))
-	.action(function() {
+	.action(a(function() {
 		program.help();
-	});
+	}));
 
 program.parse(process.argv);
 
-console.log(`Invalid arguments: ${JSON.stringify(program.args)}`);
-program.help();
+if(!ranCommand) {
+	console.log(`Unknown command: ${program.args[0]}; see ts help`)
+	process.exit(1);
+}
