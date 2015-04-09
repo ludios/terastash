@@ -96,23 +96,22 @@ function lsPath(stashName, p) {
 	}
 	//console.log({stashName, dbPath})
 	const client = getNewClient();
-	client.execute(`SELECT * from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
+	client.execute(`SELECT pathname from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ?`,
 		[dbPath],
 		function(err, result) {
 			client.shutdown();
 			assert.ifError(err);
-			console.log(result.rows);
+			for(let row of result.rows) {
+				console.log(row.pathname);
+			}
 		}
 	);
 }
 
-/**
- * Put a file or directory into the Cassandra database.
- */
-function putFile(p) {
+function doWithPath(p, f) {
+	const client = getNewClient();
 	const resolvedPathname = path.resolve(p);
-	const content = fs.readFileSync(p);
 	const stashInfo = findStashInfo(resolvedPathname);
 	if(!stashInfo) {
 		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
@@ -121,17 +120,27 @@ function putFile(p) {
 	const parentPath = getParentPath(dbPath);
 	assert(!parentPath.startsWith('/'), parentPath);
 
-	const client = getNewClient();
 	// TODO: validate stashInfo.name - it may contain injection
-	// TODO: make sure it does not already exist? require additional flag to update?
-	client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-		(pathname, parent, content) VALUES (?, ?, ?);`,
-		[dbPath, parentPath, content],
-		function(err, result) {
-			client.shutdown();
-			assert.ifError(err);
-		}
-	);
+	f(client, stashInfo.name, dbPath, parentPath);
+}
+
+/**
+ * Put a file or directory into the Cassandra database.
+ */
+function putFile(p) {
+	doWithPath(p, function(client, stashName, dbPath, parentPath) {
+		const content = fs.readFileSync(p);
+
+		// TODO: make sure it does not already exist? require additional flag to update?
+		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
+			(pathname, parent, content) VALUES (?, ?, ?);`,
+			[dbPath, parentPath, content],
+			function(err, result) {
+				client.shutdown();
+				assert.ifError(err);
+			}
+		);
+	});
 }
 
 /**
@@ -180,6 +189,14 @@ function getFiles(pathnames) {
 	for(let p of pathnames) {
 		getFile(p);
 	}
+}
+
+function catFile(p) {
+
+}
+
+function catFiles(pathnames) {
+
 }
 
 function nukeFile(p) {
@@ -285,8 +302,12 @@ function initStash(stashPath, name) {
 		yield executeWithPromise(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
 			pathname text PRIMARY KEY,
 			parent text,
+			size bigint,
 			content blob,
-			sha256sum blob
+			sha256sum blob,
+			mtime timestamp,
+			crtime timestamp,
+			executable boolean
 		);`, []);
 
 		yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
@@ -306,4 +327,5 @@ function initStash(stashPath, name) {
 
 module.exports = {
 	initStash, ol, destroyKeyspace, listKeyspaces, putFile, putFiles, getFile, getFiles,
-	nukeFile, nukeFiles, lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}
+	catFile, catFiles, nukeFile, nukeFiles, lsPath, canonicalizePathname, getParentPath,
+	CASSANDRA_KEYSPACE_PREFIX}

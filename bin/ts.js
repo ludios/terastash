@@ -75,6 +75,15 @@ program
 	}));
 
 program
+	.command('cat <file...>')
+	.description(d(`
+		Dump the contents of a file in the database to stdout`))
+	.action(a(function(files) {
+		// TODO: support -n
+		terastash.catFiles(files);
+	}));
+
+program
 	.command('nuke <file...>')
 	.description(d(`
 		Removes file(s) from database and their corresponding chunks, if any.
