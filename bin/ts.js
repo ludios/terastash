@@ -84,14 +84,14 @@ program
 	}));
 
 program
-	.command('nuke <file...>')
+	.command('drop <file...>')
 	.description(d(`
-		Removes file(s) from database and their corresponding chunks, if any.
+		Removes file(s) from the database and their corresponding chunks, if any.
 		Does not emit error or warning if specified files are not in the database.
-		Does not remove corresponding local checkout of the file.`))
+		Does not remove the corresponding file in the stash directory, if it is there.`))
 	.action(a(function(files) {
 		// TODO: support -n
-		terastash.nukeFiles(files);
+		terastash.dropFiles(files);
 	}));
 
 program

@@ -121,18 +121,18 @@ function doWithPath(p, f) {
 	assert(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
-	f(client, stashInfo.name, dbPath, parentPath);
+	f(client, stashInfo, dbPath, parentPath);
 }
 
 /**
  * Put a file or directory into the Cassandra database.
  */
 function putFile(p) {
-	doWithPath(p, function(client, stashName, dbPath, parentPath) {
+	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
 		const content = fs.readFileSync(p);
 
 		// TODO: make sure it does not already exist? require additional flag to update?
-		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
+		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			(pathname, parent, content) VALUES (?, ?, ?);`,
 			[dbPath, parentPath, content],
 			function(err, result) {
@@ -156,30 +156,20 @@ function putFiles(pathnames) {
  * Get a file or directory from the Cassandra database.
  */
 function getFile(p) {
-	const resolvedPathname = path.resolve(p);
-	const stashInfo = findStashInfo(resolvedPathname);
-	if(!stashInfo) {
-		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
-	}
-	const dbPath = userPathToDatabasePath(stashInfo.path, p);
-	const parentPath = getParentPath(dbPath);
-	assert(!parentPath.startsWith('/'), parentPath);
-
-	const client = getNewClient();
-	// TODO: validate stashInfo.name - it may contain injection
-	// TODO: make sure it does not already exist? require additional flag to update?
-	client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-		WHERE pathname = ?;`,
-		[dbPath],
-		function(err, result) {
-			//console.log(result);
-			for(let row of result.rows) {
-				fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+		client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath],
+			function(err, result) {
+				//console.log(result);
+				for(let row of result.rows) {
+					fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+				}
+				client.shutdown();
+				assert.ifError(err);
 			}
-			client.shutdown();
-			assert.ifError(err);
-		}
-	);
+		);
+	});
 }
 
 /**
@@ -199,32 +189,25 @@ function catFiles(pathnames) {
 
 }
 
-function nukeFile(p) {
-	const resolvedPathname = path.resolve(p);
-	const stashInfo = findStashInfo(resolvedPathname);
-	if(!stashInfo) {
-		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
-	}
-	const dbPath = userPathToDatabasePath(stashInfo.path, p);
-
-	const client = getNewClient();
-	// TODO: validate stashInfo.name - it may contain injection
-	client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-		WHERE pathname = ?;`,
-		[dbPath],
-		function(err, result) {
-			client.shutdown();
-			assert.ifError(err);
-		}
-	);
+function dropFile(p) {
+	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+		client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath],
+			function(err, result) {
+				client.shutdown();
+				assert.ifError(err);
+			}
+		);
+	});
 }
 
 /**
  * Remove files from the Cassandra database and their corresponding chunks.
  */
-function nukeFiles(pathnames) {
+function dropFiles(pathnames) {
 	for(let p of pathnames) {
-		nukeFile(p);
+		dropFile(p);
 	}
 }
 
@@ -327,5 +310,5 @@ function initStash(stashPath, name) {
 
 module.exports = {
 	initStash, ol, destroyKeyspace, listKeyspaces, putFile, putFiles, getFile, getFiles,
-	catFile, catFiles, nukeFile, nukeFiles, lsPath, canonicalizePathname, getParentPath,
+	catFile, catFiles, dropFile, dropFiles, lsPath, canonicalizePathname, getParentPath,
 	CASSANDRA_KEYSPACE_PREFIX}
