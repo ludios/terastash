@@ -108,9 +108,9 @@ function lsPath(stashName, p) {
 }
 
 /**
- * Add a file into the Cassandra database.
+ * Put a file or directory into the Cassandra database.
  */
-function addFile(p) {
+function putFile(p) {
 	const resolvedPathname = path.resolve(p);
 	const content = fs.readFileSync(p);
 	const stashInfo = findStashInfo(resolvedPathname);
@@ -135,11 +135,50 @@ function addFile(p) {
 }
 
 /**
- * Add files into the Cassandra database.
+ * Put files or directories into the Cassandra database.
  */
-function addFiles(pathnames) {
+function putFiles(pathnames) {
 	for(let p of pathnames) {
-		addFile(p);
+		putFile(p);
+	}
+}
+
+/**
+ * Get a file or directory from the Cassandra database.
+ */
+function getFile(p) {
+	const resolvedPathname = path.resolve(p);
+	const stashInfo = findStashInfo(resolvedPathname);
+	if(!stashInfo) {
+		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
+	}
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+	const parentPath = getParentPath(dbPath);
+	assert(!parentPath.startsWith('/'), parentPath);
+
+	const client = getNewClient();
+	// TODO: validate stashInfo.name - it may contain injection
+	// TODO: make sure it does not already exist? require additional flag to update?
+	client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		WHERE pathname = ?;`,
+		[dbPath],
+		function(err, result) {
+			//console.log(result);
+			for(let row of result.rows) {
+				fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+			}
+			client.shutdown();
+			assert.ifError(err);
+		}
+	);
+}
+
+/**
+ * Get files or directories from the Cassandra database.
+ */
+function getFiles(pathnames) {
+	for(let p of pathnames) {
+		getFile(p);
 	}
 }
 
@@ -266,5 +305,5 @@ function initStash(stashPath, name) {
 }
 
 module.exports = {
-	initStash, ol, destroyKeyspace, listKeyspaces, addFile, addFiles, nukeFile, nukeFiles,
-	lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}
+	initStash, ol, destroyKeyspace, listKeyspaces, putFile, putFiles, getFile, getFiles,
+	nukeFile, nukeFiles, lsPath, canonicalizePathname, getParentPath, CASSANDRA_KEYSPACE_PREFIX}

@@ -55,13 +55,23 @@ program
 		terastash.destroyKeyspace(name);
 	}));
 
+/* It's 'add' instead of 'put' for left-hand-only typing */
 program
-	.command('add <file...>')
+	.command('add <path...>')
 	.description(d(`
-		Adds file(s) to database`))
+		Put a file or directory (recursively) into the database`))
 	.action(a(function(files) {
 		// TODO: support -n
-		terastash.addFiles(files);
+		terastash.putFiles(files);
+	}));
+
+program
+	.command('get <path...>')
+	.description(d(`
+		Get a file or directory (recursively) from the database`))
+	.action(a(function(files) {
+		// TODO: support -n
+		terastash.getFiles(files);
 	}));
 
 program
