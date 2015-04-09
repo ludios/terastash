@@ -61,37 +61,39 @@ program
 	.description(d(`
 		Put a file or directory (recursively) into the database`))
 	.action(a(function(files) {
-		// TODO: support -n
 		terastash.putFiles(files);
 	}));
 
 program
 	.command('get <path...>')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
 		Get a file or directory (recursively) from the database`))
-	.action(a(function(files) {
-		// TODO: support -n
-		terastash.getFiles(files);
+	.action(a(function(files, options) {
+		const name = stringOrNull(options.name);
+		terastash.getFiles(name, files);
 	}));
 
 program
 	.command('cat <file...>')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
 		Dump the contents of a file in the database to stdout`))
-	.action(a(function(files) {
-		// TODO: support -n
-		terastash.catFiles(files);
+	.action(a(function(files, options) {
+		const name = stringOrNull(options.name);
+		terastash.catFiles(name, files);
 	}));
 
 program
 	.command('drop <file...>')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
 		Removes file(s) from the database and their corresponding chunks, if any.
 		Does not emit error or warning if specified files are not in the database.
 		Does not remove the corresponding file in the stash directory, if it is there.`))
-	.action(a(function(files) {
-		// TODO: support -n
-		terastash.dropFiles(files);
+	.action(a(function(files, options) {
+		const name = stringOrNull(options.name);
+		terastash.dropFiles(name, files);
 	}));
 
 program
@@ -106,15 +108,19 @@ program
 			console.error("When using -n/--name, a database path is required");
 			process.exit(1);
 		}
-		terastash.lsPath(name, paths[0] || '.');
+		// When not using -n, and no path given, use '.'
+		if(name == null && paths[0] == null) {
+			paths[0] = '.';
+		}
+		terastash.lsPath(name, paths[0]);
 	}));
 
 program
-	.command('list-keyspaces')
+	.command('list-stashes')
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
 	.action(a(function(cmd, options) {
-		terastash.listKeyspaces();
+		terastash.listStashes();
 	}));
 
 program

@@ -40,7 +40,7 @@ function getTerastashConfig() {
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
  */
-function findStashInfo(pathname) {
+function findStashInfoByPath(pathname) {
 	const config = getTerastashConfig();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
 		throw new Error(`terastash config has no "stashes" or not an Array`)
@@ -50,6 +50,23 @@ function findStashInfo(pathname) {
 	for(let stash of config.stashes) {
 		//console.log(resolvedPathname, stash.path);
 		if(resolvedPathname.startsWith(stash.path)) {
+			return stash;
+		}
+	}
+	return null;
+}
+
+/**
+ * Return a stash for a given stash name
+ */
+function findStashInfoByName(stashName) {
+	const config = getTerastashConfig();
+	if(!config.stashes || !Array.isArray(config.stashes)) {
+		throw new Error(`terastash config has no "stashes" or not an Array`)
+	}
+
+	for(let stash of config.stashes) {
+		if(stash.name == stashName) {
 			return stash;
 		}
 	}
@@ -85,38 +102,40 @@ function userPathToDatabasePath(base, p) {
 }
 
 function lsPath(stashName, p) {
-	let dbPath;
-	if(stashName) { // Explicit stash name provided
-		dbPath = p;
-		p = canonicalizePathname(p);
-	} else {
-		const stashInfo = findStashInfo(p);
-		stashName = stashInfo.name;
-		dbPath = userPathToDatabasePath(stashInfo.path, p);
-	}
-	//console.log({stashName, dbPath})
-	const client = getNewClient();
-	client.execute(`SELECT pathname from "${CASSANDRA_KEYSPACE_PREFIX + stashName}".fs
-		WHERE parent = ?`,
-		[dbPath],
-		function(err, result) {
-			client.shutdown();
-			assert.ifError(err);
-			for(let row of result.rows) {
-				console.log(row.pathname);
+	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+		client.execute(`SELECT pathname from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE parent = ?`,
+			[dbPath],
+			function(err, result) {
+				client.shutdown();
+				assert.ifError(err);
+				for(let row of result.rows) {
+					console.log(row.pathname);
+				}
 			}
-		}
-	);
+		);
+	});
 }
 
-function doWithPath(p, f) {
+function doWithPath(stashName, p, f) {
 	const client = getNewClient();
 	const resolvedPathname = path.resolve(p);
-	const stashInfo = findStashInfo(resolvedPathname);
-	if(!stashInfo) {
-		throw new Error(`File ${p} is not inside a stash; edit terastash.json and add a stash`);
+	let dbPath;
+	let stashInfo;
+	if(stashName) { // Explicit stash name provided
+		stashInfo = findStashInfoByName(stashName);
+		if(!stashInfo) {
+			throw new Error(`No stash with name ${stashName}; consult terastash.json and ts help`);
+		}
+		dbPath = p;
+	} else {
+		stashInfo = findStashInfoByPath(resolvedPathname);
+		if(!stashInfo) {
+			throw new Error(`File ${p} is not in a stash directory; consult terastash.json and ts help`);
+		}
+		dbPath = userPathToDatabasePath(stashInfo.path, p);
 	}
-	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+
 	const parentPath = getParentPath(dbPath);
 	assert(!parentPath.startsWith('/'), parentPath);
 
@@ -128,7 +147,7 @@ function doWithPath(p, f) {
  * Put a file or directory into the Cassandra database.
  */
 function putFile(p) {
-	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+	doWithPath(null, p, function(client, stashInfo, dbPath, parentPath) {
 		const content = fs.readFileSync(p);
 
 		// TODO: make sure it does not already exist? require additional flag to update?
@@ -155,15 +174,21 @@ function putFiles(pathnames) {
 /**
  * Get a file or directory from the Cassandra database.
  */
-function getFile(p) {
-	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+function getFile(stashName, p) {
+	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
 			function(err, result) {
 				//console.log(result);
 				for(let row of result.rows) {
-					fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+					// TODO: create directories if needed
+					// If stashName was given, write file to current directory
+					if(stashName) {
+						fs.writeFileSync(row.pathname, row.content);
+					} else {
+						fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+					}
 				}
 				client.shutdown();
 				assert.ifError(err);
@@ -175,14 +200,14 @@ function getFile(p) {
 /**
  * Get files or directories from the Cassandra database.
  */
-function getFiles(pathnames) {
+function getFiles(stashName, pathnames) {
 	for(let p of pathnames) {
-		getFile(p);
+		getFile(stashName, p);
 	}
 }
 
-function catFile(p) {
-	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+function catFile(stashName, p) {
+	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		client.execute(`SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
@@ -197,14 +222,15 @@ function catFile(p) {
 	});
 }
 
-function catFiles(pathnames) {
+function catFiles(stashName, pathnames) {
 	for(let p of pathnames) {
-		catFile(p);
+		catFile(stashName, p);
 	}
 }
 
-function dropFile(p) {
-	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+function dropFile(stashName, p) {
+	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+		//console.log({stashInfo, dbPath, parentPath});
 		client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
@@ -219,16 +245,16 @@ function dropFile(p) {
 /**
  * Remove files from the Cassandra database and their corresponding chunks.
  */
-function dropFiles(pathnames) {
+function dropFiles(stashName, pathnames) {
 	for(let p of pathnames) {
-		dropFile(p);
+		dropFile(stashName, p);
 	}
 }
 
 /**
  * List all terastash keyspaces in Cassandra
  */
-function listKeyspaces() {
+function listStashes() {
 	const client = getNewClient();
 	// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 	client.execute(`SELECT keyspace_name FROM System.schema_keyspaces;`, [], function(err, result) {
@@ -323,6 +349,6 @@ function initStash(stashPath, name) {
 }
 
 module.exports = {
-	initStash, ol, destroyKeyspace, listKeyspaces, putFile, putFiles, getFile, getFiles,
+	initStash, ol, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
 	catFile, catFiles, dropFile, dropFiles, lsPath, canonicalizePathname, getParentPath,
 	CASSANDRA_KEYSPACE_PREFIX}
