@@ -182,11 +182,25 @@ function getFiles(pathnames) {
 }
 
 function catFile(p) {
-
+	doWithPath(p, function(client, stashInfo, dbPath, parentPath) {
+		client.execute(`SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath],
+			function(err, result) {
+				for(let row of result.rows) {
+					process.stdout.write(row.content);
+				}
+				client.shutdown();
+				assert.ifError(err);
+			}
+		);
+	});
 }
 
 function catFiles(pathnames) {
-
+	for(let p of pathnames) {
+		catFile(p);
+	}
 }
 
 function dropFile(p) {
