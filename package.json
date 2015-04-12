@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha --harmony test/test.js; echo 'Now running integration tests...'; cd test && python2 -S -B ../../hg-test-runner/run-tests.py"
+    "test": "./node_modules/.bin/mocha --harmony test/test.js; echo 'Now running integration tests...'; cd test && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
   },
   "bin": {
     "ts": "./bin/ts"

@@ -1,20 +1,38 @@
 Can add and drop a file
 
-  $ ts init ts_unit_tests
+  $ ts init unit_tests
   Created Cassandra keyspace and updated terastash.json.
-  $ touch empty
-  $ ts add empty
+  $ echo -e "hello\nworld" > sample
+  $ ts add sample
   $ ts ls
-  empty
-  $ ts drop empty
+  sample
+  $ ts cat sample
+  hello
+  world
+  $ rm -f sample
+  $ ls -1 sample
+  ls: cannot access sample: No such file or directory
+  [2]
+  $ ts get sample
+  $ ls -1 sample
+  sample
+  $ cat sample
+  hello
+  world
+  $ ts drop sample
   $ ts ls
 
 Dropping file again is a no-op
 
-  $ ts drop empty
+  $ ts drop sample
   $ ts ls
 
 Dropping nonexistent file is a no-op
 
   $ ts drop doesntexist
   $ ts ls
+
+Can destroy a terastash
+
+  $ ts destroy unit_tests
+  Destroyed keyspace ts_unit_tests.
