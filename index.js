@@ -7,6 +7,7 @@ const cassandra = require('cassandra-driver');
 const co = require('co');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
+const utils = require('./utils');
 
 const CASSANDRA_KEYSPACE_PREFIX = "ts_";
 
@@ -31,7 +32,7 @@ function getTerastashConfig() {
 		// If there is no config file, write one.
 		const config = {
 			stashes: [],
-			_comment: ol(`You cannot change the name of a stash because it must match
+			_comment: utils.ol(`You cannot change the name of a stash because it must match
 				the Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)};
 		writeTerastashConfig(config);
 		return config;
@@ -75,18 +76,6 @@ function findStashInfoByName(stashName) {
 	return null;
 }
 
-function getParentPath(path) {
-	const parts = path.split('/');
-	parts.pop();
-	return parts.join('/');
-}
-
-function canonicalizePathname(pathname) {
-	pathname = pathname.replace(/\/+/g, "/");
-	pathname = pathname.replace(/\/$/g, "");
-	return pathname;
-}
-
 /**
  * For any given relative user path, which may include ../, return
  * the corresponding path that should be used in the Cassandra
@@ -101,22 +90,6 @@ function userPathToDatabasePath(base, p) {
 		assert(!dbPath.startsWith('/'), dbPath);
 		return dbPath;
 	}
-}
-
-/**
- * ISO-ish string without the seconds
- */
-function shortISO(d) {
-	return d.toISOString().substr(0, 16).replace("T", " ");
-}
-
-function pad(s, wantLength) {
-	return " ".repeat(Math.max(0, wantLength - s.length)) + s;
-}
-
-// http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
-function numberWithCommas(s_or_n) {
-	return ("" + s_or_n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function lsPath(stashName, p) {
@@ -134,8 +107,8 @@ function lsPath(stashName, p) {
 						nameWithExec += '*';
 					}
 					console.log(
-						pad(numberWithCommas(row.size.toString()), 18) + " " +
-						shortISO(row.mtime) + " " +
+						utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
+						utils.shortISO(row.mtime) + " " +
 						nameWithExec
 					);
 				}
@@ -163,7 +136,7 @@ function doWithPath(stashName, p, f) {
 		dbPath = userPathToDatabasePath(stashInfo.path, p);
 	}
 
-	const parentPath = getParentPath(dbPath);
+	const parentPath = utils.getParentPath(dbPath);
 	assert(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
@@ -325,13 +298,6 @@ function destroyKeyspace(name) {
 // TODO: function to destroy all keyspaces that no longer have a matching .terastash.json file
 // TODO: need to store path to terastash base in a cassandra table
 
-/**
- * Convert string with newlines and tabs to one without.
- */
-function ol(s) {
-	return s.replace(/[\n\t]+/g, " ");
-}
-
 function executeWithPromise(client, statement, args) {
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, function(err, result) {
@@ -387,6 +353,5 @@ function initStash(stashPath, name) {
 }
 
 module.exports = {
-	initStash, ol, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
-	catFile, catFiles, dropFile, dropFiles, lsPath, canonicalizePathname, getParentPath,
-	CASSANDRA_KEYSPACE_PREFIX, pad}
+	initStash, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
+	catFile, catFiles, dropFile, dropFiles, lsPath, CASSANDRA_KEYSPACE_PREFIX}
