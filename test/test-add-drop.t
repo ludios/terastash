@@ -3,9 +3,10 @@ Can add and drop a file
   $ ts init unit_tests
   Created Cassandra keyspace and updated terastash.json.
   $ echo -e "hello\nworld" > sample
+  $ touch --date=1970-01-01 sample
   $ ts add sample
   $ ts ls
-  sample
+                  12 1970-01-01 00:00 sample
   $ ts cat sample
   hello
   world

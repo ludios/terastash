@@ -103,16 +103,45 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
+/**
+ * ISO-ish string without the seconds
+ */
+function shortISO(d) {
+	return d.toISOString().substr(0, 16).replace("T", " ");
+}
+
+function pad(s, wantLength) {
+	const len = s.length;
+	if(len >= wantLength) {
+		return s;
+	}
+	return " ".repeat(wantLength - len) + s;
+}
+
+// http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
+function numberWithCommas(s_or_n) {
+	return ("" + s_or_n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function lsPath(stashName, p) {
 	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		client.execute(`SELECT pathname from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		client.execute(`SELECT pathname, size, mtime, executable from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE parent = ?`,
 			[dbPath],
+			{prepare: true},
 			function(err, result) {
 				client.shutdown();
 				assert.ifError(err);
 				for(let row of result.rows) {
-					console.log(row.pathname);
+					let nameWithExec = row.pathname;
+					if(row.executable) {
+						nameWithExec += '*';
+					}
+					console.log(
+						pad(numberWithCommas(row.size.toString()), 18) + " " +
+						shortISO(row.mtime) + " " +
+						nameWithExec
+					);
 				}
 			}
 		);
@@ -156,12 +185,14 @@ function putFile(p) {
 		const content = fs.readFileSync(p);
 		const stat = fs.statSync(p);
 		const mtime = stat.mtime;
+		const size = content.length;
 		const executable = Boolean(stat.mode & S_IEXEC);
 
 		// TODO: make sure it does not already exist? require additional flag to update?
 		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			(pathname, parent, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, content, content.length, mtime, executable],
+			[dbPath, parentPath, content, size, mtime, executable],
+			{prepare: true},
 			function(err, result) {
 				client.shutdown();
 				assert.ifError(err);
@@ -187,6 +218,7 @@ function getFile(stashName, p) {
 		client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
+			{prepare: true},
 			function(err, result) {
 				//console.log(result);
 				for(let row of result.rows) {
@@ -219,6 +251,7 @@ function catFile(stashName, p) {
 		client.execute(`SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
+			{prepare: true},
 			function(err, result) {
 				for(let row of result.rows) {
 					process.stdout.write(row.content);
@@ -242,6 +275,7 @@ function dropFile(stashName, p) {
 		client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
+			{prepare: true},
 			function(err, result) {
 				client.shutdown();
 				assert.ifError(err);
@@ -359,4 +393,4 @@ function initStash(stashPath, name) {
 module.exports = {
 	initStash, ol, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
 	catFile, catFiles, dropFile, dropFiles, lsPath, canonicalizePathname, getParentPath,
-	CASSANDRA_KEYSPACE_PREFIX}
+	CASSANDRA_KEYSPACE_PREFIX, pad}
