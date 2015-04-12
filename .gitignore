@@ -1,2 +1,4 @@
 /node_modules
 /.terastash.json
+/test/*.err
+/trash

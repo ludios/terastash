@@ -5,6 +5,7 @@ const assert = require('assert');
 const path = require('path');
 const cassandra = require('cassandra-driver');
 const co = require('co');
+const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 
 const CASSANDRA_KEYSPACE_PREFIX = "ts_";
@@ -15,6 +16,7 @@ function getNewClient() {
 
 function writeTerastashConfig(config) {
 	const configPath = basedir.configPath("terastash.json");
+	mkdirp(path.dirname(configPath));
 	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
@@ -312,7 +314,7 @@ function executeWithPromise(client, statement, args) {
 function initStash(stashPath, name) {
 	assertName(name);
 
-	if(findStashInfo(stashPath)) {
+	if(findStashInfoByPath(stashPath)) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
