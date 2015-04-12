@@ -111,11 +111,7 @@ function shortISO(d) {
 }
 
 function pad(s, wantLength) {
-	const len = s.length;
-	if(len >= wantLength) {
-		return s;
-	}
-	return " ".repeat(wantLength - len) + s;
+	return " ".repeat(Math.max(0, wantLength - s.length)) + s;
 }
 
 // http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
