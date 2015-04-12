@@ -1,5 +1,5 @@
-import * as terastash from '..';
-import assert from 'assert';
+const terastash = require('..');
+const assert = require('assert');
 
 describe('getParentPath', function() {
 	it('should return the parent path', function() {
