@@ -145,17 +145,23 @@ function doWithPath(stashName, p, f) {
 	f(client, stashInfo, dbPath, parentPath);
 }
 
+/* also called S_IXUSR */
+const S_IEXEC = parseInt('0100', 8);
+
 /**
  * Put a file or directory into the Cassandra database.
  */
 function putFile(p) {
 	doWithPath(null, p, function(client, stashInfo, dbPath, parentPath) {
 		const content = fs.readFileSync(p);
+		const stat = fs.statSync(p);
+		const mtime = stat.mtime;
+		const executable = Boolean(stat.mode & S_IEXEC);
 
 		// TODO: make sure it does not already exist? require additional flag to update?
 		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, content) VALUES (?, ?, ?);`,
-			[dbPath, parentPath, content],
+			(pathname, parent, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?);`,
+			[dbPath, parentPath, content, content.length, mtime, executable],
 			function(err, result) {
 				client.shutdown();
 				assert.ifError(err);
