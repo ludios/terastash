@@ -117,7 +117,7 @@ function lsPath(stashName, p) {
 	});
 }
 
-function doWithPath(stashName, p, f) {
+function doWithPath(stashName, p, fn) {
 	const client = getNewClient();
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
@@ -140,7 +140,7 @@ function doWithPath(stashName, p, f) {
 	assert(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
-	f(client, stashInfo, dbPath, parentPath);
+	fn(client, stashInfo, dbPath, parentPath);
 }
 
 /* also called S_IXUSR */
