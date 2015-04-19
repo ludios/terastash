@@ -341,7 +341,7 @@ function initStash(stashPath, name) {
 
 	const client = getNewClient();
 
-	co(function*(){
+	co(function*() {
 		yield executeWithPromise(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
