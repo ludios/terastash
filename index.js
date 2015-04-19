@@ -192,13 +192,11 @@ function doWithClient(f) {
  * Put files or directories into the Cassandra database.
  */
 function putFiles(pathnames) {
-	return doWithClient(function(client) {
-		return co(function*() {
-			for(let p of pathnames) {
-				yield putFile(client, p);
-			}
-		})
-	});
+	return doWithClient(co.wrap(function*(client) {
+		for(let p of pathnames) {
+			yield putFile(client, p);
+		}
+	}));
 }
 
 /**
@@ -228,13 +226,11 @@ function getFile(client, stashName, p) {
 }
 
 function getFiles(stashName, pathnames) {
-	return doWithClient(function(client) {
-		return co(function*() {
-			for(let p of pathnames) {
-				yield getFile(client, stashName, p);
-			}
-		})
-	});
+	return doWithClient(co.wrap(function*(client) {
+		for(let p of pathnames) {
+			yield getFile(client, stashName, p);
+		}
+	}));
 }
 
 function catFile(client, stashName, p) {
@@ -251,13 +247,11 @@ function catFile(client, stashName, p) {
 }
 
 function catFiles(stashName, pathnames) {
-	return doWithClient(function(client) {
-		return co(function*() {
-			for(let p of pathnames) {
-				yield catFile(client, stashName, p);
-			}
-		})
-	});
+	return doWithClient(co.wrap(function*(client) {
+		for(let p of pathnames) {
+			yield catFile(client, stashName, p);
+		}
+	}));
 }
 
 function dropFile(client, stashName, p) {
@@ -276,13 +270,11 @@ function dropFile(client, stashName, p) {
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, pathnames) {
-	return doWithClient(function(client) {
-		return co(function*() {
-			for(let p of pathnames) {
-				yield dropFile(client, stashName, p);
-			}
-		})
-	});
+	return doWithClient(co.wrap(function*(client) {
+		for(let p of pathnames) {
+			yield dropFile(client, stashName, p);
+		}
+	}));
 }
 
 /**
@@ -358,34 +350,32 @@ function initStash(stashPath, name) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	return doWithClient(function(client) {
-		return co(function*() {
-			yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
-				WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
+	return doWithClient(co.wrap(function*(client) {
+		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
+			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
-			yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
-				pathname text PRIMARY KEY,
-				parent text,
-				size bigint,
-				content blob,
-				chunks list<blob>,
-				checksum blob,
-				password blob,
-				mtime timestamp,
-				crtime timestamp,
-				executable boolean
-			);`, []);
+		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+			pathname text PRIMARY KEY,
+			parent text,
+			size bigint,
+			content blob,
+			chunks list<blob>,
+			checksum blob,
+			password blob,
+			mtime timestamp,
+			crtime timestamp,
+			executable boolean
+		);`, []);
 
-			yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
-				ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
+		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
+			ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
-			const config = getTerastashConfig();
-			config['stashes'].push({name, path: path.resolve(stashPath)});
-			writeTerastashConfig(config);
+		const config = getTerastashConfig();
+		config['stashes'].push({name, path: path.resolve(stashPath)});
+		writeTerastashConfig(config);
 
-			console.log("Created Cassandra keyspace and updated terastash.json.");
-		});
-	});
+		console.log("Created Cassandra keyspace and updated terastash.json.");
+	}));
 }
 
 module.exports = {
