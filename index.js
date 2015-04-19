@@ -366,9 +366,9 @@ function initStash(stashPath, name) {
 		writeTerastashConfig(config);
 
 		console.log("Created Cassandra keyspace and updated terastash.json.");
-		client.shutdown();
 	}).catch(function(err) {
-		console.error(err);
+		console.error(err.stack);
+	}).then(function() {
 		client.shutdown();
 	});
 }
