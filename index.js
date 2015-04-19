@@ -93,7 +93,8 @@ function userPathToDatabasePath(base, p) {
 }
 
 function lsPath(stashName, p) {
-	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+	const client = getNewClient();
+	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		client.execute(`SELECT pathname, size, mtime, executable from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE parent = ?`,
 			[dbPath],
@@ -117,8 +118,7 @@ function lsPath(stashName, p) {
 	});
 }
 
-function doWithPath(stashName, p, fn) {
-	const client = getNewClient();
+function doWithPath(client, stashName, p, fn) {
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
@@ -140,7 +140,7 @@ function doWithPath(stashName, p, fn) {
 	assert(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
-	fn(client, stashInfo, dbPath, parentPath);
+	return fn(client, stashInfo, dbPath, parentPath);
 }
 
 /* also called S_IXUSR */
@@ -150,13 +150,11 @@ function shouldStoreInChunks(p, stat) {
 	return stat.size > 200*1024;
 }
 
-
-
 /**
  * Put a file or directory into the Cassandra database.
  */
-function putFile(p) {
-	doWithPath(null, p, function(client, stashInfo, dbPath, parentPath) {
+function putFile(client, p) {
+	return doWithPath(client, null, p, function(client, stashInfo, dbPath, parentPath) {
 		const stat = fs.statSync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & S_IEXEC);
@@ -173,14 +171,9 @@ function putFile(p) {
 		}
 
 		// TODO: make sure it does not already exist? require additional flag to update?
-		client.execute(`INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		return executeWithPromise(client, `INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			(pathname, parent, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, content, size, mtime, executable],
-			{prepare: true},
-			function(err, result) {
-				client.shutdown();
-				assert.ifError(err);
-			}
+			[dbPath, parentPath, content, size, mtime, executable]
 		);
 	});
 }
@@ -189,16 +182,23 @@ function putFile(p) {
  * Put files or directories into the Cassandra database.
  */
 function putFiles(pathnames) {
-	for(let p of pathnames) {
-		putFile(p);
-	}
+	const client = getNewClient();
+	return co(function* () {
+		for(let p of pathnames) {
+			yield putFile(client, p);
+		}
+	}).catch(function(err) {
+		console.error(err.stack);
+	}).then(function() {
+		client.shutdown();
+	});
 }
 
 /**
  * Get a file or directory from the Cassandra database.
  */
-function getFile(stashName, p) {
-	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+function getFile(client, stashName, p) {
+	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
@@ -225,13 +225,14 @@ function getFile(stashName, p) {
  * Get files or directories from the Cassandra database.
  */
 function getFiles(stashName, pathnames) {
+	const client = getNewClient();
 	for(let p of pathnames) {
-		getFile(stashName, p);
+		getFile(client, stashName, p);
 	}
 }
 
-function catFile(stashName, p) {
-	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+function catFile(client, stashName, p) {
+	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		client.execute(`SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath],
@@ -248,13 +249,14 @@ function catFile(stashName, p) {
 }
 
 function catFiles(stashName, pathnames) {
+	const client = getNewClient();
 	for(let p of pathnames) {
-		catFile(stashName, p);
+		catFile(client, stashName, p);
 	}
 }
 
-function dropFile(stashName, p) {
-	doWithPath(stashName, p, function(client, stashInfo, dbPath, parentPath) {
+function dropFile(client, stashName, p) {
+	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		//console.log({stashInfo, dbPath, parentPath});
 		client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
@@ -272,8 +274,9 @@ function dropFile(stashName, p) {
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, pathnames) {
+	const client = getNewClient();
 	for(let p of pathnames) {
-		dropFile(stashName, p);
+		dropFile(client, stashName, p);
 	}
 }
 
@@ -314,8 +317,9 @@ function destroyKeyspace(name) {
 // TODO: need to store path to terastash base in a cassandra table
 
 function executeWithPromise(client, statement, args) {
+	//console.log('executeWithPromise(%s, %s, %s)', client, statement, args);
 	return new Promise(function(resolve, reject) {
-		client.execute(statement, args, function(err, result) {
+		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
 				reject(err);
 			} else {
@@ -346,7 +350,8 @@ function initStash(stashPath, name) {
 			parent text,
 			size bigint,
 			content blob,
-			sha256sum blob,
+			chunks list<blob>,
+			checksum blob,
 			password blob,
 			mtime timestamp,
 			crtime timestamp,
