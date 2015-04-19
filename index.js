@@ -264,16 +264,13 @@ function catFiles(stashName, pathnames) {
 }
 
 function dropFile(client, stashName, p) {
-	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		//console.log({stashInfo, dbPath, parentPath});
-		client.execute(`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		return executeWithPromise(
+			client,
+			`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
-			[dbPath],
-			{prepare: true},
-			function(err, result) {
-				client.shutdown();
-				assert.ifError(err);
-			}
+			[dbPath]
 		);
 	});
 }
@@ -282,10 +279,13 @@ function dropFile(client, stashName, p) {
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, pathnames) {
-	const client = getNewClient();
-	for(let p of pathnames) {
-		dropFile(client, stashName, p);
-	}
+	return doWithClient(function(client) {
+		return co(function*() {
+			for(let p of pathnames) {
+				yield dropFile(client, stashName, p);
+			}
+		})
+	});
 }
 
 /**
