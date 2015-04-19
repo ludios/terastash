@@ -95,7 +95,7 @@ function userPathToDatabasePath(base, p) {
 function lsPath(stashName, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-			return executeWithPromise(
+			return runQuery(
 				client,
 				`SELECT pathname, size, mtime, executable
 				from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
@@ -171,7 +171,7 @@ function putFile(client, p) {
 		}
 
 		// TODO: make sure it does not already exist? require additional flag to update?
-		return executeWithPromise(client, `INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		return runQuery(client, `INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			(pathname, parent, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?);`,
 			[dbPath, parentPath, content, size, mtime, executable]
 		);
@@ -206,7 +206,7 @@ function putFiles(pathnames) {
  */
 function getFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return executeWithPromise(
+		return runQuery(
 			client,
 			`SELECT pathname, content
 			FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
@@ -239,7 +239,7 @@ function getFiles(stashName, pathnames) {
 
 function catFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return executeWithPromise(client, `SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		return runQuery(client, `SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
@@ -263,7 +263,7 @@ function catFiles(stashName, pathnames) {
 function dropFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		//console.log({stashInfo, dbPath, parentPath});
-		return executeWithPromise(
+		return runQuery(
 			client,
 			`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
@@ -291,7 +291,7 @@ function dropFiles(stashName, pathnames) {
 function listStashes() {
 	return doWithClient(function(client) {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
-		return executeWithPromise(
+		return runQuery(
 			client,
 			`SELECT keyspace_name FROM System.schema_keyspaces;`,
 			[]
@@ -314,7 +314,7 @@ function assertName(name) {
 function destroyKeyspace(name) {
 	assertName(name);
 	return doWithClient(function(client) {
-		return executeWithPromise(
+		return runQuery(
 			client,
 			`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`,
 			[]
@@ -327,8 +327,12 @@ function destroyKeyspace(name) {
 // TODO: function to destroy all keyspaces that no longer have a matching .terastash.json file
 // TODO: need to store path to terastash base in a cassandra table
 
-function executeWithPromise(client, statement, args) {
-	//console.log('executeWithPromise(%s, %s, %s)', client, statement, args);
+/**
+ * Run a Cassandra query and return a Promise that is fulfilled
+ * with the query results.
+ */
+function runQuery(client, statement, args) {
+	//console.log('runQuery(%s, %s, %s)', client, statement, args);
 	assert(typeof client == 'object');
 	assert(typeof statement == 'string');
 	assert(Array.isArray(args));
@@ -356,10 +360,10 @@ function initStash(stashPath, name) {
 
 	return doWithClient(function(client) {
 		return co(function*() {
-			yield executeWithPromise(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
+			yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
 				WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
-			yield executeWithPromise(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+			yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
 				pathname text PRIMARY KEY,
 				parent text,
 				size bigint,
@@ -372,7 +376,7 @@ function initStash(stashPath, name) {
 				executable boolean
 			);`, []);
 
-			yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
+			yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
 				ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
 			const config = getTerastashConfig();
