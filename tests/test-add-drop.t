@@ -44,14 +44,16 @@ Can add and drop a file
 
 Parent directories are automatically created as needed
 
-  $ mkdir dir
-  $ touch dir/empty
-  $ ts add dir/empty
-  $ ts ls -j dir
+  $ mkdir -p d1/d2/d3
+  $ touch d1/d2/d3/empty
+  $ ts add d1/d2/d3/empty
+  $ ts ls -j d1
+  d2
+  $ ts ls -j d1/d2
+  d3
+  $ ts ls -j d1/d2/d3
   empty
-  $ ts ls -j
-  dir
-  $ ts drop dir
+  $ ts drop d1
 
 Dropping file again is a no-op
 
