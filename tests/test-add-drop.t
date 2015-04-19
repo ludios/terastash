@@ -2,30 +2,46 @@ Can add and drop a file
 
   $ ts init unit_tests
   Created Cassandra keyspace and updated terastash.json.
-  $ echo -e "hello\nworld" > sample
-  $ touch --date=1970-01-01 sample
-  $ ts add sample
+  $ echo -e "hello\nworld" > sample1
+  $ touch --date=1970-01-01 sample1
+  $ echo -e "second\nsample" > sample2
+  $ touch --date=1980-01-01 sample2
+  $ ts add sample1 sample2
   $ ts ls
-                  12 1970-01-01 00:00 sample
-  $ ts cat sample
+                  14 1980-01-01 00:00 sample2
+                  12 1970-01-01 00:00 sample1
+  $ ts cat sample1
   hello
   world
-  $ rm -f sample
-  $ ls -1 sample
-  ls: cannot access sample: No such file or directory
-  [2]
-  $ ts get sample
-  $ ls -1 sample
+  $ ts cat sample1 sample2
+  hello
+  world
+  second
   sample
-  $ cat sample
+  $ ts cat sample2 sample1
+  second
+  sample
   hello
   world
-  $ ts drop sample
+  $ rm -f sample1
+  $ ls -1 sample1
+  ls: cannot access sample1: No such file or directory
+  [2]
+  $ ts get sample1
+  $ ls -1 sample1
+  sample1
+  $ cat sample1
+  hello
+  world
+  $ ts drop sample1
+  $ ts ls
+                  14 1980-01-01 00:00 sample2
+  $ ts drop sample2
   $ ts ls
 
 Dropping file again is a no-op
 
-  $ ts drop sample
+  $ ts drop sample1
   $ ts ls
 
 Dropping nonexistent file is a no-op
