@@ -93,30 +93,27 @@ function userPathToDatabasePath(base, p) {
 }
 
 function lsPath(stashName, p) {
-	const client = getNewClient();
-	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return executeWithPromise(
-			client,
-			`SELECT pathname, size, mtime, executable
-			from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE parent = ?`,
-			[dbPath]
-		).then(function(result) {
-			for(let row of result.rows) {
-				let nameWithExec = row.pathname;
-				if(row.executable) {
-					nameWithExec += '*';
+	return doWithClient(function(client) {
+		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+			return executeWithPromise(
+				client,
+				`SELECT pathname, size, mtime, executable
+				from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+				WHERE parent = ?`,
+				[dbPath]
+			).then(function(result) {
+				for(let row of result.rows) {
+					let nameWithExec = row.pathname;
+					if(row.executable) {
+						nameWithExec += '*';
+					}
+					console.log(
+						utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
+						utils.shortISO(row.mtime) + " " +
+						nameWithExec
+					);
 				}
-				console.log(
-					utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
-					utils.shortISO(row.mtime) + " " +
-					nameWithExec
-				);
-			}
-		}).catch(function(err) {
-			console.error(err.stack);
-		}).then(function() {
-			client.shutdown();
+			})
 		});
 	});
 }
