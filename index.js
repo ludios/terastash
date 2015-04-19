@@ -241,27 +241,26 @@ function getFiles(stashName, pathnames) {
 }
 
 function catFile(client, stashName, p) {
-	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		client.execute(`SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+		return executeWithPromise(client, `SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
-			[dbPath],
-			{prepare: true},
-			function(err, result) {
-				for(let row of result.rows) {
-					process.stdout.write(row.content);
-				}
-				client.shutdown();
-				assert.ifError(err);
+			[dbPath]
+		).then(function(result) {
+			for(let row of result.rows) {
+				process.stdout.write(row.content);
 			}
-		);
+		});
 	});
 }
 
 function catFiles(stashName, pathnames) {
-	const client = getNewClient();
-	for(let p of pathnames) {
-		catFile(client, stashName, p);
-	}
+	return doWithClient(function(client) {
+		return co(function*() {
+			for(let p of pathnames) {
+				yield catFile(client, stashName, p);
+			}
+		})
+	});
 }
 
 function dropFile(client, stashName, p) {
