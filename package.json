@@ -12,7 +12,7 @@
   "author": "Ivan Kozik",
   "dependencies": {
     "cassandra-driver": "^2.0.1",
-    "co": "^4.5.1",
+    "co": "^4.5.2",
     "commander": "^2.7.1",
     "xdg": "^0.1.1"
   },
