@@ -181,16 +181,10 @@ function putFile(client, p) {
 	});
 }
 
-/**
- * Put files or directories into the Cassandra database.
- */
-function putFiles(pathnames) {
+function doWithClient(f) {
 	const client = getNewClient();
-	return co(function* () {
-		for(let p of pathnames) {
-			yield putFile(client, p);
-		}
-	}).catch(function(err) {
+	const p = f(client);
+	return p.catch(function(err) {
 		console.error(err.stack);
 	}).then(function() {
 		client.shutdown();
@@ -198,40 +192,52 @@ function putFiles(pathnames) {
 }
 
 /**
- * Get a file or directory from the Cassandra database.
+ * Put files or directories into the Cassandra database.
  */
-function getFile(client, stashName, p) {
-	doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		client.execute(`SELECT pathname, content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath],
-			{prepare: true},
-			function(err, result) {
-				//console.log(result);
-				for(let row of result.rows) {
-					// TODO: create directories if needed
-					// If stashName was given, write file to current directory
-					if(stashName) {
-						fs.writeFileSync(row.pathname, row.content);
-					} else {
-						fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
-					}
-				}
-				client.shutdown();
-				assert.ifError(err);
+function putFiles(pathnames) {
+	return doWithClient(function(client) {
+		return co(function*() {
+			for(let p of pathnames) {
+				yield putFile(client, p);
 			}
-		);
+		})
 	});
 }
 
 /**
- * Get files or directories from the Cassandra database.
+ * Get a file or directory from the Cassandra database.
  */
+function getFile(client, stashName, p) {
+	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+		return executeWithPromise(
+			client,
+			`SELECT pathname, content
+			FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath]
+		).then(function(result) {
+			//console.log(result);
+			for(let row of result.rows) {
+				// TODO: create directories if needed
+				// If stashName was given, write file to current directory
+				if(stashName) {
+					fs.writeFileSync(row.pathname, row.content);
+				} else {
+					fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+				}
+			}
+		});
+	});
+}
+
 function getFiles(stashName, pathnames) {
-	const client = getNewClient();
-	for(let p of pathnames) {
-		getFile(client, stashName, p);
-	}
+	return doWithClient(function(client) {
+		return co(function*() {
+			for(let p of pathnames) {
+				yield getFile(client, stashName, p);
+			}
+		})
+	});
 }
 
 function catFile(client, stashName, p) {
