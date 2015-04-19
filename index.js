@@ -292,17 +292,20 @@ function dropFiles(stashName, pathnames) {
  * List all terastash keyspaces in Cassandra
  */
 function listStashes() {
-	const client = getNewClient();
-	// TODO: also display durable_writes, strategy_class, strategy_options  info in table
-	client.execute(`SELECT keyspace_name FROM System.schema_keyspaces;`, [], function(err, result) {
-		client.shutdown();
-		assert.ifError(err);
-		for(let row of result.rows) {
-			const name = row.keyspace_name;
-			if(name.startsWith(CASSANDRA_KEYSPACE_PREFIX)) {
-				console.log(name.replace(CASSANDRA_KEYSPACE_PREFIX, ""));
+	return doWithClient(function(client) {
+		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
+		return executeWithPromise(
+			client,
+			`SELECT keyspace_name FROM System.schema_keyspaces;`,
+			[]
+		).then(function(result) {
+			for(let row of result.rows) {
+				const name = row.keyspace_name;
+				if(name.startsWith(CASSANDRA_KEYSPACE_PREFIX)) {
+					console.log(name.replace(CASSANDRA_KEYSPACE_PREFIX, ""));
+				}
 			}
-		}
+		});
 	});
 }
 

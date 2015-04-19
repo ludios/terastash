@@ -49,7 +49,17 @@ Dropping nonexistent file is a no-op
   $ ts drop doesntexist
   $ ts ls
 
+Can list stashes
+
+  $ ts list-stashes | grep -P '^unit_tests$'
+  unit_tests
+
 Can destroy a terastash
 
   $ ts destroy unit_tests
   Destroyed keyspace ts_unit_tests.
+
+Stash is not listed after being destroyed
+
+  $ ts list-stashes | grep -P '^unit_tests$'
+  [1]
