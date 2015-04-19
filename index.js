@@ -11,7 +11,7 @@ const chalk = require('chalk');
 
 const utils = require('./utils');
 
-const CASSANDRA_KEYSPACE_PREFIX = "ts_";
+const KEYSPACE_PREFIX = "ts_";
 
 function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
@@ -99,22 +99,26 @@ function lsPath(stashName, justNames, p) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 			return runQuery(
 				client,
-				`SELECT pathname, size, mtime, executable
-				from "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+				`SELECT pathname, type, size, mtime, executable
+				from "${KEYSPACE_PREFIX + stashInfo.name}".fs
 				WHERE parent = ?`,
 				[dbPath]
 			).then(function(result) {
 				for(let row of result.rows) {
+					const baseName = utils.getBaseName(row.pathname);
 					if(justNames) {
-						console.log(row.pathname);
+						console.log(baseName);
 					} else {
-						let decoratedName = row.pathname;
-						if(row.executable) {
+						let decoratedName = baseName;
+						if(row.type == 'd') {
+							decoratedName = chalk.bold.blue(decoratedName);
+							decoratedName += '/';
+						} else if(row.executable) {
 							decoratedName = chalk.bold.green(decoratedName);
 							decoratedName += '*';
 						}
 						console.log(
-							utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
+							utils.pad(utils.numberWithCommas((row.size || 0).toString()), 18) + " " +
 							utils.shortISO(row.mtime) + " " +
 							decoratedName
 						);
@@ -157,11 +161,40 @@ function shouldStoreInChunks(p, stat) {
 	return stat.size > 200*1024;
 }
 
+function doWithClient(f) {
+	const client = getNewClient();
+	const p = f(client);
+	return p.catch(function(err) {
+		console.error(err.stack);
+	}).then(function() {
+		client.shutdown();
+	});
+}
+
+function makeDirs(client, stashInfo, p, dbPath) {
+	return co(function*() {
+		const type = 'd';
+		const stat = fs.statSync(p);
+		const mtime = stat.mtime;
+		const parentPath = utils.getParentPath(dbPath);
+		if(parentPath) {
+			yield makeDirs(client, stashInfo, p, parentPath);
+		}
+		yield runQuery(
+			client,
+			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+			(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
+			[dbPath, parentPath, type, mtime]
+		);
+	});
+}
+
 /**
  * Put a file or directory into the Cassandra database.
  */
 function putFile(client, p) {
-	return doWithPath(client, null, p, function(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(client, null, p, co.wrap(function*(client, stashInfo, dbPath, parentPath) {
+		const type = 'f';
 		const stat = fs.statSync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & S_IEXEC);
@@ -177,22 +210,18 @@ function putFile(client, p) {
 			size = content.length;
 		}
 
-		// TODO: make sure it does not already exist? require additional flag to update?
-		return runQuery(client, `INSERT INTO "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, content, size, mtime, executable]
-		);
-	});
-}
+		if(parentPath) {
+			yield makeDirs(client, stashInfo, path.dirname(p), parentPath);
+		}
 
-function doWithClient(f) {
-	const client = getNewClient();
-	const p = f(client);
-	return p.catch(function(err) {
-		console.error(err.stack);
-	}).then(function() {
-		client.shutdown();
-	});
+		// TODO: make sure it does not already exist? require additional flag to update?
+		yield runQuery(
+			client,
+			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+			(pathname, parent, type, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+			[dbPath, parentPath, type, content, size, mtime, executable]
+		);
+	}));
 }
 
 /**
@@ -214,7 +243,7 @@ function getFile(client, stashName, p) {
 		return runQuery(
 			client,
 			`SELECT pathname, content
-			FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
@@ -242,7 +271,9 @@ function getFiles(stashName, pathnames) {
 
 function catFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return runQuery(client, `SELECT content FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+		return runQuery(
+			client,
+			`SELECT content FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
@@ -266,7 +297,7 @@ function dropFile(client, stashName, p) {
 		//console.log({stashInfo, dbPath, parentPath});
 		return runQuery(
 			client,
-			`DELETE FROM "${CASSANDRA_KEYSPACE_PREFIX + stashInfo.name}".fs
+			`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		);
@@ -297,8 +328,8 @@ function listStashes() {
 		).then(function(result) {
 			for(let row of result.rows) {
 				const name = row.keyspace_name;
-				if(name.startsWith(CASSANDRA_KEYSPACE_PREFIX)) {
-					console.log(name.replace(CASSANDRA_KEYSPACE_PREFIX, ""));
+				if(name.startsWith(KEYSPACE_PREFIX)) {
+					console.log(name.replace(KEYSPACE_PREFIX, ""));
 				}
 			}
 		});
@@ -315,10 +346,10 @@ function destroyKeyspace(name) {
 	return doWithClient(function(client) {
 		return runQuery(
 			client,
-			`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`,
+			`DROP KEYSPACE "${KEYSPACE_PREFIX + name}";`,
 			[]
 		).then(function() {
-			console.log(`Destroyed keyspace ${CASSANDRA_KEYSPACE_PREFIX + name}.`);
+			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + name}.`);
 		});
 	});
 }
@@ -358,11 +389,12 @@ function initStash(stashPath, name) {
 	}
 
 	return doWithClient(co.wrap(function*(client) {
-		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
+		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + name}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
-		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + name}".fs (
 			pathname text PRIMARY KEY,
+			type ascii,
 			parent text,
 			size bigint,
 			content blob,
@@ -375,7 +407,7 @@ function initStash(stashPath, name) {
 		);`, []);
 
 		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
-			ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
+			ON "${KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
 		const config = getTerastashConfig();
 		config['stashes'].push({name, path: path.resolve(stashPath)});
@@ -387,4 +419,4 @@ function initStash(stashPath, name) {
 
 module.exports = {
 	initStash, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
-	catFile, catFiles, dropFile, dropFiles, lsPath, CASSANDRA_KEYSPACE_PREFIX}
+	catFile, catFiles, dropFile, dropFiles, lsPath, KEYSPACE_PREFIX}

@@ -3,7 +3,9 @@ const assert = require('assert');
 
 describe('getParentPath', function() {
 	it('should return the parent path', function() {
-		assert.equal('/blah', utils.getParentPath('/blah/child'))
+		assert.equal('blah', utils.getParentPath('blah/child'));
+		assert.equal('', utils.getParentPath('blah'));
+		assert.equal('', utils.getParentPath(''));
 	});
 });
 

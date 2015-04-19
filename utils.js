@@ -24,10 +24,18 @@ function getParentPath(path) {
 }
 
 /**
+ * '/'-based operation on all OSes
+ */
+function getBaseName(path) {
+	const parts = path.split('/');
+	return parts[parts.length - 1];
+}
+
+/**
  * Convert string with newlines and tabs to one without.
  */
 function ol(s) {
 	return s.replace(/[\n\t]+/g, " ");
 }
 
-module.exports = {shortISO, pad, numberWithCommas, getParentPath, ol};
+module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol};

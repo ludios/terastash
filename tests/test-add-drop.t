@@ -42,6 +42,17 @@ Can add and drop a file
   $ ts drop sample2
   $ ts ls
 
+Parent directories are automatically created as needed
+
+  $ mkdir dir
+  $ touch dir/empty
+  $ ts add dir/empty
+  $ ts ls -j dir
+  empty
+  $ ts ls -j
+  dir
+  $ ts drop dir
+
 Dropping file again is a no-op
 
   $ ts drop sample1
