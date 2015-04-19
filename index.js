@@ -353,37 +353,33 @@ function initStash(stashPath, name) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	const client = getNewClient();
+	return doWithClient(function(client) {
+		return co(function*() {
+			yield executeWithPromise(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
+				WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
-	co(function*() {
-		yield executeWithPromise(client, `CREATE KEYSPACE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}"
-			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
+			yield executeWithPromise(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
+				pathname text PRIMARY KEY,
+				parent text,
+				size bigint,
+				content blob,
+				chunks list<blob>,
+				checksum blob,
+				password blob,
+				mtime timestamp,
+				crtime timestamp,
+				executable boolean
+			);`, []);
 
-		yield executeWithPromise(client, `CREATE TABLE IF NOT EXISTS "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (
-			pathname text PRIMARY KEY,
-			parent text,
-			size bigint,
-			content blob,
-			chunks list<blob>,
-			checksum blob,
-			password blob,
-			mtime timestamp,
-			crtime timestamp,
-			executable boolean
-		);`, []);
+			yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
+				ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
-		yield executeWithPromise(client, `CREATE INDEX IF NOT EXISTS fs_parent
-			ON "${CASSANDRA_KEYSPACE_PREFIX + name}".fs (parent);`, []);
+			const config = getTerastashConfig();
+			config['stashes'].push({name, path: path.resolve(stashPath)});
+			writeTerastashConfig(config);
 
-		const config = getTerastashConfig();
-		config['stashes'].push({name, path: path.resolve(stashPath)});
-		writeTerastashConfig(config);
-
-		console.log("Created Cassandra keyspace and updated terastash.json.");
-	}).catch(function(err) {
-		console.error(err.stack);
-	}).then(function() {
-		client.shutdown();
+			console.log("Created Cassandra keyspace and updated terastash.json.");
+		});
 	});
 }
 
