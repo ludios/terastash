@@ -101,6 +101,7 @@ program
 	.description(d(`
 		List directory in the database`))
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-j, --just-names', 'Print just the filenames without any decoration')
 	.action(a(function(paths, options) {
 		//console.log({cmd, options}); process.exit();
 		const name = stringOrNull(options.name);
@@ -112,7 +113,7 @@ program
 		if(name == null && paths[0] == null) {
 			paths[0] = '.';
 		}
-		terastash.lsPath(name, paths[0]);
+		terastash.lsPath(name, options.justNames, paths[0]);
 	}));
 
 program

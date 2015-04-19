@@ -10,6 +10,9 @@ Can add and drop a file
   $ ts ls
                   14 1980-01-01 00:00 sample2
                   12 1970-01-01 00:00 sample1
+  $ ts ls -j
+  sample2
+  sample1
   $ ts cat sample1
   hello
   world

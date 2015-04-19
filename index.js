@@ -7,6 +7,8 @@ const cassandra = require('cassandra-driver');
 const co = require('co');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
+const chalk = require('chalk');
+
 const utils = require('./utils');
 
 const CASSANDRA_KEYSPACE_PREFIX = "ts_";
@@ -92,7 +94,7 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
-function lsPath(stashName, p) {
+function lsPath(stashName, justNames, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 			return runQuery(
@@ -103,15 +105,20 @@ function lsPath(stashName, p) {
 				[dbPath]
 			).then(function(result) {
 				for(let row of result.rows) {
-					let nameWithExec = row.pathname;
-					if(row.executable) {
-						nameWithExec += '*';
+					if(justNames) {
+						console.log(row.pathname);
+					} else {
+						let decoratedName = row.pathname;
+						if(row.executable) {
+							decoratedName = chalk.bold.green(decoratedName);
+							decoratedName += '*';
+						}
+						console.log(
+							utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
+							utils.shortISO(row.mtime) + " " +
+							decoratedName
+						);
 					}
-					console.log(
-						utils.pad(utils.numberWithCommas(row.size.toString()), 18) + " " +
-						utils.shortISO(row.mtime) + " " +
-						nameWithExec
-					);
 				}
 			})
 		});
