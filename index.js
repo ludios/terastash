@@ -328,10 +328,11 @@ function destroyKeyspace(name) {
 // TODO: need to store path to terastash base in a cassandra table
 
 function executeWithPromise(client, statement, args) {
+	//console.log('executeWithPromise(%s, %s, %s)', client, statement, args);
 	assert(typeof client == 'object');
 	assert(typeof statement == 'string');
 	assert(Array.isArray(args));
-	//console.log('executeWithPromise(%s, %s, %s)', client, statement, args);
+
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
