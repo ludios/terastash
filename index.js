@@ -94,6 +94,27 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
+/**
+ * Run a Cassandra query and return a Promise that is fulfilled
+ * with the query results.
+ */
+function runQuery(client, statement, args) {
+	//console.log('runQuery(%s, %s, %s)', client, statement, args);
+	assert(typeof client == 'object');
+	assert(typeof statement == 'string');
+	assert(Array.isArray(args));
+
+	return new Promise(function(resolve, reject) {
+		client.execute(statement, args, {prepare: true}, function(err, result) {
+			if(err) {
+				reject(err);
+			} else {
+				resolve(result);
+			}
+		});
+	});
+}
+
 function lsPath(stashName, justNames, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
@@ -356,27 +377,6 @@ function destroyKeyspace(name) {
 
 // TODO: function to destroy all keyspaces that no longer have a matching .terastash.json file
 // TODO: need to store path to terastash base in a cassandra table
-
-/**
- * Run a Cassandra query and return a Promise that is fulfilled
- * with the query results.
- */
-function runQuery(client, statement, args) {
-	//console.log('runQuery(%s, %s, %s)', client, statement, args);
-	assert(typeof client == 'object');
-	assert(typeof statement == 'string');
-	assert(Array.isArray(args));
-
-	return new Promise(function(resolve, reject) {
-		client.execute(statement, args, {prepare: true}, function(err, result) {
-			if(err) {
-				reject(err);
-			} else {
-				resolve(result);
-			}
-		});
-	});
-}
 
 /**
  * Initialize a new stash
