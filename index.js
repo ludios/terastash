@@ -316,11 +316,14 @@ function assertName(name) {
 
 function destroyKeyspace(name) {
 	assertName(name);
-	const client = getNewClient();
-	client.execute(`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`, [], function(err, result) {
-		client.shutdown();
-		assert.ifError(err);
-		console.log(`Destroyed keyspace ${CASSANDRA_KEYSPACE_PREFIX + name}.`);
+	return doWithClient(function(client) {
+		return executeWithPromise(
+			client,
+			`DROP KEYSPACE "${CASSANDRA_KEYSPACE_PREFIX + name}";`,
+			[]
+		).then(function() {
+			console.log(`Destroyed keyspace ${CASSANDRA_KEYSPACE_PREFIX + name}.`);
+		});
 	});
 }
 
@@ -328,6 +331,9 @@ function destroyKeyspace(name) {
 // TODO: need to store path to terastash base in a cassandra table
 
 function executeWithPromise(client, statement, args) {
+	assert(typeof client == 'object');
+	assert(typeof statement == 'string');
+	assert(Array.isArray(args));
 	//console.log('executeWithPromise(%s, %s, %s)', client, statement, args);
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
