@@ -1,3 +1,5 @@
+"use strict";
+
 /**
  * ISO-ish string without the seconds
  */
