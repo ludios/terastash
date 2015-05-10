@@ -100,9 +100,9 @@ function userPathToDatabasePath(base, p) {
  */
 function runQuery(client, statement, args) {
 	//console.log('runQuery(%s, %s, %s)', client, statement, args);
-	assert(typeof client == 'object');
-	assert(typeof statement == 'string');
-	assert(Array.isArray(args));
+	assert.equal(typeof client, 'object');
+	assert.equal(typeof statement, 'string');
+	assert(Array.isArray(args), typeof args);
 
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
@@ -356,7 +356,7 @@ function listStashes() {
 
 function assertName(name) {
 	assert(name, "Name must not be empty");
-	assert(typeof name == 'string', `Name must be string, got ${typeof name}`);
+	assert.equal(typeof name, 'string');
 }
 
 function destroyKeyspace(name) {
