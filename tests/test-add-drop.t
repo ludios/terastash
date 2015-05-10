@@ -6,9 +6,10 @@ Can add and drop a file
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2
   $ touch --date=1980-01-01 sample2
+  $ chmod +x sample2
   $ ts add sample1 sample2
   $ ts ls
-                  14 1980-01-01 00:00 sample2
+                  14 1980-01-01 00:00 sample2*
                   12 1970-01-01 00:00 sample1
   $ ts ls -j
   sample2
@@ -38,7 +39,7 @@ Can add and drop a file
   world
   $ ts drop sample1
   $ ts ls
-                  14 1980-01-01 00:00 sample2
+                  14 1980-01-01 00:00 sample2*
   $ ts drop sample2
   $ ts ls
 

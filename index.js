@@ -175,9 +175,6 @@ function doWithPath(client, stashName, p, fn) {
 	return fn(client, stashInfo, dbPath, parentPath);
 }
 
-/* also called S_IXUSR */
-const S_IEXEC = parseInt('0100', 8);
-
 function shouldStoreInChunks(p, stat) {
 	return stat.size > 200*1024;
 }
@@ -218,7 +215,7 @@ function putFile(client, p) {
 		const type = 'f';
 		const stat = fs.statSync(p);
 		const mtime = stat.mtime;
-		const executable = Boolean(stat.mode & S_IEXEC);
+		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 		let content;
 		let size;
 		if(shouldStoreInChunks(p, stat)) {
