@@ -216,12 +216,15 @@ function makeDirs(client, stashInfo, p, dbPath) {
 
 const CHUNK_SIZE = 100 * 1024;
 
-function writeChunks(directory, key, inputStream) {
+function writeChunks(directory, key, p) {
+	const expectedTotalSize = fs.statSync(p).size;
+	const inputStream = fs.createReadStream(p);
 	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 	assert.equal(iv0.length, 128/8);
 	assert.equal(key.length, 128/8);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	inputStream.pipe(cipherStream);
+	let totalSize = 0;
 	return co(function*() {
 		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
@@ -230,6 +233,9 @@ function writeChunks(directory, key, inputStream) {
 			chunkStream.pipe(writeStream);
 			yield new Promise(function(resolve) {
 				writeStream.once('finish', function() {
+					const size = fs.statSync(tempFname).size;
+					assert(size <= CHUNK_SIZE, size);
+					totalSize += size;
 					const hexDigest = new Buffer(224/8).fill(0).toString('hex');
 					fs.renameSync(
 						tempFname,
@@ -239,6 +245,9 @@ function writeChunks(directory, key, inputStream) {
 				});
 			});
 		}
+		assert.equal(totalSize, expectedTotalSize,
+			`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
+			`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
 	});
 }
 
@@ -258,7 +267,7 @@ function putFile(client, p) {
 		if(shouldStoreInChunks(p, stat)) {
 			content = null;
 			key = crypto.randomBytes(128/8);
-			yield writeChunks(process.env.CHUNKS_DIR, key, fs.createReadStream(p));
+			yield writeChunks(process.env.CHUNKS_DIR, key, p);
 			size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
