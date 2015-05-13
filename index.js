@@ -3,12 +3,14 @@
 const fs = require('fs');
 const assert = require('assert');
 const path = require('path');
+const crypto = require('crypto');
 const cassandra = require('cassandra-driver');
 const co = require('co');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
 const blake2 = require('blake2');
+const chopshop = require('chopshop');
 
 const utils = require('./utils');
 
@@ -212,6 +214,43 @@ function makeDirs(client, stashInfo, p, dbPath) {
 	});
 }
 
+const CHUNK_SIZE = 100 * 1024;
+
+function writeChunks(directory, key, stream) {
+	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
+	assert.equal(iv0.length, 128/8);
+	assert.equal(key.length, 128/8);
+	const cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	stream.pipe(cipher);
+	return co(function*() {
+		for(const chunkStream of chopshop.chunk(cipher, CHUNK_SIZE)) {
+			const tempFname = path.join(directory, 'temp-' + Math.random());
+			const writeStream = fs.createWriteStream(tempFname);
+			const blake2b = blake2.createHash('blake2b');
+			chunkStream.on('data', function(buf) {
+				blake2b.update(buf);
+				if(!writeStream.write(buf)) {
+					chunkStream.pause();
+				}
+			});
+			chunkStream.on('drain', function() {
+				chunkStream.resume();
+			});
+			yield new Promise(function(resolve) {
+				chunkStream.on('end', function() {
+					writeStream.close();
+					const hexDigest = blake2b.slice(0, 224/8).digest('hex');
+					fs.renameSync(
+						tempFname,
+						path.join(directory, hexDigest)
+					);
+					resolve();
+				});
+			});
+		}
+	});
+}
+
 /**
  * Put a file or directory into the Cassandra database.
  */
@@ -224,13 +263,17 @@ function putFile(client, p) {
 		let content;
 		let size;
 		let blake2b224;
+		let key;
 		if(shouldStoreInChunks(p, stat)) {
 			content = null;
+			key = crypto.randomBytes(128/8);
+			writeChunks(process.env.CHUNKS_DIR, key, fs.createReadStream(p));
 			size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
 		} else {
 			content = fs.readFileSync(p);
+			key = null;
 			blake2b224 = blake2b224Buffer(content);
 			size = content.length;
 		}
@@ -243,8 +286,8 @@ function putFile(client, p) {
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, type, content, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, type, content, size, blake2b224, mtime, executable]
+			(pathname, parent, type, content, key, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[dbPath, parentPath, type, content, key, size, blake2b224, mtime, executable]
 		);
 	}));
 }
@@ -414,7 +457,7 @@ function initStash(stashPath, name) {
 			content blob,
 			chunks list<blob>,
 			blake2b224 blob,
-			password blob,
+			key blob,
 			mtime timestamp,
 			crtime timestamp,
 			executable boolean

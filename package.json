@@ -14,6 +14,7 @@
     "blake2": "^0.2.3",
     "cassandra-driver": "^2.0.1",
     "chalk": "^1.0.0",
+    "chopshop": "^0.1.2",
     "co": "^4.5.2",
     "commander": "^2.8.1",
     "xdg": "^0.1.1"

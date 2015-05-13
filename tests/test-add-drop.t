@@ -1,5 +1,6 @@
 Can add and drop a file
 
+  $ export CHUNKS_DIR=/tmp/mychunks
   $ ts init unit_tests
   Created Cassandra keyspace and updated terastash.json.
   $ echo -e "hello\nworld" > sample1
@@ -7,12 +8,16 @@ Can add and drop a file
   $ echo -e "second\nsample" > sample2
   $ touch --date=1980-01-01 sample2
   $ chmod +x sample2
-  $ ts add sample1 sample2
+  $ dd bs=1024 count=1024 if=/dev/zero of=bigfile 2> /dev/null
+  $ touch --date=1990-01-01 bigfile
+  $ ts add sample1 sample2 bigfile
   $ ts ls
                   14 1980-01-01 00:00 sample2*
+           1,048,576 1990-01-01 00:00 bigfile
                   12 1970-01-01 00:00 sample1
   $ ts ls -j
   sample2
+  bigfile
   sample1
   $ ts cat sample1
   hello
@@ -37,7 +42,7 @@ Can add and drop a file
   $ cat sample1
   hello
   world
-  $ ts drop sample1
+  $ ts drop sample1 bigfile
   $ ts ls
                   14 1980-01-01 00:00 sample2*
   $ ts drop sample2
