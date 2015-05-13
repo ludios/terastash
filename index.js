@@ -280,8 +280,8 @@ function getFile(client, stashName, p) {
 				}
 				if(!row.blake2b224.equals(blake2b224)) {
 					throw new Error(
-						`BLAKE2b-224 of ${row.pathname} should be \n` +
-						`${row.blake2b224.toString('hex')} but was \n` +
+						`Database says BLAKE2b-224 of ${row.pathname} is\n` +
+						`${row.blake2b224.toString('hex')} but content was \n` +
 						`${blake2b224.toString('hex')}`);
 				}
 				// TODO: create directories if needed
