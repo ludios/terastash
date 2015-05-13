@@ -1,5 +1,7 @@
 "use strict";
 
+require('better-buffer-inspect');
+
 const utils = require('../utils');
 const assert = require('assert');
 

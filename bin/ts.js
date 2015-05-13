@@ -1,5 +1,7 @@
 "use strict";
 
+require('better-buffer-inspect');
+
 const terastash = require('..');
 const assert = require('assert');
 const program = require('commander');
