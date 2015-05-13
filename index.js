@@ -216,34 +216,28 @@ function makeDirs(client, stashInfo, p, dbPath) {
 
 const CHUNK_SIZE = 100 * 1024;
 
-function writeChunks(directory, key, stream) {
+function writeChunks(directory, key, inputStream) {
 	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 	assert.equal(iv0.length, 128/8);
 	assert.equal(key.length, 128/8);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-	stream.pipe(cipherStream);
-	var count = 0;
+	inputStream.pipe(cipherStream);
 	return co(function*() {
 		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
 			const writeStream = fs.createWriteStream(tempFname);
 			const blake2b = blake2.createHash('blake2b');
 			chunkStream.pipe(writeStream);
-			chunkStream.on('end', function() {
-				console.log("end " + count);
-			})
 			yield new Promise(function(resolve) {
 				writeStream.once('finish', function() {
-					console.log("finish " + tempFname + " " + count);
 					const hexDigest = new Buffer(224/8).fill(0).toString('hex');
 					fs.renameSync(
 						tempFname,
-						path.join(directory, count + '-' + hexDigest)
+						path.join(directory, hexDigest)
 					);
 					resolve();
 				});
 			});
-			count += 1;
 		}
 	});
 }
