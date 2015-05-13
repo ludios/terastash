@@ -4,6 +4,7 @@ const fs = require('fs');
 const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
+const stream = require('stream');
 const cassandra = require('cassandra-driver');
 const co = require('co');
 const mkdirp = require('mkdirp');
@@ -230,13 +231,18 @@ function writeChunks(directory, key, p) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
 			const writeStream = fs.createWriteStream(tempFname);
 			const blake2b = blake2.createHash('blake2b');
-			chunkStream.pipe(writeStream);
+			const passthrough = new stream.PassThrough();
+			chunkStream.pipe(passthrough);
+			passthrough.on('data', function(data) {
+				blake2b.update(data);
+			});
+			passthrough.pipe(writeStream);
 			yield new Promise(function(resolve) {
 				writeStream.once('finish', function() {
 					const size = fs.statSync(tempFname).size;
 					assert(size <= CHUNK_SIZE, size);
 					totalSize += size;
-					const hexDigest = new Buffer(224/8).fill(0).toString('hex');
+					const hexDigest = blake2b.digest().slice(0, 224/8).toString('hex');
 					fs.renameSync(
 						tempFname,
 						path.join(directory, hexDigest)
