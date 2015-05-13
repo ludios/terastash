@@ -222,6 +222,7 @@ function writeChunks(directory, key, stream) {
 	assert.equal(key.length, 128/8);
 	const cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	stream.pipe(cipher);
+	var count = 0;
 	return co(function*() {
 		for(const chunkStream of chopshop.chunk(cipher, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
@@ -237,16 +238,17 @@ function writeChunks(directory, key, stream) {
 				chunkStream.resume();
 			});
 			yield new Promise(function(resolve) {
-				chunkStream.on('end', function() {
+				chunkStream.once('end', function() {
 					writeStream.close();
 					const hexDigest = blake2b.digest().slice(0, 224/8).toString('hex');
 					fs.renameSync(
 						tempFname,
-						path.join(directory, hexDigest)
+						path.join(directory, count + '-' + hexDigest)
 					);
 					resolve();
 				});
 			});
+			count += 1;
 		}
 	});
 }
