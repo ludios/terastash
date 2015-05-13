@@ -233,13 +233,13 @@ function writeChunks(directory, key, stream) {
 					chunkStream.pause();
 				}
 			});
-			chunkStream.on('drain', function() {
+			writeStream.on('drain', function() {
 				chunkStream.resume();
 			});
 			yield new Promise(function(resolve) {
 				chunkStream.on('end', function() {
 					writeStream.close();
-					const hexDigest = blake2b.slice(0, 224/8).digest('hex');
+					const hexDigest = blake2b.digest().slice(0, 224/8).toString('hex');
 					fs.renameSync(
 						tempFname,
 						path.join(directory, hexDigest)
@@ -248,6 +248,8 @@ function writeChunks(directory, key, stream) {
 				});
 			});
 		}
+	}).catch(function(e) {
+		console.error(e.stack);
 	});
 }
 
