@@ -11,6 +11,7 @@
   },
   "author": "Ivan Kozik",
   "dependencies": {
+    "blake2": "^0.2.3",
     "cassandra-driver": "^2.0.1",
     "chalk": "^1.0.0",
     "co": "^4.5.2",

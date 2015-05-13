@@ -8,10 +8,15 @@ const co = require('co');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
+const blake2 = require('blake2');
 
 const utils = require('./utils');
 
 const KEYSPACE_PREFIX = "ts_";
+
+function blake2b224Buffer(buf) {
+	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
+}
 
 function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
@@ -218,6 +223,7 @@ function putFile(client, p) {
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 		let content;
 		let size;
+		let blake2b224;
 		if(shouldStoreInChunks(p, stat)) {
 			content = null;
 			size = stat.size;
@@ -225,6 +231,7 @@ function putFile(client, p) {
 			    what we've actually read from the file. */
 		} else {
 			content = fs.readFileSync(p);
+			blake2b224 = blake2b224Buffer(content);
 			size = content.length;
 		}
 
@@ -236,8 +243,8 @@ function putFile(client, p) {
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, type, content, size, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, type, content, size, mtime, executable]
+			(pathname, parent, type, content, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+			[dbPath, parentPath, type, content, size, blake2b224, mtime, executable]
 		);
 	}));
 }
@@ -260,13 +267,23 @@ function getFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		return runQuery(
 			client,
-			`SELECT pathname, content
+			`SELECT pathname, size, blake2b224, content
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
 			//console.log(result);
 			for(let row of result.rows) {
+				let blake2b224 = blake2b224Buffer(row.content);
+				if(row.size != row.content.length) {
+					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
+				}
+				if(!row.blake2b224.equals(blake2b224)) {
+					throw new Error(
+						`BLAKE2b-224 of ${row.pathname} should be \n` +
+						`${row.blake2b224.toString('hex')} but was \n` +
+						`${blake2b224.toString('hex')}`);
+				}
 				// TODO: create directories if needed
 				// If stashName was given, write file to current directory
 				if(stashName) {
@@ -396,7 +413,7 @@ function initStash(stashPath, name) {
 			size bigint,
 			content blob,
 			chunks list<blob>,
-			checksum blob,
+			blake2b224 blob,
 			password blob,
 			mtime timestamp,
 			crtime timestamp,
