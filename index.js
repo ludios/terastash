@@ -248,8 +248,6 @@ function writeChunks(directory, key, stream) {
 				});
 			});
 		}
-	}).catch(function(e) {
-		console.error(e.stack);
 	});
 }
 
@@ -269,7 +267,7 @@ function putFile(client, p) {
 		if(shouldStoreInChunks(p, stat)) {
 			content = null;
 			key = crypto.randomBytes(128/8);
-			writeChunks(process.env.CHUNKS_DIR, key, fs.createReadStream(p));
+			yield writeChunks(process.env.CHUNKS_DIR, key, fs.createReadStream(p));
 			size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
