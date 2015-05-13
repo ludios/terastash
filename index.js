@@ -1,5 +1,6 @@
 "use strict";
 
+require('better-buffer-inspect');
 const fs = require('fs');
 const assert = require('assert');
 const path = require('path');

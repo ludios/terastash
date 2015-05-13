@@ -11,6 +11,7 @@
   },
   "author": "Ivan Kozik",
   "dependencies": {
+    "better-buffer-inspect": "^0.1.0",
     "blake2": "^0.2.3",
     "cassandra-driver": "^2.1.0",
     "chalk": "^1.0.0",
