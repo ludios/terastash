@@ -220,27 +220,22 @@ function writeChunks(directory, key, stream) {
 	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 	assert.equal(iv0.length, 128/8);
 	assert.equal(key.length, 128/8);
-	const cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
-	stream.pipe(cipher);
+	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	stream.pipe(cipherStream);
 	var count = 0;
 	return co(function*() {
-		for(const chunkStream of chopshop.chunk(cipher, CHUNK_SIZE)) {
+		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
 			const writeStream = fs.createWriteStream(tempFname);
 			const blake2b = blake2.createHash('blake2b');
-			chunkStream.on('data', function(buf) {
-				blake2b.update(buf);
-				if(!writeStream.write(buf)) {
-					chunkStream.pause();
-				}
-			});
-			writeStream.on('drain', function() {
-				chunkStream.resume();
-			});
+			chunkStream.pipe(writeStream);
+			chunkStream.on('end', function() {
+				console.log("end " + count);
+			})
 			yield new Promise(function(resolve) {
-				chunkStream.once('end', function() {
-					writeStream.close();
-					const hexDigest = blake2b.digest().slice(0, 224/8).toString('hex');
+				writeStream.once('finish', function() {
+					console.log("finish " + tempFname + " " + count);
+					const hexDigest = new Buffer(224/8).fill(0).toString('hex');
 					fs.renameSync(
 						tempFname,
 						path.join(directory, count + '-' + hexDigest)
