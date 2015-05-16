@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "iojs --es_staging --strong_mode ./node_modules/.bin/mocha tests/*.js; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
+    "test": "iojs --es_staging --strong_mode ./node_modules/.bin/_mocha tests/*.js; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
   },
   "bin": {
     "ts": "./bin/ts"
