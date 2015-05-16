@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha --harmony tests/*.js; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
+    "test": "./node_modules/.bin/mocha --es_staging --strong_mode tests/*.js; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
   },
   "bin": {
     "ts": "./bin/ts"
@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "mocha": "^2.2.1"
+  },
+  "engines": {
+    "iojs": ">= 2.0.2"
   }
 }

@@ -1,4 +1,4 @@
-"use strict";
+"use strong";
 
 const fs = require('fs');
 const assert = require('assert');
@@ -35,7 +35,7 @@ function getTerastashConfig() {
 	try {
 		return JSON.parse(fs.readFileSync(configPath));
 	} catch(e) {
-		if(e.code != 'ENOENT') {
+		if(e.code !== 'ENOENT') {
 			throw e;
 		}
 		// If there is no config file, write one.
@@ -78,7 +78,7 @@ function findStashInfoByName(stashName) {
 	}
 
 	for(let stash of config.stashes) {
-		if(stash.name == stashName) {
+		if(stash.name === stashName) {
 			return stash;
 		}
 	}
@@ -92,7 +92,7 @@ function findStashInfoByName(stashName) {
  */
 function userPathToDatabasePath(base, p) {
 	const resolved = path.resolve(p);
-	if(resolved == base) {
+	if(resolved === base) {
 		return "";
 	} else {
 		const dbPath = resolved.replace(base + "/", "").replace(/\\/g, "/");
@@ -138,7 +138,7 @@ function lsPath(stashName, justNames, p) {
 						console.log(baseName);
 					} else {
 						let decoratedName = baseName;
-						if(row.type == 'd') {
+						if(row.type === 'd') {
 							decoratedName = chalk.bold.blue(decoratedName);
 							decoratedName += '/';
 						} else if(row.executable) {
@@ -281,7 +281,7 @@ function getFile(client, stashName, p) {
 			//console.log(result);
 			for(let row of result.rows) {
 				let blake2b224 = blake2b224Buffer(row.content);
-				if(row.size != row.content.length) {
+				if(Number(row.size) !== row.content.length) {
 					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
 				}
 				if(!row.blake2b224.equals(blake2b224)) {

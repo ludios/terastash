@@ -1,4 +1,4 @@
 #!/bin/bash
 
 export NODE_PATH="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
-iojs --es_staging "$NODE_PATH/bin/ts.js" "$@"
+iojs --es_staging --strong_mode "$NODE_PATH/bin/ts.js" "$@"
