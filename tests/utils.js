@@ -1,3 +1,4 @@
+"use strong";
 "use strict";
 
 require('better-buffer-inspect');
