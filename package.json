@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "iojs --es_staging --strong_mode ./node_modules/.bin/_mocha tests/*.js; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
+    "test": "iojs --harmony --harmony-rest-parameters --strong_mode ./node_modules/.bin/_mocha tests/*.js && ./node_modules/.bin/eslint .; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
   },
   "bin": {
     "ts": "./bin/ts"
@@ -12,16 +12,17 @@
   "author": "Ivan Kozik",
   "dependencies": {
     "better-buffer-inspect": "^0.1.2",
-    "blake2": "^0.2.4",
+    "blake2": "^0.3.0",
     "cassandra-driver": "^2.1.0",
     "chalk": "^1.0.0",
-    "chopshop": "^0.1.6",
+    "chopshop": "^0.2.0",
     "co": "^4.5.2",
     "commander": "^2.8.1",
     "mkdirp": "^0.5.1",
     "xdg": "^0.1.1"
   },
   "devDependencies": {
+    "eslint": "^0.21.1",
     "mocha": "^2.2.5"
   },
   "engines": {

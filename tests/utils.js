@@ -29,4 +29,4 @@ describe('pad', function() {
 		assert.equal('12345', utils.pad('12345', 3));
 		assert.equal('12345', utils.pad('12345', 0));
 	});
-})
+});

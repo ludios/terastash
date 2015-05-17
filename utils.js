@@ -12,8 +12,8 @@ function pad(s, wantLength) {
 }
 
 // http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
-function numberWithCommas(s_or_n) {
-	return ("" + s_or_n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+function numberWithCommas(stringOrNum) {
+	return ("" + stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 /**

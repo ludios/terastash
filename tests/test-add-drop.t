@@ -11,11 +11,18 @@ Can add and drop a file
   $ dd bs=1024 count=1024 if=/dev/zero of=bigfile 2> /dev/null
   $ touch --date=1990-01-01 bigfile
   $ ts add sample1 sample2 bigfile
+  $ ts ls -n unit_tests
+  When using -n/--name, a database path is required
+  [1]
   $ ts ls
                   14 1980-01-01 00:00 sample2*
            1,048,576 1990-01-01 00:00 bigfile
                   12 1970-01-01 00:00 sample1
   $ ts ls -j
+  sample2
+  bigfile
+  sample1
+  $ ts ls -j -n unit_tests ''
   sample2
   bigfile
   sample1

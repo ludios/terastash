@@ -56,7 +56,7 @@ function getTerastashConfig() {
 function findStashInfoByPath(pathname) {
 	const config = getTerastashConfig();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
-		throw new Error(`terastash config has no "stashes" or not an Array`)
+		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
 
 	const resolvedPathname = path.resolve(pathname);
@@ -75,7 +75,7 @@ function findStashInfoByPath(pathname) {
 function findStashInfoByName(stashName) {
 	const config = getTerastashConfig();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
-		throw new Error(`terastash config has no "stashes" or not an Array`)
+		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
 
 	for(let stash of config.stashes) {
@@ -153,7 +153,7 @@ function lsPath(stashName, justNames, p) {
 						);
 					}
 				}
-			})
+			});
 		});
 	});
 }
@@ -431,7 +431,7 @@ function initStash(stashPath, name) {
 			ON "${KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
 		const config = getTerastashConfig();
-		config['stashes'].push({name, path: path.resolve(stashPath)});
+		config.stashes.push({name, path: path.resolve(stashPath)});
 		writeTerastashConfig(config);
 
 		console.log("Created Cassandra keyspace and updated terastash.json.");
@@ -440,4 +440,4 @@ function initStash(stashPath, name) {
 
 module.exports = {
 	initStash, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
-	catFile, catFiles, dropFile, dropFiles, lsPath, KEYSPACE_PREFIX}
+	catFile, catFiles, dropFile, dropFiles, lsPath, KEYSPACE_PREFIX};

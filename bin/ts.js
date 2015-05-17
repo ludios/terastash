@@ -1,4 +1,7 @@
+"use strong";
 "use strict";
+
+/* eslint-disable no-process-exit */
 
 require('better-buffer-inspect');
 
@@ -8,7 +11,7 @@ const program = require('commander');
 
 // Ugly hack to avoid getting Function
 function stringOrNull(o) {
-	return typeof o == "string" ? o : null;
+	return typeof o === "string" ? o : null;
 }
 
 /**
@@ -29,9 +32,9 @@ function d(s) {
  */
 let ranCommand = false;
 function a(f) {
-	return function() {
+	return function(...args) {
 		ranCommand = true;
-		f.apply(this, arguments);
+		f.apply(this, args);
 	};
 }
 
@@ -44,7 +47,7 @@ program
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
 	.action(a(function(name) {
-		assert(typeof name == "string", name);
+		assert.equal(typeof name, "string");
 		terastash.initStash(process.cwd(), name);
 	}));
 
@@ -53,7 +56,7 @@ program
 	.description(d(`
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`))
 	.action(a(function(name) {
-		assert(typeof name == "string", name);
+		assert.equal(typeof name, "string");
 		terastash.destroyKeyspace(name);
 	}));
 
@@ -107,12 +110,12 @@ program
 	.action(a(function(paths, options) {
 		//console.log({cmd, options}); process.exit();
 		const name = stringOrNull(options.name);
-		if(name != null && !paths.length) {
+		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
 			process.exit(1);
 		}
 		// When not using -n, and no path given, use '.'
-		if(name == null && paths[0] == null) {
+		if(name === null && !paths.length) {
 			paths[0] = '.';
 		}
 		terastash.lsPath(name, options.justNames, paths[0]);
@@ -137,6 +140,6 @@ program
 program.parse(process.argv);
 
 if(!ranCommand) {
-	console.log(`Unknown command: ${program.args[0]}; see ts help`)
+	console.log(`Unknown command: ${program.args[0]}; see ts help`);
 	process.exit(1);
 }
