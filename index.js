@@ -123,6 +123,41 @@ function runQuery(client, statement, args) {
 	});
 }
 
+function doWithClient(f) {
+	const client = getNewClient();
+	const p = f(client);
+	return p.catch(function(err) {
+		console.error(err.stack);
+	}).then(function() {
+		client.shutdown();
+	});
+}
+
+function doWithPath(client, stashName, p, fn) {
+	const resolvedPathname = path.resolve(p);
+	let dbPath;
+	let stashInfo;
+	if(stashName) { // Explicit stash name provided
+		stashInfo = findStashInfoByName(stashName);
+		if(!stashInfo) {
+			throw new Error(`No stash with name ${stashName}; consult terastash.json and ts help`);
+		}
+		dbPath = p;
+	} else {
+		stashInfo = findStashInfoByPath(resolvedPathname);
+		if(!stashInfo) {
+			throw new Error(`File ${p} is not in a stash directory; consult terastash.json and ts help`);
+		}
+		dbPath = userPathToDatabasePath(stashInfo.path, p);
+	}
+
+	const parentPath = utils.getParentPath(dbPath);
+	assert(!parentPath.startsWith('/'), parentPath);
+
+	// TODO: validate stashInfo.name - it may contain injection
+	return fn(client, stashInfo, dbPath, parentPath);
+}
+
 function lsPath(stashName, justNames, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
@@ -158,43 +193,8 @@ function lsPath(stashName, justNames, p) {
 	});
 }
 
-function doWithPath(client, stashName, p, fn) {
-	const resolvedPathname = path.resolve(p);
-	let dbPath;
-	let stashInfo;
-	if(stashName) { // Explicit stash name provided
-		stashInfo = findStashInfoByName(stashName);
-		if(!stashInfo) {
-			throw new Error(`No stash with name ${stashName}; consult terastash.json and ts help`);
-		}
-		dbPath = p;
-	} else {
-		stashInfo = findStashInfoByPath(resolvedPathname);
-		if(!stashInfo) {
-			throw new Error(`File ${p} is not in a stash directory; consult terastash.json and ts help`);
-		}
-		dbPath = userPathToDatabasePath(stashInfo.path, p);
-	}
-
-	const parentPath = utils.getParentPath(dbPath);
-	assert(!parentPath.startsWith('/'), parentPath);
-
-	// TODO: validate stashInfo.name - it may contain injection
-	return fn(client, stashInfo, dbPath, parentPath);
-}
-
 function shouldStoreInChunks(p, stat) {
 	return stat.size > 200*1024;
-}
-
-function doWithClient(f) {
-	const client = getNewClient();
-	const p = f(client);
-	return p.catch(function(err) {
-		console.error(err.stack);
-	}).then(function() {
-		client.shutdown();
-	});
 }
 
 function makeDirs(client, stashInfo, p, dbPath) {
