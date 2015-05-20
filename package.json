@@ -13,6 +13,7 @@
   "dependencies": {
     "better-buffer-inspect": "^0.1.2",
     "blake2": "^0.3.0",
+    "bluebird": "^2.9.25",
     "cassandra-driver": "^2.1.0",
     "chalk": "^1.0.0",
     "chopshop": "^0.2.1",

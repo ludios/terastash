@@ -11,6 +11,7 @@ const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
 const blake2 = require('blake2');
+const Promise = require('bluebird');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
