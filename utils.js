@@ -1,4 +1,7 @@
+"use strong";
 "use strict";
+
+const assert = require('assert');
 
 /**
  * ISO-ish string without the seconds
@@ -40,4 +43,40 @@ function ol(s) {
 	return s.replace(/[\n\t]+/g, " ");
 }
 
-module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol};
+/**
+ * Takes a predicate function that returns true if x < y and returns a
+ * comparator function that can be passed to arr.sort(...)
+ *
+ * Like clojure.core/comparator
+ */
+function comparator(pred) {
+	assert.equal(typeof pred, 'function');
+	return function(x, y) {
+		if(pred(x, y)) {
+			return -1;
+		} else if(pred(y, x)) {
+			return 1;
+		} else {
+			return 0;
+		}
+	};
+}
+
+/**
+ * Takes a function that maps obj -> (key to sort by) and
+ * returns a comparator function that can be passed to arr.sort(...)
+ */
+function comparedBy(mapping, reverse) {
+	assert.equal(typeof mapping, 'function');
+	if(!reverse) {
+		return comparator(function(x, y) {
+			return mapping(x) < mapping(y);
+		});
+	} else {
+		return comparator(function(x, y) {
+			return mapping(x) > mapping(y);
+		});
+	}
+}
+
+module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol, comparator, comparedBy};
