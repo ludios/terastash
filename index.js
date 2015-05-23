@@ -229,16 +229,19 @@ function putFile(client, p) {
 		let size;
 		let blake2b224;
 		let key;
+		let chunks;
 		if(shouldStoreInChunks(p, stat)) {
 			content = null;
 			key = crypto.randomBytes(128/8);
-			yield localfs.writeChunks(process.env.CHUNKS_DIR, key, p);
+			chunks = yield localfs.writeChunks(process.env.CHUNKS_DIR, key, p);
+			assert(Array.isArray(chunks), chunks);
 			size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
 		} else {
 			content = fs.readFileSync(p);
 			key = null;
+			chunks = null;
 			blake2b224 = blake2b224Buffer(content);
 			size = content.length;
 		}
@@ -251,8 +254,8 @@ function putFile(client, p) {
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, type, content, key, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, type, content, key, size, blake2b224, mtime, executable]
+			(pathname, parent, type, content, key, chunks, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[dbPath, parentPath, type, content, key, chunks, size, blake2b224, mtime, executable]
 		);
 	}));
 }
@@ -275,29 +278,47 @@ function getFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 		return runQuery(
 			client,
-			`SELECT pathname, size, blake2b224, content
+			`SELECT pathname, size, key, blake2b224, chunks, content
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
 			//console.log(result);
 			for(let row of result.rows) {
-				let blake2b224 = blake2b224Buffer(row.content);
-				if(Number(row.size) !== row.content.length) {
-					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
-				}
-				if(!row.blake2b224.equals(blake2b224)) {
-					throw new Error(
-						`Database says BLAKE2b-224 of ${row.pathname} is\n` +
-						`${row.blake2b224.toString('hex')} but content was \n` +
-						`${blake2b224.toString('hex')}`);
-				}
+				let outputFilename;
 				// TODO: create directories if needed
 				// If stashName was given, write file to current directory
 				if(stashName) {
-					fs.writeFileSync(row.pathname, row.content);
+					outputFilename = row.pathname;
 				} else {
-					fs.writeFileSync(stashInfo.path + '/' + row.pathname, row.content);
+					outputFilename = stashInfo.path + '/' + row.pathname;
+				}
+
+				//console.log({p, row});
+				if(row.chunks) {
+					assert.strictEqual(row.content, null);
+					assert.strictEqual(row.blake2b224, null);
+					const readStream = localfs.readChunks(process.env.CHUNKS_DIR, row.key, row.chunks);
+					const writeStream = fs.createWriteStream(outputFilename);
+					readStream.pipe(writeStream);
+					const p = new Promise(function(resolve) {
+						writeStream.once('finish', function() {
+							resolve();
+						});
+					});
+					return p;
+				} else {
+					let blake2b224 = blake2b224Buffer(row.content);
+					if(Number(row.size) !== row.content.length) {
+						throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
+					}
+					if(!row.blake2b224.equals(blake2b224)) {
+						throw new Error(
+							`Database says BLAKE2b-224 of ${row.pathname} is\n` +
+							`${row.blake2b224.toString('hex')} but content was \n` +
+							`${blake2b224.toString('hex')}`);
+					}
+					fs.writeFileSync(outputFilename, row.content);
 				}
 			}
 		});

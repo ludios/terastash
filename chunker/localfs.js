@@ -1,4 +1,5 @@
 "use strong";
+"use strict";
 
 const fs = require('fs');
 const path = require('path');
@@ -7,20 +8,26 @@ const assert = require('assert');
 const stream = require('stream');
 const blake2 = require('blake2');
 const co = require('co');
+const Promise = require('bluebird');
 const chopshop = require('chopshop');
+const MultiStream = require('multistream');
 const utils = require('../utils');
 
 const CHUNK_SIZE = 100 * 1024;
+const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
+assert.equal(iv0.length, 128/8);
 
 function writeChunks(directory, key, p) {
+	assert.equal(typeof directory, "string");
+	assert.equal(typeof p, "string");
+	assert(key instanceof Buffer, key);
+	assert.equal(key.length, 128/8);
 	const expectedTotalSize = fs.statSync(p).size;
 	const inputStream = fs.createReadStream(p);
-	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
-	assert.equal(iv0.length, 128/8);
-	assert.equal(key.length, 128/8);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	inputStream.pipe(cipherStream);
 	let totalSize = 0;
+	const chunkDigests = [];
 	return co(function*() {
 		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
@@ -37,10 +44,11 @@ function writeChunks(directory, key, p) {
 					const size = fs.statSync(tempFname).size;
 					assert(size <= CHUNK_SIZE, size);
 					totalSize += size;
-					const hexDigest = blake2b.digest().slice(0, 224/8).toString('hex');
+					const digest = blake2b.digest().slice(0, 224/8);
+					chunkDigests.push(digest);
 					fs.renameSync(
 						tempFname,
-						path.join(directory, hexDigest)
+						path.join(directory, digest.toString('hex'))
 					);
 					resolve();
 				});
@@ -49,7 +57,26 @@ function writeChunks(directory, key, p) {
 		assert.equal(totalSize, expectedTotalSize,
 			`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
 			`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
+		return chunkDigests;
 	});
 }
 
-module.exports = {writeChunks};
+/**
+ * Returns a readable stream by decrypting and concatenating the chunks.
+ */
+function readChunks(directory, key, chunkDigests) {
+	assert.equal(typeof directory, "string");
+	assert(key instanceof Buffer, key);
+	assert.equal(key.length, 128/8);
+	assert(Array.isArray(chunkDigests), chunkDigests);
+	// TODO: check hashes
+	const chunkStreams = chunkDigests
+		.map(function(digest) { return digest.toString('hex'); })
+		.map(function(hexDigest) { return fs.createReadStream(path.join(directory, hexDigest)); } );
+	const cipherStream = new MultiStream(chunkStreams);
+	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	cipherStream.pipe(clearStream);
+	return clearStream;
+}
+
+module.exports = {writeChunks, readChunks};

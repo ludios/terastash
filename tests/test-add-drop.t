@@ -9,6 +9,8 @@ Can add and drop a file
   $ touch --date=1980-01-01 sample2
   $ chmod +x sample2
   $ dd bs=1024 count=1024 if=/dev/zero of=bigfile 2> /dev/null
+  $ cat bigfile | md5sum | cut -f 1 -d " "
+  b6d81b360a5672d80c27430f39153e2c
   $ touch --date=1990-01-01 bigfile
   $ ts add sample1 sample2 bigfile
   $ ts ls -n unit_tests
@@ -49,6 +51,10 @@ Can add and drop a file
   $ cat sample1
   hello
   world
+  $ rm bigfile
+  $ ts get bigfile
+  $ cat bigfile | md5sum | cut -f 1 -d " "
+  b6d81b360a5672d80c27430f39153e2c
   $ ts drop sample1 bigfile
   $ ts ls
                   14 1980-01-01 00:00 sample2*
