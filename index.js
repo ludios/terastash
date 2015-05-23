@@ -1,6 +1,11 @@
 "use strong";
 "use strict";
 
+const Promise = require('bluebird');
+// Hack to make co() return bluebird promises.  We want this
+// primarily because bluebird prints unhandled rejections.
+global.Promise = Promise;
+
 const fs = require('fs');
 const assert = require('assert');
 const path = require('path');
@@ -11,7 +16,6 @@ const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
 const blake2 = require('blake2');
-const Promise = require('bluebird');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
