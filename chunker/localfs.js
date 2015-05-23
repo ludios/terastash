@@ -16,7 +16,7 @@ const CHUNK_SIZE = 100 * 1024;
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 assert.equal(iv0.length, 128/8);
 
-function writeChunks(directory, key, p) {
+const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	assert.equal(typeof directory, "string");
 	assert.equal(typeof p, "string");
 	assert(key instanceof Buffer, key);
@@ -28,38 +28,37 @@ function writeChunks(directory, key, p) {
 	inputStream.pipe(cipherStream);
 	let totalSize = 0;
 	const chunkDigests = [];
-	return Promise.coroutine(function*() {
-		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
-			const tempFname = path.join(directory, 'temp-' + Math.random());
-			const writeStream = fs.createWriteStream(tempFname);
-			const blake2b = blake2.createHash('blake2b');
-			const passthrough = new stream.PassThrough();
-			chunkStream.pipe(passthrough);
-			passthrough.on('data', function(data) {
-				blake2b.update(data);
+
+	for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
+		const tempFname = path.join(directory, 'temp-' + Math.random());
+		const writeStream = fs.createWriteStream(tempFname);
+		const blake2b = blake2.createHash('blake2b');
+		const passthrough = new stream.PassThrough();
+		chunkStream.pipe(passthrough);
+		passthrough.on('data', function(data) {
+			blake2b.update(data);
+		});
+		passthrough.pipe(writeStream);
+		yield new Promise(function(resolve) {
+			writeStream.once('finish', function() {
+				const size = fs.statSync(tempFname).size;
+				assert(size <= CHUNK_SIZE, size);
+				totalSize += size;
+				const digest = blake2b.digest().slice(0, 224/8);
+				chunkDigests.push(digest);
+				fs.renameSync(
+					tempFname,
+					path.join(directory, digest.toString('hex'))
+				);
+				resolve();
 			});
-			passthrough.pipe(writeStream);
-			yield new Promise(function(resolve) {
-				writeStream.once('finish', function() {
-					const size = fs.statSync(tempFname).size;
-					assert(size <= CHUNK_SIZE, size);
-					totalSize += size;
-					const digest = blake2b.digest().slice(0, 224/8);
-					chunkDigests.push(digest);
-					fs.renameSync(
-						tempFname,
-						path.join(directory, digest.toString('hex'))
-					);
-					resolve();
-				});
-			});
-		}
-		assert.equal(totalSize, expectedTotalSize,
-			`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
-			`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
-		return chunkDigests;
-	})();
-}
+		});
+	}
+	assert.equal(totalSize, expectedTotalSize,
+		`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
+		`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
+	return chunkDigests;
+});
 
 class BadChunk extends Error {
 	get name() {
@@ -78,6 +77,8 @@ function readChunks(directory, key, chunkDigests) {
 
 	const cipherStream = new Combine();
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	// We don't return this Promise; we return the stream and
+	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
 		for(const digest of chunkDigests) {
 			assert(digest instanceof Buffer, digest);
