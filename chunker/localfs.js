@@ -62,7 +62,11 @@ function writeChunks(directory, key, p) {
 	});
 }
 
-class BadChunk extends Error {}
+class BadChunk extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
 
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
