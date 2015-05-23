@@ -13,6 +13,8 @@ const Combine = require('combine-streams');
 const utils = require('../utils');
 
 const CHUNK_SIZE = 100 * 1024;
+// Chunk size must be a multiple of an AES block, for our convenience.
+assert.strictEqual(CHUNK_SIZE % 128/8, 0);
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 assert.equal(iv0.length, 128/8);
 
