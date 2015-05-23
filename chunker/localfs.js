@@ -7,7 +7,6 @@ const crypto = require('crypto');
 const assert = require('assert');
 const stream = require('stream');
 const blake2 = require('blake2');
-const co = require('co');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
@@ -29,7 +28,7 @@ function writeChunks(directory, key, p) {
 	inputStream.pipe(cipherStream);
 	let totalSize = 0;
 	const chunkDigests = [];
-	return co(function*() {
+	return Promise.coroutine(function*() {
 		for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 			const tempFname = path.join(directory, 'temp-' + Math.random());
 			const writeStream = fs.createWriteStream(tempFname);
@@ -59,7 +58,7 @@ function writeChunks(directory, key, p) {
 			`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
 			`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
 		return chunkDigests;
-	});
+	})();
 }
 
 class BadChunk extends Error {
@@ -79,7 +78,7 @@ function readChunks(directory, key, chunkDigests) {
 
 	const cipherStream = new Combine();
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-	co(function*() {
+	Promise.coroutine(function*() {
 		for(const digest of chunkDigests) {
 			assert(digest instanceof Buffer, digest);
 
@@ -109,7 +108,7 @@ function readChunks(directory, key, chunkDigests) {
 			});
 		}
 		cipherStream.append(null);
-	}).catch(function(err) {
+	})().catch(function(err) {
 		clearStream.emit('error', err);
 	});
 	cipherStream.pipe(clearStream);

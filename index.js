@@ -7,7 +7,6 @@ const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
 const cassandra = require('cassandra-driver');
-const co = require('co');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
@@ -198,29 +197,27 @@ function shouldStoreInChunks(p, stat) {
 	return stat.size > 200*1024;
 }
 
-function makeDirs(client, stashInfo, p, dbPath) {
-	return co(function*() {
-		const type = 'd';
-		const stat = fs.statSync(p);
-		const mtime = stat.mtime;
-		const parentPath = utils.getParentPath(dbPath);
-		if(parentPath) {
-			yield makeDirs(client, stashInfo, p, parentPath);
-		}
-		yield runQuery(
-			client,
-			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
-			[dbPath, parentPath, type, mtime]
-		);
-	});
-}
+const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
+	const type = 'd';
+	const stat = fs.statSync(p);
+	const mtime = stat.mtime;
+	const parentPath = utils.getParentPath(dbPath);
+	if(parentPath) {
+		yield makeDirs(client, stashInfo, p, parentPath);
+	}
+	yield runQuery(
+		client,
+		`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+		(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
+		[dbPath, parentPath, type, mtime]
+	);
+});
 
 /**
  * Put a file or directory into the Cassandra database.
  */
 function putFile(client, p) {
-	return doWithPath(client, null, p, co.wrap(function*(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(client, null, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
 		const type = 'f';
 		const stat = fs.statSync(p);
 		const mtime = stat.mtime;
@@ -264,7 +261,7 @@ function putFile(client, p) {
  * Put files or directories into the Cassandra database.
  */
 function putFiles(pathnames) {
-	return doWithClient(co.wrap(function*(client) {
+	return doWithClient(Promise.coroutine(function*(client) {
 		for(let p of pathnames) {
 			yield putFile(client, p);
 		}
@@ -332,7 +329,7 @@ function getFile(client, stashName, p) {
 }
 
 function getFiles(stashName, pathnames) {
-	return doWithClient(co.wrap(function*(client) {
+	return doWithClient(Promise.coroutine(function*(client) {
 		for(let p of pathnames) {
 			yield getFile(client, stashName, p);
 		}
@@ -355,7 +352,7 @@ function catFile(client, stashName, p) {
 }
 
 function catFiles(stashName, pathnames) {
-	return doWithClient(co.wrap(function*(client) {
+	return doWithClient(Promise.coroutine(function*(client) {
 		for(let p of pathnames) {
 			yield catFile(client, stashName, p);
 		}
@@ -378,7 +375,7 @@ function dropFile(client, stashName, p) {
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, pathnames) {
-	return doWithClient(co.wrap(function*(client) {
+	return doWithClient(Promise.coroutine(function*(client) {
 		for(let p of pathnames) {
 			yield dropFile(client, stashName, p);
 		}
@@ -437,7 +434,7 @@ function initStash(stashPath, name) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	return doWithClient(co.wrap(function*(client) {
+	return doWithClient(Promise.coroutine(function*(client) {
 		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + name}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 

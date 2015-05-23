@@ -17,7 +17,6 @@
     "cassandra-driver": "^2.1.0",
     "chalk": "^1.0.0",
     "chopshop": "^0.2.1",
-    "co": "^4.5.2",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
     "mkdirp": "^0.5.1",

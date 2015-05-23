@@ -5,11 +5,6 @@
 
 require('better-buffer-inspect');
 
-const Promise = require('bluebird');
-// Hack to make co() return bluebird promises.  We want this
-// primarily because bluebird prints unhandled rejections.
-global.Promise = Promise;
-
 const terastash = require('..');
 const assert = require('assert');
 const program = require('commander');
