@@ -10,7 +10,7 @@ const blake2 = require('blake2');
 const co = require('co');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
-const MultiStream = require('multistream');
+const Combine = require('combine-streams');
 const utils = require('../utils');
 
 const CHUNK_SIZE = 100 * 1024;
@@ -22,6 +22,7 @@ function writeChunks(directory, key, p) {
 	assert.equal(typeof p, "string");
 	assert(key instanceof Buffer, key);
 	assert.equal(key.length, 128/8);
+
 	const expectedTotalSize = fs.statSync(p).size;
 	const inputStream = fs.createReadStream(p);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
@@ -69,11 +70,24 @@ function readChunks(directory, key, chunkDigests) {
 	assert(key instanceof Buffer, key);
 	assert.equal(key.length, 128/8);
 	assert(Array.isArray(chunkDigests), chunkDigests);
+
 	// TODO: check hashes
-	const chunkStreams = chunkDigests
-		.map(function(digest) { return digest.toString('hex'); })
-		.map(function(hexDigest) { return fs.createReadStream(path.join(directory, hexDigest)); } );
-	const cipherStream = new MultiStream(chunkStreams);
+	const cipherStream = new Combine();
+	co(function*() {
+		for(const digest of chunkDigests) {
+			const chunkStream = fs.createReadStream(path.join(directory, digest.toString('hex')));
+			cipherStream.append(chunkStream);
+			yield new Promise(function(resolve) {
+				chunkStream.once('end', function() {
+					resolve();
+				});
+			});
+		}
+		cipherStream.append(null);
+	}).catch(function(err) {
+		// TODO: emit the error through the streams instead?
+		console.log(err.stack);
+	});
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	cipherStream.pipe(clearStream);
 	return clearStream;

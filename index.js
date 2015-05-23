@@ -301,9 +301,13 @@ function getFile(client, stashName, p) {
 					const readStream = localfs.readChunks(process.env.CHUNKS_DIR, row.key, row.chunks);
 					const writeStream = fs.createWriteStream(outputFilename);
 					readStream.pipe(writeStream);
-					const p = new Promise(function(resolve) {
+					// TODO: check file length
+					const p = new Promise(function(resolve, reject) {
 						writeStream.once('finish', function() {
 							resolve();
+						});
+						writeStream.once('error', function(err) {
+							reject(err);
 						});
 					});
 					return p;
