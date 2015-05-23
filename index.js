@@ -308,6 +308,9 @@ function getFile(client, stashName, p) {
 						writeStream.once('error', function(err) {
 							reject(err);
 						});
+						readStream.once('error', function(err) {
+							reject(err);
+						});
 					});
 					return p;
 				} else {

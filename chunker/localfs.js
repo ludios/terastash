@@ -62,6 +62,8 @@ function writeChunks(directory, key, p) {
 	});
 }
 
+class BadChunk extends Error {}
+
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
@@ -73,22 +75,40 @@ function readChunks(directory, key, chunkDigests) {
 
 	// TODO: check hashes
 	const cipherStream = new Combine();
+	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	co(function*() {
 		for(const digest of chunkDigests) {
+			assert(digest instanceof Buffer, digest);
+
 			const chunkStream = fs.createReadStream(path.join(directory, digest.toString('hex')));
-			cipherStream.append(chunkStream);
-			yield new Promise(function(resolve) {
+
+			const blake2b = blake2.createHash('blake2b');
+			const passthrough = new stream.PassThrough();
+			chunkStream.pipe(passthrough);
+			passthrough.on('data', function(data) {
+				blake2b.update(data);
+			});
+
+			cipherStream.append(passthrough);
+			yield new Promise(function(resolve, reject) {
 				chunkStream.once('end', function() {
-					resolve();
+					const readDigest = blake2b.digest().slice(0, 224/8);
+					if(readDigest.equals(digest)) {
+						resolve();
+					} else {
+						reject(new BadChunk(
+							`BLAKE2b-224 of chunk should be\n` +
+							`${digest.toString('hex')} but read data was \n` +
+							`${readDigest.toString('hex')}`
+						));
+					}
 				});
 			});
 		}
 		cipherStream.append(null);
 	}).catch(function(err) {
-		// TODO: emit the error through the streams instead?
-		console.log(err.stack);
+		clearStream.emit('error', err);
 	});
-	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	cipherStream.pipe(clearStream);
 	return clearStream;
 }
