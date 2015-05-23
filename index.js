@@ -286,15 +286,14 @@ function getFile(client, stashName, p) {
 			//console.log(result);
 			for(let row of result.rows) {
 				let outputFilename;
-				// TODO: create directories if needed
 				// If stashName was given, write file to current directory
 				if(stashName) {
 					outputFilename = row.pathname;
 				} else {
 					outputFilename = stashInfo.path + '/' + row.pathname;
 				}
+				mkdirp(path.dirname(outputFilename));
 
-				//console.log({p, row});
 				if(row.chunks) {
 					assert.strictEqual(row.content, null);
 					assert.strictEqual(row.blake2b224, null);
