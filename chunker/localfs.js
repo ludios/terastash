@@ -77,7 +77,6 @@ function readChunks(directory, key, chunkDigests) {
 	assert.equal(key.length, 128/8);
 	assert(Array.isArray(chunkDigests), chunkDigests);
 
-	// TODO: check hashes
 	const cipherStream = new Combine();
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	co(function*() {
