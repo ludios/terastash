@@ -6,7 +6,7 @@
 require('better-buffer-inspect');
 
 const terastash = require('..');
-const assert = require('contend');
+const T = require('notmytype');
 const program = require('commander');
 
 // Ugly hack to avoid getting Function
@@ -47,7 +47,7 @@ program
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
 	.action(a(function(name) {
-		assert.equal(typeof name, "string");
+		T(name, T.string);
 		terastash.initStash(process.cwd(), name);
 	}));
 
@@ -56,7 +56,7 @@ program
 	.description(d(`
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`))
 	.action(a(function(name) {
-		assert.equal(typeof name, "string");
+		T(name, T.string);
 		terastash.destroyKeyspace(name);
 	}));
 
@@ -66,6 +66,7 @@ program
 	.description(d(`
 		Put a file or directory (recursively) into the database`))
 	.action(a(function(files) {
+		T(files, T.list(T.string));
 		terastash.putFiles(files);
 	}));
 
@@ -75,6 +76,7 @@ program
 	.description(d(`
 		Get a file or directory (recursively) from the database`))
 	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		terastash.getFiles(name, files);
 	}));
@@ -85,6 +87,7 @@ program
 	.description(d(`
 		Dump the contents of a file in the database to stdout`))
 	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		terastash.catFiles(name, files);
 	}));
@@ -97,6 +100,7 @@ program
 		Does not emit error or warning if specified files are not in the database.
 		Does not remove the corresponding file in the stash directory, if it is there.`))
 	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		terastash.dropFiles(name, files);
 	}));
@@ -108,7 +112,7 @@ program
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.option('-j, --just-names', 'Print just the filenames without any decoration')
 	.action(a(function(paths, options) {
-		//console.log({cmd, options}); process.exit();
+		T(paths, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
@@ -125,7 +129,7 @@ program
 	.command('list-stashes')
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
-	.action(a(function(cmd, options) {
+	.action(a(function() {
 		terastash.listStashes();
 	}));
 
