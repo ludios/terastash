@@ -4,7 +4,7 @@
 require('better-buffer-inspect');
 
 const utils = require('../utils');
-const assert = require('assert');
+const assert = require('contend');
 
 describe('getParentPath', function() {
 	it('should return the parent path', function() {

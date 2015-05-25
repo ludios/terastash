@@ -6,7 +6,7 @@
 require('better-buffer-inspect');
 
 const terastash = require('..');
-const assert = require('assert');
+const assert = require('contend');
 const program = require('commander');
 
 // Ugly hack to avoid getting Function

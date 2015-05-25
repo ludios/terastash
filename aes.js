@@ -2,7 +2,7 @@
 "use strict";
 
 const crypto = require('crypto');
-const assert = require('assert');
+const assert = require('contend');
 
 /**
  * Make sure that OpenSSL's AES-128-CTR cipher works as expected, including
