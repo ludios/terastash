@@ -11,6 +11,7 @@ const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
 const blake2 = require('blake2');
+const T = require('notmytype');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
@@ -107,10 +108,8 @@ function userPathToDatabasePath(base, p) {
  * with the query results.
  */
 function runQuery(client, statement, args) {
+	T(client, cassandra.Client, statement, T.string, args, Array);
 	//console.log('runQuery(%s, %s, %s)', client, statement, args);
-	assert.equal(typeof client, 'object');
-	assert.equal(typeof statement, 'string');
-	assert(Array.isArray(args), typeof args);
 
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
@@ -236,7 +235,7 @@ function putFile(client, p) {
 			content = null;
 			key = crypto.randomBytes(128/8);
 			chunks = yield localfs.writeChunks(process.env.CHUNKS_DIR, key, p);
-			assert(Array.isArray(chunks), chunks);
+			T(chunks, Array);
 			size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
@@ -409,8 +408,8 @@ function listStashes() {
 }
 
 function assertName(name) {
+	T(name, T.string);
 	assert(name, "Name must not be empty");
-	assert.equal(typeof name, 'string');
 }
 
 function destroyKeyspace(name) {

@@ -72,6 +72,8 @@ class BadChunk extends Error {
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
 function readChunks(directory, key, chunkDigests) {
+	//T(directory, 'string', key, Buffer, chunkDigests, T.Array(Buffer));
+
 	assert.equal(typeof directory, "string");
 	assert(key instanceof Buffer, key);
 	assert.equal(key.length, 128/8);

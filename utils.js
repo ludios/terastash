@@ -1,21 +1,26 @@
 "use strong";
 "use strict";
 
-const assert = require('assert');
+const T = require('notmytype');
+
 
 /**
  * ISO-ish string without the seconds
  */
 function shortISO(d) {
+	T(d, Date);
 	return d.toISOString().substr(0, 16).replace("T", " ");
 }
 
 function pad(s, wantLength) {
+	T(s, T.string, wantLength, T.number);
 	return " ".repeat(Math.max(0, wantLength - s.length)) + s;
 }
 
-// http://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
+const stringOrNumType = T.union([T.string, T.number]);
 function numberWithCommas(stringOrNum) {
+	T(stringOrNum, stringOrNumType);
+	// http://stackoverflow.com/questions/2901102/
 	return ("" + stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
@@ -23,6 +28,7 @@ function numberWithCommas(stringOrNum) {
  * '/'-based operation on all OSes
  */
 function getParentPath(path) {
+	T(path, T.string);
 	const parts = path.split('/');
 	parts.pop();
 	return parts.join('/');
@@ -32,6 +38,7 @@ function getParentPath(path) {
  * '/'-based operation on all OSes
  */
 function getBaseName(path) {
+	T(path, T.string);
 	const parts = path.split('/');
 	return parts[parts.length - 1];
 }
@@ -40,6 +47,7 @@ function getBaseName(path) {
  * Convert string with newlines and tabs to one without.
  */
 function ol(s) {
+	T(s, T.string);
 	return s.replace(/[\n\t]+/g, " ");
 }
 
@@ -50,7 +58,7 @@ function ol(s) {
  * Like clojure.core/comparator
  */
 function comparator(pred) {
-	assert.equal(typeof pred, 'function');
+	T(pred, T.function);
 	return function(x, y) {
 		if(pred(x, y)) {
 			return -1;
@@ -67,7 +75,7 @@ function comparator(pred) {
  * returns a comparator function that can be passed to arr.sort(...)
  */
 function comparedBy(mapping, reverse) {
-	assert.equal(typeof mapping, 'function');
+	T(mapping, T.function, reverse, T.optional(T.boolean));
 	if(!reverse) {
 		return comparator(function(x, y) {
 			return mapping(x) < mapping(y);
