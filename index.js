@@ -3,7 +3,7 @@
 
 const Promise = require('bluebird');
 const fs = require('fs');
-const assert = require('contend');
+const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
 const cassandra = require('cassandra-driver');
