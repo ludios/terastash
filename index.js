@@ -19,6 +19,7 @@ const localfs = require('./chunker/localfs');
 const KEYSPACE_PREFIX = "ts_";
 
 function blake2b224Buffer(buf) {
+	T(buf, Buffer);
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
 }
 
@@ -27,6 +28,7 @@ function getNewClient() {
 }
 
 function writeTerastashConfig(config) {
+	T(config, T.object);
 	const configPath = basedir.configPath("terastash.json");
 	mkdirp(path.dirname(configPath));
 	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -55,13 +57,14 @@ function getTerastashConfig() {
  * or `null` if there is no terastash base.
  */
 function findStashInfoByPath(pathname) {
+	T(pathname, T.string);
 	const config = getTerastashConfig();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
 		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
 
 	const resolvedPathname = path.resolve(pathname);
-	for(let stash of config.stashes) {
+	for(const stash of config.stashes) {
 		//console.log(resolvedPathname, stash.path);
 		if(resolvedPathname.startsWith(stash.path)) {
 			return stash;
@@ -74,12 +77,13 @@ function findStashInfoByPath(pathname) {
  * Return a stash for a given stash name
  */
 function findStashInfoByName(stashName) {
+	T(stashName, T.string);
 	const config = getTerastashConfig();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
 		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
 
-	for(let stash of config.stashes) {
+	for(const stash of config.stashes) {
 		if(stash.name === stashName) {
 			return stash;
 		}
@@ -93,6 +97,7 @@ function findStashInfoByName(stashName) {
  * database.
  */
 function userPathToDatabasePath(base, p) {
+	T(base, T.string, p, T.string);
 	const resolved = path.resolve(p);
 	if(resolved === base) {
 		return "";
@@ -110,7 +115,6 @@ function userPathToDatabasePath(base, p) {
 function runQuery(client, statement, args) {
 	T(client, cassandra.Client, statement, T.string, args, Array);
 	//console.log('runQuery(%s, %s, %s)', client, statement, args);
-
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
@@ -123,6 +127,7 @@ function runQuery(client, statement, args) {
 }
 
 function doWithClient(f) {
+	T(f, T.function);
 	const client = getNewClient();
 	const p = f(client);
 	return p.catch(function(err) {
@@ -133,6 +138,7 @@ function doWithClient(f) {
 }
 
 function doWithPath(client, stashName, p, fn) {
+	T(client, cassandra.Client, stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
@@ -172,7 +178,7 @@ function lsPath(stashName, justNames, p) {
 				[dbPath]
 			).then(function(result) {
 				result.rows.sort(pathnameSorter);
-				for(let row of result.rows) {
+				for(const row of result.rows) {
 					const baseName = utils.getBaseName(row.pathname);
 					if(justNames) {
 						console.log(baseName);
@@ -266,7 +272,7 @@ function putFile(client, p) {
  */
 function putFiles(pathnames) {
 	return doWithClient(Promise.coroutine(function*(client) {
-		for(let p of pathnames) {
+		for(const p of pathnames) {
 			yield putFile(client, p);
 		}
 	}));
@@ -285,7 +291,7 @@ function getFile(client, stashName, p) {
 			[dbPath]
 		).then(function(result) {
 			//console.log(result);
-			for(let row of result.rows) {
+			for(const row of result.rows) {
 				let outputFilename;
 				// If stashName was given, write file to current directory
 				if(stashName) {
@@ -334,7 +340,7 @@ function getFile(client, stashName, p) {
 
 function getFiles(stashName, pathnames) {
 	return doWithClient(Promise.coroutine(function*(client) {
-		for(let p of pathnames) {
+		for(const p of pathnames) {
 			yield getFile(client, stashName, p);
 		}
 	}));
@@ -348,7 +354,7 @@ function catFile(client, stashName, p) {
 			WHERE pathname = ?;`,
 			[dbPath]
 		).then(function(result) {
-			for(let row of result.rows) {
+			for(const row of result.rows) {
 				process.stdout.write(row.content);
 			}
 		});
@@ -357,7 +363,7 @@ function catFile(client, stashName, p) {
 
 function catFiles(stashName, pathnames) {
 	return doWithClient(Promise.coroutine(function*(client) {
-		for(let p of pathnames) {
+		for(const p of pathnames) {
 			yield catFile(client, stashName, p);
 		}
 	}));
@@ -380,7 +386,7 @@ function dropFile(client, stashName, p) {
  */
 function dropFiles(stashName, pathnames) {
 	return doWithClient(Promise.coroutine(function*(client) {
-		for(let p of pathnames) {
+		for(const p of pathnames) {
 			yield dropFile(client, stashName, p);
 		}
 	}));
@@ -397,7 +403,7 @@ function listStashes() {
 			`SELECT keyspace_name FROM System.schema_keyspaces;`,
 			[]
 		).then(function(result) {
-			for(let row of result.rows) {
+			for(const row of result.rows) {
 				const name = row.keyspace_name;
 				if(name.startsWith(KEYSPACE_PREFIX)) {
 					console.log(name.replace(KEYSPACE_PREFIX, ""));
