@@ -11,18 +11,17 @@ const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
+const T = require('notmytype');
 
 const CHUNK_SIZE = 100 * 1024;
 // Chunk size must be a multiple of an AES block, for our convenience.
 assert.strictEqual(CHUNK_SIZE % 128/8, 0);
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
-assert.equal(iv0.length, 128/8);
+assert.strictEqual(iv0.length, 128/8);
 
 const writeChunks = Promise.coroutine(function*(directory, key, p) {
-	assert.equal(typeof directory, "string");
-	assert.equal(typeof p, "string");
-	assert(key instanceof Buffer, key);
-	assert.equal(key.length, 128/8);
+	T(directory, T.string, key, Buffer, p, T.string);
+	assert.strictEqual(key.length, 128/8);
 
 	const expectedTotalSize = fs.statSync(p).size;
 	const inputStream = fs.createReadStream(p);
@@ -72,12 +71,8 @@ class BadChunk extends Error {
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
 function readChunks(directory, key, chunkDigests) {
-	//T(directory, 'string', key, Buffer, chunkDigests, T.Array(Buffer));
-
-	assert.equal(typeof directory, "string");
-	assert(key instanceof Buffer, key);
-	assert.equal(key.length, 128/8);
-	assert(Array.isArray(chunkDigests), chunkDigests);
+	T(directory, T.string, key, Buffer, chunkDigests, T.list(Buffer));
+	assert.strictEqual(key.length, 128/8);
 
 	const cipherStream = new Combine();
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
@@ -85,8 +80,6 @@ function readChunks(directory, key, chunkDigests) {
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
 		for(const digest of chunkDigests) {
-			assert(digest instanceof Buffer, digest);
-
 			const chunkStream = fs.createReadStream(path.join(directory, digest.toString('hex')));
 
 			const blake2b = blake2.createHash('blake2b');
