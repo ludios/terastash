@@ -20,6 +20,14 @@ Can add and drop a file
            1,048,576 1990-01-01 00:00 bigfile
                   12 1970-01-01 00:00 sample1
                   14 1980-01-01 00:00 sample2*
+  $ ts ls -t
+           1,048,576 1990-01-01 00:00 bigfile
+                  14 1980-01-01 00:00 sample2*
+                  12 1970-01-01 00:00 sample1
+  $ ts ls -rt
+                  12 1970-01-01 00:00 sample1
+                  14 1980-01-01 00:00 sample2*
+           1,048,576 1990-01-01 00:00 bigfile
   $ ts ls -j
   bigfile
   sample1

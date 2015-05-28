@@ -111,6 +111,7 @@ program
 		List directory in the database`))
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.option('-j, --just-names', 'Print just the filenames without any decoration')
+	.option('-t, --sort-by-mtime', 'Sort by modification time, newest first') /* newest first to match ls behavior */
 	.option('-r, --reverse', 'Reverse order while sorting')
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
@@ -123,7 +124,14 @@ program
 		if(name === null && !paths.length) {
 			paths[0] = '.';
 		}
-		terastash.lsPath(name, options.justNames, options.reverse, paths[0]);
+		terastash.lsPath(
+			name, {
+				justNames: options.justNames,
+				reverse: options.reverse,
+				sortByMtime: options.sortByMtime
+			},
+			paths[0]
+		);
 	}));
 
 program

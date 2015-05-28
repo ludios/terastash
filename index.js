@@ -171,7 +171,15 @@ const pathnameSorterDesc = utils.comparedBy(function(row) {
 	return utils.getBaseName(row.pathname);
 }, true);
 
-function lsPath(stashName, justNames, reverse, p) {
+const mtimeSorterAsc = utils.comparedBy(function(row) {
+	return row.mtime;
+});
+
+const mtimeSorterDesc = utils.comparedBy(function(row) {
+	return row.mtime;
+}, true);
+
+function lsPath(stashName, options, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 			return runQuery(
@@ -181,10 +189,14 @@ function lsPath(stashName, justNames, reverse, p) {
 				WHERE parent = ?`,
 				[dbPath]
 			).then(function(result) {
-				result.rows.sort(reverse ? pathnameSorterDesc : pathnameSorterAsc);
+				if(options.sortByMtime) {
+					result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+				} else {
+					result.rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
+				}
 				for(const row of result.rows) {
 					const baseName = utils.getBaseName(row.pathname);
-					if(justNames) {
+					if(options.justNames) {
 						console.log(baseName);
 					} else {
 						let decoratedName = baseName;
