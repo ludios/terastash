@@ -163,11 +163,15 @@ function doWithPath(client, stashName, p, fn) {
 	return fn(client, stashInfo, dbPath, parentPath);
 }
 
-const pathnameSorter = utils.comparedBy(function(row) {
+const pathnameSorterAsc = utils.comparedBy(function(row) {
 	return utils.getBaseName(row.pathname);
 });
 
-function lsPath(stashName, justNames, p) {
+const pathnameSorterDesc = utils.comparedBy(function(row) {
+	return utils.getBaseName(row.pathname);
+}, true);
+
+function lsPath(stashName, justNames, reverse, p) {
 	return doWithClient(function(client) {
 		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
 			return runQuery(
@@ -177,7 +181,7 @@ function lsPath(stashName, justNames, p) {
 				WHERE parent = ?`,
 				[dbPath]
 			).then(function(result) {
-				result.rows.sort(pathnameSorter);
+				result.rows.sort(reverse ? pathnameSorterDesc : pathnameSorterAsc);
 				for(const row of result.rows) {
 					const baseName = utils.getBaseName(row.pathname);
 					if(justNames) {

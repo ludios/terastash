@@ -24,6 +24,10 @@ Can add and drop a file
   bigfile
   sample1
   sample2
+  $ ts ls -rj
+  sample2
+  sample1
+  bigfile
   $ ts ls -j -n unit_tests ''
   bigfile
   sample1
