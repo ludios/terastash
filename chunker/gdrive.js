@@ -94,7 +94,6 @@ function getCredential(clientId) {
 // TODO: allow specifying parent folder
 function createFolder(oauth2Client, name) {
 	T(oauth2Client, OAuth2, name, T.string);
-	// TODO: require google/drive directly to speed up startup?
 	const drive = google.drive({version: 'v2', auth: oauth2Client});
 	return new Promise(function(resolve, reject) {
 		drive.files.insert({
