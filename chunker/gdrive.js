@@ -5,6 +5,7 @@ const google = require('googleapis');
 const Promise = require('bluebird');
 const T = require('notmytype');
 const OAuth2 = google.auth.OAuth2;
+const basedir = require('xdg').basedir;
 
 const REDIRECT_URL = 'urn:ietf:wg:oauth:2.0:oob';
 
@@ -35,6 +36,8 @@ function getCredentials(oauth2Client) {
 /**
  * Hit Google to get an access and refresh token based on `authCode`
  * and set the tokens on the `oauth2Client` object.
+ *
+ * Returns a Promise that resolves with the tokens
  */
 function importAuthCode(oauth2Client, authCode) {
 	T(oauth2Client, OAuth2, authCode, T.string);
@@ -50,8 +53,42 @@ function importAuthCode(oauth2Client, authCode) {
 	});
 }
 
+/**
+ * Returns a Promise that resolves with the tokens
+ */
+function refreshTokens(oauth2Client) {
+	T(oauth2Client, OAuth2);
+	return new Promise(function(resolve, reject) {
+		oauth2Client.refreshAccessToken(function(err, tokens) {
+			if(err) {
+				reject(err);
+			} else {
+				resolve(tokens);
+			}
+		});
+	});
+}
+
+function areTokensExpired(oauth2Client) {
+	T(oauth2Client, OAuth2);
+	const expiryDate = oauth2Client.credentials.expiry_date;
+	return expiryDate <= Date.now();
+}
+
+/*
+function writeTokens(oauth2Client) {
+	const configPath = basedir.configPath("terastash.json");
+	mkdirp(path.dirname(configPath));
+	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+}*/
+
 // TODO: allow specifying parent folder
 function createFolder(oauth2Client, name) {
+	T(oauth2Client, OAuth2, name, T.string);
+	// We refresh the tokens ourselves so that we can capture them
+	// and store them in a file.
+	// XXX
+
 	const drive = google.drive({version: 'v2', auth: oauth2Client});
 	return new Promise(function(resolve, reject) {
 		drive.files.insert({
