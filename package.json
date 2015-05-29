@@ -19,6 +19,7 @@
     "chopshop": "^0.2.2",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
+    "googleapis": "^2.0.4",
     "mkdirp": "^0.5.1",
     "notmytype": "^0.1.4",
     "xdg": "^0.1.1"
