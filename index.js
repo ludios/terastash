@@ -29,13 +29,13 @@ function getNewClient() {
 
 function writeTerastashConfig(config) {
 	T(config, T.object);
-	const configPath = basedir.configPath("terastash.json");
+	const configPath = basedir.configPath(path.join("terastash", "stashes.json"));
 	mkdirp(path.dirname(configPath));
 	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
 function getTerastashConfig() {
-	const configPath = basedir.configPath("terastash.json");
+	const configPath = basedir.configPath(path.join("terastash", "stashes.json"));
 	try {
 		return JSON.parse(fs.readFileSync(configPath));
 	} catch(e) {

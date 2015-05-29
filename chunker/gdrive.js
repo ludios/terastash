@@ -2,8 +2,10 @@
 "use strict";
 
 const google = require('googleapis');
+const path = require('path');
 const Promise = require('bluebird');
 const T = require('notmytype');
+const mkdirp = require('mkdirp');
 const OAuth2 = google.auth.OAuth2;
 const basedir = require('xdg').basedir;
 
@@ -53,42 +55,46 @@ function importAuthCode(oauth2Client, authCode) {
 	});
 }
 
-/**
- * Returns a Promise that resolves with the tokens
- */
-function refreshTokens(oauth2Client) {
-	T(oauth2Client, OAuth2);
-	return new Promise(function(resolve, reject) {
-		oauth2Client.refreshAccessToken(function(err, tokens) {
-			if(err) {
-				reject(err);
-			} else {
-				resolve(tokens);
-			}
-		});
-	});
+function writeCredentials(allCredentials) {
+	T(allCredentials, T.object);
+	const tokensPath = basedir.tokensPath(path.join("terastash", "google-tokens.json"));
+	mkdirp(path.dirname(tokensPath));
+	fs.writeFileSync(tokensPath, JSON.stringify(allCredentials, null, 2));
 }
 
-function areTokensExpired(oauth2Client) {
-	T(oauth2Client, OAuth2);
-	const expiryDate = oauth2Client.credentials.expiry_date;
-	return expiryDate <= Date.now();
+function updateCredential(clientId, credentials) {
+	T(credentials, T.object);
+	const allCredentials = readCredentials();
+	allCredentials.credentials[clientId] = credentials;
+	writeCredentials(allCredentials);
 }
 
-/*
-function writeTokens(oauth2Client) {
-	const configPath = basedir.configPath("terastash.json");
-	mkdirp(path.dirname(configPath));
-	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-}*/
+function readCredentials() {
+	const tokensPath = basedir.tokensPath(path.join("terastash", "google-tokens.json"));
+	try {
+		return JSON.parse(fs.readFileSync(tokensPath));
+	} catch(e) {
+		if(e.code !== 'ENOENT') {
+			throw e;
+		}
+		// If there is no config file, write one.
+		const allCredentials = {
+			credentials: {},
+			_comment: "access tokens expire quickly; refresh tokens never expire unless revoked"
+		}
+		writeCredentials(allCredentials);
+		return allCredentials;
+	}
+}
+
+function getCredential(clientId) {
+	return readCredentials().credentials[clientId] || null;
+}
 
 // TODO: allow specifying parent folder
 function createFolder(oauth2Client, name) {
 	T(oauth2Client, OAuth2, name, T.string);
-	// We refresh the tokens ourselves so that we can capture them
-	// and store them in a file.
-	// XXX
-
+	// TODO: require google/drive directly to speed up startup?
 	const drive = google.drive({version: 'v2', auth: oauth2Client});
 	return new Promise(function(resolve, reject) {
 		drive.files.insert({
