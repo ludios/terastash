@@ -25,8 +25,8 @@ function getAuthUrl(oauth2Client) {
 	T(oauth2Client, OAuth2);
 	const scopes = ['https://www.googleapis.com/auth/drive'];
 	const url = oauth2Client.generateAuthUrl({
-		access_type: 'offline', // 'online' (default) or 'offline' (gets refresh_token)
-		scope: scopes
+		"access_type": 'offline', // 'online' (default) or 'offline' (gets refresh_token)
+		"scope": scopes
 	});
 	return url;
 }
@@ -63,13 +63,6 @@ function writeCredentials(allCredentials) {
 	fs.writeFileSync(tokensPath, JSON.stringify(allCredentials, null, 2));
 }
 
-function updateCredential(clientId, credentials) {
-	T(credentials, T.object);
-	const allCredentials = readCredentials();
-	allCredentials.credentials[clientId] = credentials;
-	writeCredentials(allCredentials);
-}
-
 function readCredentials() {
 	const tokensPath = basedir.configPath(path.join("terastash", "google-tokens.json"));
 	try {
@@ -82,10 +75,17 @@ function readCredentials() {
 		const allCredentials = {
 			credentials: {},
 			_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
-		}
+		};
 		writeCredentials(allCredentials);
 		return allCredentials;
 	}
+}
+
+function updateCredential(clientId, credentials) {
+	T(credentials, T.object);
+	const allCredentials = readCredentials();
+	allCredentials.credentials[clientId] = credentials;
+	writeCredentials(allCredentials);
 }
 
 function getCredential(clientId) {
@@ -108,7 +108,7 @@ function createFolder(oauth2Client, name) {
 			} else {
 				resolve(obj);
 			}
-		});	
+		});
 	});
 }
 

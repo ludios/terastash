@@ -6,15 +6,15 @@ const fs = require('fs');
 const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
-const cassandra = require('cassandra-driver');
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 const chalk = require('chalk');
-const blake2 = require('blake2');
 const T = require('notmytype');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
+let cassandra;
+let blake2;
 let gdrive;
 let readline;
 
@@ -22,10 +22,17 @@ const KEYSPACE_PREFIX = "ts_";
 
 function blake2b224Buffer(buf) {
 	T(buf, Buffer);
+	if(!blake2) { blake2 = require('blake2'); }
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
 }
 
+let CassandraClientType = T.object;
+
 function getNewClient() {
+	if(!cassandra) {
+		cassandra = require('cassandra-driver');
+		CassandraClientType = cassandra.Client;
+	}
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
@@ -144,7 +151,7 @@ function userPathToDatabasePath(base, p) {
  * with the query results.
  */
 function runQuery(client, statement, args) {
-	T(client, cassandra.Client, statement, T.string, args, Array);
+	T(client, CassandraClientType, statement, T.string, args, Array);
 	//console.log('runQuery(%s, %s, %s)', client, statement, args);
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
@@ -186,7 +193,7 @@ function doWithClient(f) {
 }
 
 const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {
-	T(client, cassandra.Client, stashName, T.maybe(T.string), p, T.string, fn, T.function);
+	T(client, CassandraClientType, stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
@@ -531,7 +538,7 @@ const questionAsync = function(question) {
 			resolve(answer);
 		});
 	});
-}
+};
 
 const authorizeGDrive = Promise.coroutine(function*(name) {
 	T(name, T.string);
@@ -549,7 +556,8 @@ const authorizeGDrive = Promise.coroutine(function*(name) {
 	}
 	const oauth2Client = gdrive.getOAuth2Client(chunkStore.clientId, chunkStore.clientSecret);
 	const url = gdrive.getAuthUrl(oauth2Client);
-	console.log("Please open this URL in a browser (one where you are signed in to Google) and authorize the application:")
+	console.log("Please open this URL in a browser (one where" +
+		" you are signed in to Google) and authorize the application:");
 	console.log("");
 	console.log(url);
 	console.log("");
