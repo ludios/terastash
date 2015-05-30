@@ -143,6 +143,27 @@ program
 	}));
 
 program
+	.command('list-chunk-stores')
+	.description(d(`
+		List chunk stores`))
+	.action(a(function() {
+		terastash.listChunkStores();
+	}));
+
+program
+	.command('define-chunk-store <store-name>')
+	.description(d(`
+		Define a chunk store`))
+	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
+	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
+	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
+	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
+	.action(a(function(storeName, options) {
+		T(storeName, T.string, options, T.object);
+		terastash.defineChunkStore(storeName, options);
+	}));
+
+program
 	.command('help')
 	.description(d(`
 		Output usage information`))

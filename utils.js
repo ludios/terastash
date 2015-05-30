@@ -87,4 +87,9 @@ function comparedBy(mapping, reverse) {
 	}
 }
 
-module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol, comparator, comparedBy};
+function hasKey(obj, key) {
+	T(obj, T.object, key, T.string);
+	return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol, comparator, comparedBy, hasKey};

@@ -73,6 +73,14 @@ const getStashes = makeConfigFileInitializer(
 	}
 );
 
+const getChunkStores = makeConfigFileInitializer(
+	"chunk-stores.json", {
+		stores: {},
+		_comment: utils.ol(`You cannot change the name of a store because existing
+			chunks reference it by name in the Cassandra database.`)
+	}
+);
+
 /**
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
@@ -450,6 +458,34 @@ function listTerastashKeyspaces() {
 	});
 }
 
+const listChunkStores = Promise.coroutine(function*() {
+	const config = yield getChunkStores();
+	for(const name of Object.keys(config.stores)) {
+		console.log(name);
+	}
+});
+
+const defineChunkStore = Promise.coroutine(function*(name, opts) {
+	T(name, T.string, opts, T.object);
+	const config = yield getChunkStores();
+	if(utils.hasKey(config.stores, name)) {
+		throw new Error(`${name} is already defined in chunk-stores.json`);
+	}
+	const storeDef = {type: opts.type};
+	if(opts.type === "localfs") {
+		T(opts.directory, T.string);
+		storeDef.directory = opts.directory;
+	} else if(opts.type === "gdrive") {
+		T(opts.clientId, T.string, opts.clientSecret, T.string);
+		storeDef.clientId = opts.clientId;
+		storeDef.clientSecret = opts.clientSecret;
+	} else {
+		throw new Error(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
+	}
+	config.stores[name] = storeDef;
+	yield writeObjectToConfigFile("chunk-stores.json", config);
+});
+
 function assertName(name) {
 	T(name, T.string);
 	assert(name, "Name must not be empty");
@@ -467,9 +503,6 @@ function destroyKeyspace(name) {
 		});
 	});
 }
-
-// TODO: function to destroy all keyspaces that no longer have a matching .terastash.json file
-// TODO: need to store path to terastash base in a cassandra table
 
 /**
  * Initialize a new stash
@@ -511,5 +544,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 });
 
 module.exports = {
-	initStash, destroyKeyspace, getStashes, listTerastashKeyspaces, putFile, putFiles, getFile, getFiles,
-	catFile, catFiles, dropFile, dropFiles, lsPath, KEYSPACE_PREFIX};
+	initStash, destroyKeyspace, getStashes, listTerastashKeyspaces,
+	listChunkStores, defineChunkStore, putFile, putFiles, getFile, getFiles, catFile, catFiles,
+	dropFile, dropFiles, lsPath, KEYSPACE_PREFIX
+};
