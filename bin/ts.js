@@ -139,7 +139,7 @@ program
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
 	.action(a(function() {
-		terastash.listStashes();
+		terastash.listTerastashKeyspaces();
 	}));
 
 program

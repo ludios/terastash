@@ -27,38 +27,59 @@ function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
-function writeTerastashConfig(config) {
-	T(config, T.object);
-	const configPath = basedir.configPath(path.join("terastash", "stashes.json"));
-	mkdirp(path.dirname(configPath));
-	fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+const readFileAsync = Promise.promisify(fs.readFile);
+const writeFileAsync = Promise.promisify(fs.writeFile);
+const mkdirpAsync = Promise.promisify(mkdirp);
+
+const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
+	T(fname, T.string, object, T.object);
+	const configPath = basedir.configPath(path.join("terastash", fname));
+	yield mkdirpAsync(path.dirname(configPath));
+	yield writeFileAsync(configPath, JSON.stringify(object, null, 2));
+});
+
+const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
+	T(fname, T.string);
+	const configPath = basedir.configPath(path.join("terastash", fname));
+	const buf = yield readFileAsync(configPath);
+	return JSON.parse(buf);
+});
+
+function clone(obj) {
+	return JSON.parse(JSON.stringify(obj));
 }
 
-function getTerastashConfig() {
-	const configPath = basedir.configPath(path.join("terastash", "stashes.json"));
-	try {
-		return JSON.parse(fs.readFileSync(configPath));
-	} catch(e) {
-		if(e.code !== 'ENOENT') {
-			throw e;
+const makeConfigFileInitializer = function(fname, defaultConfig) {
+	T(fname, T.string, defaultConfig, T.object);
+	return Promise.coroutine(function*() {
+		try {
+			return (yield readObjectFromConfigFile(fname));
+		} catch(e) {
+			if(e.code !== 'ENOENT') {
+				throw e;
+			}
+			// If there is no config file, write defaultConfig.
+			yield writeObjectToConfigFile(fname, defaultConfig);
+			return clone(defaultConfig);
 		}
-		// If there is no config file, write one.
-		const config = {
-			stashes: [],
-			_comment: utils.ol(`You cannot change the name of a stash because it must match
-				the Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)};
-		writeTerastashConfig(config);
-		return config;
+	});
+};
+
+const getStashes = makeConfigFileInitializer(
+	"stashes.json", {
+		stashes: [],
+		_comment: utils.ol(`You cannot change the name of a stash because it must match
+			the Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
 	}
-}
+);
 
 /**
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
  */
-function findStashInfoByPath(pathname) {
+const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 	T(pathname, T.string);
-	const config = getTerastashConfig();
+	const config = yield getStashes();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
 		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
@@ -71,14 +92,14 @@ function findStashInfoByPath(pathname) {
 		}
 	}
 	return null;
-}
+});
 
 /**
  * Return a stash for a given stash name
  */
-function findStashInfoByName(stashName) {
+const getStashInfoByName = Promise.coroutine(function*(stashName) {
 	T(stashName, T.string);
-	const config = getTerastashConfig();
+	const config = yield getStashes();
 	if(!config.stashes || !Array.isArray(config.stashes)) {
 		throw new Error(`terastash config has no "stashes" or not an Array`);
 	}
@@ -89,7 +110,7 @@ function findStashInfoByName(stashName) {
 		}
 	}
 	return null;
-}
+});
 
 /**
  * For any given relative user path, which may include ../, return
@@ -137,19 +158,19 @@ function doWithClient(f) {
 	});
 }
 
-function doWithPath(client, stashName, p, fn) {
+const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {
 	T(client, cassandra.Client, stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
 	if(stashName) { // Explicit stash name provided
-		stashInfo = findStashInfoByName(stashName);
+		stashInfo = yield getStashInfoByName(stashName);
 		if(!stashInfo) {
 			throw new Error(`No stash with name ${stashName}; consult terastash.json and ts help`);
 		}
 		dbPath = p;
 	} else {
-		stashInfo = findStashInfoByPath(resolvedPathname);
+		stashInfo = yield getStashInfoByPath(resolvedPathname);
 		if(!stashInfo) {
 			throw new Error(`File ${p} is not in a stash directory; consult terastash.json and ts help`);
 		}
@@ -161,7 +182,7 @@ function doWithPath(client, stashName, p, fn) {
 
 	// TODO: validate stashInfo.name - it may contain injection
 	return fn(client, stashInfo, dbPath, parentPath);
-}
+});
 
 const pathnameSorterAsc = utils.comparedBy(function(row) {
 	return utils.getBaseName(row.pathname);
@@ -411,7 +432,7 @@ function dropFiles(stashName, pathnames) {
 /**
  * List all terastash keyspaces in Cassandra
  */
-function listStashes() {
+function listTerastashKeyspaces() {
 	return doWithClient(function(client) {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 		return runQuery(
@@ -453,10 +474,10 @@ function destroyKeyspace(name) {
 /**
  * Initialize a new stash
  */
-function initStash(stashPath, name) {
+const initStash = Promise.coroutine(function*(stashPath, name) {
 	assertName(name);
 
-	if(findStashInfoByPath(stashPath)) {
+	if(yield getStashInfoByPath(stashPath)) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
@@ -481,14 +502,14 @@ function initStash(stashPath, name) {
 		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
 			ON "${KEYSPACE_PREFIX + name}".fs (parent);`, []);
 
-		const config = getTerastashConfig();
+		const config = yield getStashes();
 		config.stashes.push({name, path: path.resolve(stashPath)});
-		writeTerastashConfig(config);
+		yield writeObjectToConfigFile("stashes.json", config);
 
 		console.log("Created Cassandra keyspace and updated terastash.json.");
 	}));
-}
+});
 
 module.exports = {
-	initStash, destroyKeyspace, listStashes, putFile, putFiles, getFile, getFiles,
+	initStash, destroyKeyspace, getStashes, listTerastashKeyspaces, putFile, putFiles, getFile, getFiles,
 	catFile, catFiles, dropFile, dropFiles, lsPath, KEYSPACE_PREFIX};
