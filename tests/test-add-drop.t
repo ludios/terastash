@@ -2,7 +2,7 @@ Can add and drop a file
 
   $ export CHUNKS_DIR=/tmp/mychunks
   $ ts init unit_tests
-  Created Cassandra keyspace and updated terastash.json.
+  Created Cassandra keyspace and updated stashes.json.
   $ echo -e "hello\nworld" > sample1
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2

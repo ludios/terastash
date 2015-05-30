@@ -506,7 +506,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 		config.stashes.push({name, path: path.resolve(stashPath)});
 		yield writeObjectToConfigFile("stashes.json", config);
 
-		console.log("Created Cassandra keyspace and updated terastash.json.");
+		console.log("Created Cassandra keyspace and updated stashes.json.");
 	}));
 });
 
