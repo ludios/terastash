@@ -15,6 +15,8 @@ const T = require('notmytype');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
+let gdrive;
+let readline;
 
 const KEYSPACE_PREFIX = "ts_";
 
@@ -490,17 +492,73 @@ const defineChunkStore = Promise.coroutine(function*(name, opts) {
 	}
 	const storeDef = {type: opts.type};
 	if(opts.type === "localfs") {
-		T(opts.directory, T.string);
+		if(typeof opts.directory !== "string") {
+			throw new Error(`Chunk store type localfs requires a -d/--directory ` +
+				`parameter with a string; got ${opts.directory}`
+			);
+		}
 		storeDef.directory = opts.directory;
 	} else if(opts.type === "gdrive") {
-		T(opts.clientId, T.string, opts.clientSecret, T.string);
+		if(typeof opts.clientId !== "string") {
+			throw new Error(`Chunk store type gdrive requires a --client-id ` +
+				`parameter with a string; got ${opts.clientId}`
+			);
+		}
 		storeDef.clientId = opts.clientId;
+		if(typeof opts.clientSecret !== "string") {
+			throw new Error(`Chunk store type gdrive requires a --client-secret ` +
+				`parameter with a string; got ${opts.clientSecret}`
+			);
+		}
 		storeDef.clientSecret = opts.clientSecret;
 	} else {
 		throw new Error(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
 	}
 	config.stores[name] = storeDef;
 	yield writeObjectToConfigFile("chunk-stores.json", config);
+});
+
+const questionAsync = function(question) {
+	T(question, T.string);
+	if(!readline) { readline = require('readline'); }
+	return new Promise(function(resolve) {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout
+		});
+		rl.question(question, function(answer) {
+			rl.close();
+			resolve(answer);
+		});
+	});
+}
+
+const authorizeGDrive = Promise.coroutine(function*(name) {
+	T(name, T.string);
+	if(!gdrive) { gdrive = require('./chunker/gdrive'); }
+	const config = yield getChunkStores();
+	const chunkStore = config.stores[name];
+	if(!(typeof chunkStore === "object" && chunkStore !== null)) {
+		throw new Error(`Chunk store ${name} was ${chunkStore}, should be an object`);
+	}
+	if(!chunkStore.clientId) {
+		throw new Error(`Chunk store ${name} is missing a clientId`);
+	}
+	if(!chunkStore.clientSecret) {
+		throw new Error(`Chunk store ${name} is missing a clientSecret`);
+	}
+	const oauth2Client = gdrive.getOAuth2Client(chunkStore.clientId, chunkStore.clientSecret);
+	const url = gdrive.getAuthUrl(oauth2Client);
+	console.log("Please open this URL in a browser (one where you are signed in to Google) and authorize the application:")
+	console.log("");
+	console.log(url);
+	console.log("");
+	console.log("Then, copy the authorization code from the input box and paste it here:");
+	const authCode = yield questionAsync("Authorization code: ");
+	console.log("OK, sending the authorization code to Google to get a refresh token...");
+	yield gdrive.importAuthCode(oauth2Client, authCode);
+	gdrive.updateCredential(chunkStore.clientId, oauth2Client.credentials);
+	console.log("OK, saved the refresh token and access token.");
 });
 
 function assertName(name) {
@@ -561,7 +619,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 });
 
 module.exports = {
-	initStash, destroyKeyspace, getStashes, listTerastashKeyspaces,
+	initStash, destroyKeyspace, getStashes, authorizeGDrive, listTerastashKeyspaces,
 	listChunkStores, defineChunkStore, putFile, putFiles, getFile, getFiles, catFile, catFiles,
 	dropFile, dropFiles, lsPath, KEYSPACE_PREFIX
 };

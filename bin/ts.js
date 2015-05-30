@@ -154,7 +154,7 @@ program
 program
 	.command('define-chunk-store <store-name>')
 	.description(d(`
-		Define a chunk store`))
+		Define a chunk store. Name cannot be changed later.`))
 	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
 	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
 	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
@@ -162,6 +162,15 @@ program
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
 		catchAndLog(terastash.defineChunkStore(storeName, options));
+	}));
+
+program
+	.command('authorize-gdrive <store-name>')
+	.description(d(`
+		For gdrive chunk store <store-name>, start the OAuth2 authorization flow.`))
+	.action(a(function(storeName) {
+		T(storeName, T.string);
+		catchAndLog(terastash.authorizeGDrive(storeName));
 	}));
 
 program

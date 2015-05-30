@@ -1,6 +1,7 @@
 "use strong";
 "use strict";
 
+const fs = require('fs');
 const google = require('googleapis');
 const path = require('path');
 const Promise = require('bluebird');
@@ -57,7 +58,7 @@ function importAuthCode(oauth2Client, authCode) {
 
 function writeCredentials(allCredentials) {
 	T(allCredentials, T.object);
-	const tokensPath = basedir.tokensPath(path.join("terastash", "google-tokens.json"));
+	const tokensPath = basedir.configPath(path.join("terastash", "google-tokens.json"));
 	mkdirp(path.dirname(tokensPath));
 	fs.writeFileSync(tokensPath, JSON.stringify(allCredentials, null, 2));
 }
@@ -70,7 +71,7 @@ function updateCredential(clientId, credentials) {
 }
 
 function readCredentials() {
-	const tokensPath = basedir.tokensPath(path.join("terastash", "google-tokens.json"));
+	const tokensPath = basedir.configPath(path.join("terastash", "google-tokens.json"));
 	try {
 		return JSON.parse(fs.readFileSync(tokensPath));
 	} catch(e) {
@@ -80,7 +81,7 @@ function readCredentials() {
 		// If there is no config file, write one.
 		const allCredentials = {
 			credentials: {},
-			_comment: "access tokens expire quickly; refresh tokens never expire unless revoked"
+			_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
 		}
 		writeCredentials(allCredentials);
 		return allCredentials;
@@ -111,4 +112,4 @@ function createFolder(oauth2Client, name) {
 	});
 }
 
-module.exports = {getOAuth2Client, getAuthUrl, getCredentials, importAuthCode, createFolder};
+module.exports = {getOAuth2Client, getAuthUrl, getCredentials, importAuthCode, createFolder, updateCredential};
