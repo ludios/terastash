@@ -2,6 +2,8 @@
 "use strict";
 
 const T = require('notmytype');
+const NativePromise = global.Promise;
+const Promise = require('bluebird');
 
 
 /**
@@ -17,9 +19,9 @@ function pad(s, wantLength) {
 	return " ".repeat(Math.max(0, wantLength - s.length)) + s;
 }
 
-const stringOrNumType = T.union([T.string, T.number]);
+const StringOrNumber = T.union([T.string, T.number]);
 function numberWithCommas(stringOrNum) {
-	T(stringOrNum, stringOrNumType);
+	T(stringOrNum, StringOrNumber);
 	// http://stackoverflow.com/questions/2901102/
 	return ("" + stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
@@ -92,4 +94,19 @@ function hasKey(obj, key) {
 	return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-module.exports = {shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol, comparator, comparedBy, hasKey};
+const EitherPromise = T.union([Promise, NativePromise]);
+
+/**
+ * Attaches a logging .catch to a Promise
+ */
+function catchAndLog(p) {
+	T(p, EitherPromise);
+	return p.catch(function(err) {
+		console.error(err.stack);
+	});
+}
+
+module.exports = {
+	shortISO, pad, numberWithCommas, getParentPath, getBaseName,
+	catchAndLog, ol, comparator, comparedBy, hasKey
+};

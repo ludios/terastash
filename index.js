@@ -155,15 +155,32 @@ function runQuery(client, statement, args) {
 	});
 }
 
+/**
+ * Call function `f` with a Cassandra client and shut down the client
+ * after `f` is done.
+ */
 function doWithClient(f) {
 	T(f, T.function);
 	const client = getNewClient();
 	const p = f(client);
-	return p.catch(function(err) {
-		console.error(err.stack);
-	}).then(function() {
-		client.shutdown();
-	});
+	function shutdown(ret) {
+		try {
+			client.shutdown();
+		} catch(e) {
+			console.log("client.shutdown() failed:");
+			console.error(e.stack);
+		}
+		return ret;
+	}
+	// This is like a "finally" clause that we use to shut down the client,
+	// without yet handling the error returned by `f`, if any
+	return p.then(
+		shutdown,
+		function(e) {
+			shutdown();
+			throw e;
+		}
+	);
 }
 
 const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {

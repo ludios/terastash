@@ -6,6 +6,7 @@
 require('better-buffer-inspect');
 
 const terastash = require('..');
+const catchAndLog = require('../utils').catchAndLog;
 const T = require('notmytype');
 const program = require('commander');
 
@@ -48,7 +49,7 @@ program
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
 	.action(a(function(name) {
 		T(name, T.string);
-		terastash.initStash(process.cwd(), name);
+		catchAndLog(terastash.initStash(process.cwd(), name));
 	}));
 
 program
@@ -57,7 +58,7 @@ program
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`))
 	.action(a(function(name) {
 		T(name, T.string);
-		terastash.destroyKeyspace(name);
+		catchAndLog(terastash.destroyKeyspace(name));
 	}));
 
 /* It's 'add' instead of 'put' for left-hand-only typing */
@@ -67,7 +68,7 @@ program
 		Put a file or directory (recursively) into the database`))
 	.action(a(function(files) {
 		T(files, T.list(T.string));
-		terastash.putFiles(files);
+		catchAndLog(terastash.putFiles(files));
 	}));
 
 program
@@ -78,7 +79,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		terastash.getFiles(name, files);
+		catchAndLog(terastash.getFiles(name, files));
 	}));
 
 program
@@ -89,7 +90,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		terastash.catFiles(name, files);
+		catchAndLog(terastash.catFiles(name, files));
 	}));
 
 program
@@ -102,7 +103,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		terastash.dropFiles(name, files);
+		catchAndLog(terastash.dropFiles(name, files));
 	}));
 
 program
@@ -124,14 +125,14 @@ program
 		if(name === null && !paths.length) {
 			paths[0] = '.';
 		}
-		terastash.lsPath(
+		catchAndLog(terastash.lsPath(
 			name, {
 				justNames: options.justNames,
 				reverse: options.reverse,
 				sortByMtime: options.sortByMtime
 			},
 			paths[0]
-		);
+		));
 	}));
 
 program
@@ -139,7 +140,7 @@ program
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
 	.action(a(function() {
-		terastash.listTerastashKeyspaces();
+		catchAndLog(terastash.listTerastashKeyspaces());
 	}));
 
 program
@@ -147,7 +148,7 @@ program
 	.description(d(`
 		List chunk stores`))
 	.action(a(function() {
-		terastash.listChunkStores();
+		catchAndLog(terastash.listChunkStores());
 	}));
 
 program
@@ -160,7 +161,7 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
-		terastash.defineChunkStore(storeName, options);
+		catchAndLog(terastash.defineChunkStore(storeName, options));
 	}));
 
 program
