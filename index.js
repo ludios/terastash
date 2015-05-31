@@ -6,7 +6,6 @@ const fs = require('fs');
 const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
-const mkdirp = require('mkdirp');
 const chalk = require('chalk');
 const T = require('notmytype');
 
@@ -515,18 +514,17 @@ const authorizeGDrive = Promise.coroutine(function*(name) {
 	if(!chunkStore.clientSecret) {
 		throw new Error(`Chunk store ${name} is missing a clientSecret`);
 	}
-	const oauth2Client = gdrive.getOAuth2Client(chunkStore.clientId, chunkStore.clientSecret);
-	const url = gdrive.getAuthUrl(oauth2Client);
+	const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+	const url = gdriver.getAuthUrl();
 	console.log("Please open this URL in a browser (one where" +
 		" you are signed in to Google) and authorize the application:");
 	console.log("");
 	console.log(url);
 	console.log("");
-	console.log("Then, copy the authorization code from the input box and paste it here:");
+	console.log("Then, copy the authorization code from the input box, paste it here, and press Enter:");
 	const authCode = yield questionAsync("Authorization code: ");
 	console.log("OK, sending the authorization code to Google to get a refresh token...");
-	yield gdrive.importAuthCode(oauth2Client, authCode);
-	gdrive.updateCredential(chunkStore.clientId, oauth2Client.credentials);
+	yield gdriver.importAuthCode(authCode);
 	console.log("OK, saved the refresh token and access token.");
 });
 

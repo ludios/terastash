@@ -165,7 +165,7 @@ program
 	}));
 
 program
-	.command('authorize-gdrive <store-name>')
+	.command('auth-gdrive <store-name>')
 	.description(d(`
 		For gdrive chunk store <store-name>, start the OAuth2 authorization flow.`))
 	.action(a(function(storeName) {

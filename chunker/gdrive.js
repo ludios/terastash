@@ -1,16 +1,20 @@
 "use strong";
 "use strict";
 
-const fs = require('fs');
 const google = require('googleapis');
-const path = require('path');
 const Promise = require('bluebird');
 const T = require('notmytype');
-const mkdirp = require('mkdirp');
 const OAuth2 = google.auth.OAuth2;
-const basedir = require('xdg').basedir;
+const utils = require('../utils');
 
 const REDIRECT_URL = 'urn:ietf:wg:oauth:2.0:oob';
+
+const getAllCredentials = utils.makeConfigFileInitializer(
+	"google-tokens.json", {
+		credentials: {},
+		_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
+	}
+);
 
 class GDriver {
 	/* previously getOAuth2Client*/
@@ -41,7 +45,8 @@ class GDriver {
 	 * Hit Google to get an access and refresh token based on `authCode`
 	 * and set the tokens on the `oauth2Client` object.
 	 *
-	 * Returns a Promise that resolves with the tokens
+	 * Returns a Promise that resolves with null after the credentials are
+	 * saved.
 	 */
 	importAuthCode(authCode) {
 		T(authCode, T.string);
@@ -51,46 +56,24 @@ class GDriver {
 					reject(err);
 				} else {
 					this._oauth2Client.setCredentials(tokens);
-					resolve(null);
+					resolve(this.saveCredentials());
 				}
-			});
-		});
+			}.bind(this));
+		}.bind(this));
 	}
 
-	writeCredentials(allCredentials) {
-		T(allCredentials, T.object);
-		const tokensPath = basedir.configPath(path.join("terastash", "google-tokens.json"));
-		mkdirp(path.dirname(tokensPath));
-		fs.writeFileSync(tokensPath, JSON.stringify(allCredentials, null, 2));
-	}
-
-	readCredentials() {
-		const tokensPath = basedir.configPath(path.join("terastash", "google-tokens.json"));
-		try {
-			return JSON.parse(fs.readFileSync(tokensPath));
-		} catch(e) {
-			if(e.code !== 'ENOENT') {
-				throw e;
-			}
-			// If there is no config file, write one.
-			const allCredentials = {
-				credentials: {},
-				_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
-			};
-			this.writeCredentials(allCredentials);
-			return allCredentials;
+	*loadCredentials() {
+		const config = yield getAllCredentials();
+		const credentials = config.credentials[this.clientId];
+		if(credentials) {
+			this._oauth2Client.credentials = credentials;
 		}
 	}
 
-	updateCredential(clientId, credentials) {
-		T(credentials, T.object);
-		const allCredentials = this.readCredentials();
-		allCredentials.credentials[clientId] = credentials;
-		this.writeCredentials(allCredentials);
-	}
-
-	getCredential(clientId) {
-		return this.readCredentials().credentials[clientId] || null;
+	*saveCredentials() {
+		const config = yield getAllCredentials();
+		config.credentials[this.clientId] = this._oauth2Client.credentials;
+		return utils.writeObjectToConfigFile("google-tokens.json", config);
 	}
 
 	// TODO: allow specifying parent folder
@@ -113,5 +96,8 @@ class GDriver {
 		});
 	}
 }
+
+GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCredentials);
+GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
 
 module.exports = {GDriver};
