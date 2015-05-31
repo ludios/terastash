@@ -22,6 +22,27 @@ class GDriver {
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
 		this._oauth2Client = new OAuth2(clientId, clientSecret, REDIRECT_URL);
+		this._oauth2Client._realCredentials = this._oauth2Client.credentials;
+		const that = this;
+		// Replace OAuth2Client.credentials with a setter that automatically
+		// saves the credentials.  We do this instead of saving the credentials
+		// after a request, because a request may be retried by googleapis internally
+		// if the credentials are expired, and we want to capture the updated
+		// credentials as soon as possible so that other processes can use them.
+		Object.defineProperty(this._oauth2Client, 'credentials', {
+			get: function() {
+				return this._realCredentials;
+			},
+			set: function(credentials) {
+				this._realCredentials = credentials;
+				that.saveCredentials().catch(function(err) {
+					console.log("Error in GDriver.saveCredentials():");
+					console.error(err.stack);
+				});
+			},
+			enumerable: true,
+			configurable: false
+		});
 	}
 
 	getAuthUrl() {
@@ -51,7 +72,7 @@ class GDriver {
 				if(err) {
 					reject(err);
 				} else {
-					this._oauth2Client.setCredentials(tokens);
+					this._oauth2Client._realCredentials = tokens;
 					resolve(this.saveCredentials());
 				}
 			}.bind(this));
@@ -62,19 +83,20 @@ class GDriver {
 		const config = yield getAllCredentials();
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
-			this._oauth2Client.credentials = credentials;
+			this._oauth2Client._realCredentials = credentials;
 		}
 	}
 
 	*saveCredentials() {
 		const config = yield getAllCredentials();
 		config.credentials[this.clientId] = this._oauth2Client.credentials;
+		//console.log("Saving credentials", this._oauth2Client.credentials);
 		return utils.writeObjectToConfigFile("google-tokens.json", config);
 	}
 
 	// TODO: allow specifying parent folder
-	createFolder(name) {
-		T(name, T.string);
+	createFolder(name, requestCb) {
+		T(name, T.string, requestCb, T.optional(T.object));
 		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
 		return new Promise(function(resolve, reject) {
 			drive.files.insert({
@@ -89,6 +111,37 @@ class GDriver {
 					resolve(obj);
 				}
 			});
+			if(requestCb) {
+				requestCb(requestObj);
+			}
+		});
+	}
+
+	// TODO: allow specifying parent folder
+	// TODO: check md5sum of file
+	createFile(name, stream, requestCb) {
+		T(name, T.string, stream, T.object, requestCb, T.optional(T.object));
+		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
+		return new Promise(function(resolve, reject) {
+			const requestObj = drive.files.insert({
+				resource: {
+					title: name,
+					mimeType: 'application/octet-stream'
+				},
+				media: {
+					mimeType: 'application/octet-stream',
+					body: stream
+				}
+			}, function(err, obj) {
+				if(err) {
+					reject(err);
+				} else {
+					resolve(obj);
+				}
+			});
+			if(requestCb) {
+				requestCb(requestObj);
+			}
 		});
 	}
 }
