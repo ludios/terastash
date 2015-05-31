@@ -6,6 +6,9 @@ const Promise = require('bluebird');
 const T = require('notmytype');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const inspect = require('util').inspect;
+const crypto = require('crypto');
+const PassThrough = require('stream').PassThrough;
 
 const REDIRECT_URL = 'urn:ietf:wg:oauth:2.0:oob';
 
@@ -15,6 +18,12 @@ const getAllCredentials = utils.makeConfigFileInitializer(
 		_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
 	}
 );
+
+class UploadError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
 
 class GDriver {
 	constructor(clientId, clientSecret) {
@@ -118,9 +127,23 @@ class GDriver {
 	}
 
 	// TODO: allow specifying parent folder
-	// TODO: check md5sum of file
+	/**
+	 * Returns a Promise that is resolved with the response from Google,
+	 * mostly importantly containing an "id" property with the file ID that
+	 * Google has assigned to it.
+	 */
 	createFile(name, stream, requestCb) {
 		T(name, T.string, stream, T.object, requestCb, T.optional(T.object));
+
+		const md5 = crypto.createHash('md5');
+		let length = 0;
+		const passthrough = new PassThrough();
+		stream.pipe(passthrough);
+		passthrough.on('data', function(data) {
+			length += data.length;
+			md5.update(data);
+		});
+
 		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
 		return new Promise(function(resolve, reject) {
 			const requestObj = drive.files.insert({
@@ -130,7 +153,7 @@ class GDriver {
 				},
 				media: {
 					mimeType: 'application/octet-stream',
-					body: stream
+					body: passthrough
 				}
 			}, function(err, obj) {
 				if(err) {
@@ -142,6 +165,26 @@ class GDriver {
 			if(requestCb) {
 				requestCb(requestObj);
 			}
+		}).then(function(obj) {
+			T(obj, T.object);
+			if(obj.kind !== "drive#file") {
+				throw new UploadError(`Expected Google Drive to create an` +
+					` object with kind='drive#file' but was ${inspect(obj.kind)}`
+				);
+			}
+			if(obj.fileSize !== String(length)) {
+				throw new UploadError(`Expected Google Drive to create a` +
+					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
+				);
+			}
+			const expectedHexDigest = md5.digest('hex');
+			if(obj.md5Checksum !== expectedHexDigest) {
+				throw new UploadError(`Expected Google Drive to create a` +
+					` file with md5Checksum=${inspect(expectedHexDigest)}` +
+					` but was ${inspect(obj.md5Checksum)}`
+				);
+			}
+			return obj;
 		});
 	}
 }
