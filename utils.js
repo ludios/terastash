@@ -4,7 +4,10 @@
 const T = require('notmytype');
 const NativePromise = global.Promise;
 const Promise = require('bluebird');
-
+const mkdirp = require('mkdirp');
+const fs = require('fs');
+const path = require('path');
+const basedir = require('xdg').basedir;
 
 /**
  * ISO-ish string without the seconds
@@ -29,9 +32,9 @@ function numberWithCommas(stringOrNum) {
 /**
  * '/'-based operation on all OSes
  */
-function getParentPath(path) {
-	T(path, T.string);
-	const parts = path.split('/');
+function getParentPath(p) {
+	T(p, T.string);
+	const parts = p.split('/');
 	parts.pop();
 	return parts.join('/');
 }
@@ -39,9 +42,9 @@ function getParentPath(path) {
 /**
  * '/'-based operation on all OSes
  */
-function getBaseName(path) {
-	T(path, T.string);
-	const parts = path.split('/');
+function getBaseName(p) {
+	T(p, T.string);
+	const parts = p.split('/');
 	return parts[parts.length - 1];
 }
 
@@ -106,7 +109,49 @@ function catchAndLog(p) {
 	});
 }
 
+const readFileAsync = Promise.promisify(fs.readFile);
+const writeFileAsync = Promise.promisify(fs.writeFile);
+const mkdirpAsync = Promise.promisify(mkdirp);
+const statAsync = Promise.promisify(fs.stat);
+
+const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
+	T(fname, T.string, object, T.object);
+	const configPath = basedir.configPath(path.join("terastash", fname));
+	yield mkdirpAsync(path.dirname(configPath));
+	yield writeFileAsync(configPath, JSON.stringify(object, null, 2));
+});
+
+const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
+	T(fname, T.string);
+	const configPath = basedir.configPath(path.join("terastash", fname));
+	const buf = yield readFileAsync(configPath);
+	return JSON.parse(buf);
+});
+
+function clone(obj) {
+	return JSON.parse(JSON.stringify(obj));
+}
+
+const makeConfigFileInitializer = function(fname, defaultConfig) {
+	T(fname, T.string, defaultConfig, T.object);
+	return Promise.coroutine(function*() {
+		try {
+			return (yield readObjectFromConfigFile(fname));
+		} catch(e) {
+			if(e.code !== 'ENOENT') {
+				throw e;
+			}
+			// If there is no config file, write defaultConfig.
+			yield writeObjectToConfigFile(fname, defaultConfig);
+			return clone(defaultConfig);
+		}
+	});
+};
+
 module.exports = {
 	shortISO, pad, numberWithCommas, getParentPath, getBaseName,
-	catchAndLog, ol, comparator, comparedBy, hasKey
+	catchAndLog, ol, comparator, comparedBy, hasKey,
+	readFileAsync, writeFileAsync, mkdirpAsync, statAsync,
+	writeObjectToConfigFile, readObjectFromConfigFile, clone,
+	makeConfigFileInitializer
 };

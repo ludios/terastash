@@ -7,7 +7,6 @@ const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
 const mkdirp = require('mkdirp');
-const basedir = require('xdg').basedir;
 const chalk = require('chalk');
 const T = require('notmytype');
 
@@ -36,45 +35,7 @@ function getNewClient() {
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
 
-const readFileAsync = Promise.promisify(fs.readFile);
-const writeFileAsync = Promise.promisify(fs.writeFile);
-const mkdirpAsync = Promise.promisify(mkdirp);
-
-const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
-	T(fname, T.string, object, T.object);
-	const configPath = basedir.configPath(path.join("terastash", fname));
-	yield mkdirpAsync(path.dirname(configPath));
-	yield writeFileAsync(configPath, JSON.stringify(object, null, 2));
-});
-
-const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
-	T(fname, T.string);
-	const configPath = basedir.configPath(path.join("terastash", fname));
-	const buf = yield readFileAsync(configPath);
-	return JSON.parse(buf);
-});
-
-function clone(obj) {
-	return JSON.parse(JSON.stringify(obj));
-}
-
-const makeConfigFileInitializer = function(fname, defaultConfig) {
-	T(fname, T.string, defaultConfig, T.object);
-	return Promise.coroutine(function*() {
-		try {
-			return (yield readObjectFromConfigFile(fname));
-		} catch(e) {
-			if(e.code !== 'ENOENT') {
-				throw e;
-			}
-			// If there is no config file, write defaultConfig.
-			yield writeObjectToConfigFile(fname, defaultConfig);
-			return clone(defaultConfig);
-		}
-	});
-};
-
-const getStashes = makeConfigFileInitializer(
+const getStashes = utils.makeConfigFileInitializer(
 	"stashes.json", {
 		stashes: [],
 		_comment: utils.ol(`You cannot change the name of a stash because it must match
@@ -82,7 +43,7 @@ const getStashes = makeConfigFileInitializer(
 	}
 );
 
-const getChunkStores = makeConfigFileInitializer(
+const getChunkStores = utils.makeConfigFileInitializer(
 	"chunk-stores.json", {
 		stores: {},
 		_comment: utils.ol(`You cannot change the name of a store because existing
@@ -280,7 +241,7 @@ function shouldStoreInChunks(p, stat) {
 
 const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 	const type = 'd';
-	const stat = fs.statSync(p);
+	const stat = yield utils.statAsync(p);
 	const mtime = stat.mtime;
 	const parentPath = utils.getParentPath(dbPath);
 	if(parentPath) {
@@ -317,7 +278,7 @@ function putFile(client, p) {
 			/* TODO: later need to make sure that size is consistent with
 			    what we've actually read from the file. */
 		} else {
-			content = fs.readFileSync(p);
+			content = yield utils.readFileAsync(p);
 			key = null;
 			chunks = null;
 			blake2b224 = blake2b224Buffer(content);
@@ -360,7 +321,7 @@ function getFile(client, stashName, p) {
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
-		).then(function(result) {
+		).then(Promise.coroutine(function*(result) {
 			//console.log(result);
 			for(const row of result.rows) {
 				let outputFilename;
@@ -370,7 +331,7 @@ function getFile(client, stashName, p) {
 				} else {
 					outputFilename = stashInfo.path + '/' + row.pathname;
 				}
-				mkdirp(path.dirname(outputFilename));
+				yield utils.mkdirpAsync(path.dirname(outputFilename));
 
 				if(row.chunks) {
 					assert.strictEqual(row.content, null);
@@ -402,10 +363,10 @@ function getFile(client, stashName, p) {
 							`${row.blake2b224.toString('hex')} but content was \n` +
 							`${blake2b224.toString('hex')}`);
 					}
-					fs.writeFileSync(outputFilename, row.content);
+					return utils.writeFileAsync(outputFilename, row.content);
 				}
 			}
-		});
+		}));
 	});
 }
 
@@ -522,7 +483,7 @@ const defineChunkStore = Promise.coroutine(function*(name, opts) {
 		throw new Error(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
 	}
 	config.stores[name] = storeDef;
-	yield writeObjectToConfigFile("chunk-stores.json", config);
+	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
 });
 
 const questionAsync = function(question) {
@@ -620,7 +581,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 
 		const config = yield getStashes();
 		config.stashes.push({name, path: path.resolve(stashPath)});
-		yield writeObjectToConfigFile("stashes.json", config);
+		yield utils.writeObjectToConfigFile("stashes.json", config);
 
 		console.log("Created Cassandra keyspace and updated stashes.json.");
 	}));
