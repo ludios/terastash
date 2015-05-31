@@ -17,15 +17,11 @@ const getAllCredentials = utils.makeConfigFileInitializer(
 );
 
 class GDriver {
-	/* previously getOAuth2Client*/
-	constructor(clientId, clientSecret, credentials) {
-		T(clientId, T.string, clientSecret, T.string, credentials, T.optional(T.object));
+	constructor(clientId, clientSecret) {
+		T(clientId, T.string, clientSecret, T.string);
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
 		this._oauth2Client = new OAuth2(clientId, clientSecret, REDIRECT_URL);
-		if(credentials) {
-			this._oauth2Client.setCredentials(credentials);
-		}
 	}
 
 	getAuthUrl() {
