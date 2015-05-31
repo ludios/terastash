@@ -135,10 +135,16 @@ class GDriver {
 	createFile(name, opts, stream, requestCb) {
 		T(
 			name, T.string,
-			opts, T.shape({parents: T.optional(T.list(T.string))}),
+			opts, T.shape({
+				parents: T.optional(T.list(T.string)),
+				mimeType: T.optional(T.string),
+			}),
 			stream, T.object,
 			requestCb, T.optional(T.object)
 		);
+
+		opts.parents = opts.parents || utils.emptyFrozenArray;
+		opts.mimeType = opts.mimeType || "application/octet-stream";
 
 		const md5 = crypto.createHash('md5');
 		let length = 0;
@@ -154,16 +160,16 @@ class GDriver {
 			const requestObj = drive.files.insert({
 				resource: {
 					title: name,
-					parents: opts.parents && opts.parents.map(function(parentId) {
+					parents: opts.parents.map(function(parentId) {
 						return {
 							"kind": "drive#fileLink",
 							"id": parentId
 						};
 					}),
-					mimeType: 'application/octet-stream'
+					mimeType: opts.mimeType
 				},
 				media: {
-					mimeType: 'application/octet-stream',
+					mimeType: opts.mimeType,
 					body: passthrough
 				}
 			}, function(err, obj) {
@@ -188,6 +194,12 @@ class GDriver {
 					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
 				);
 			}
+			if(obj.mimeType !== opts.mimeType) {
+				throw new UploadError(`Expected Google Drive to create a` +
+					` file with mimeType=${inspect(opts.mimeType)} but was ${inspect(obj.mimeType)}`
+				);
+			}
+			// TODO: check that it has the expected parents
 			const expectedHexDigest = md5.digest('hex');
 			if(obj.md5Checksum !== expectedHexDigest) {
 				throw new UploadError(`Expected Google Drive to create a` +

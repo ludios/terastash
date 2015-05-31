@@ -9,6 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const basedir = require('xdg').basedir;
 
+const emptyFrozenArray = [];
+Object.freeze(emptyFrozenArray);
+
 /**
  * ISO-ish string without the seconds
  */
@@ -128,6 +131,7 @@ const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
 	return JSON.parse(buf);
 });
 
+// Beware: undefined converted to null
 function clone(obj) {
 	return JSON.parse(JSON.stringify(obj));
 }
@@ -149,7 +153,7 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 };
 
 module.exports = {
-	shortISO, pad, numberWithCommas, getParentPath, getBaseName,
+	emptyFrozenArray, shortISO, pad, numberWithCommas, getParentPath, getBaseName,
 	catchAndLog, ol, comparator, comparedBy, hasKey,
 	readFileAsync, writeFileAsync, mkdirpAsync, statAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
