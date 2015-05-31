@@ -132,8 +132,13 @@ class GDriver {
 	 * mostly importantly containing an "id" property with the file ID that
 	 * Google has assigned to it.
 	 */
-	createFile(name, stream, requestCb) {
-		T(name, T.string, stream, T.object, requestCb, T.optional(T.object));
+	createFile(name, opts, stream, requestCb) {
+		T(
+			name, T.string,
+			opts, T.shape({parents: T.optional(T.list(T.string))}),
+			stream, T.object,
+			requestCb, T.optional(T.object)
+		);
 
 		const md5 = crypto.createHash('md5');
 		let length = 0;
@@ -149,6 +154,12 @@ class GDriver {
 			const requestObj = drive.files.insert({
 				resource: {
 					title: name,
+					parents: opts.parents && opts.parents.map(function(parentId) {
+						return {
+							"kind": "drive#fileLink",
+							"id": parentId
+						};
+					}),
 					mimeType: 'application/octet-stream'
 				},
 				media: {
