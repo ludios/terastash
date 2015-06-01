@@ -12,6 +12,12 @@ const basedir = require('xdg').basedir;
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
 
+function randInt(min, max) {
+	const range = max - min;
+	const rand = Math.floor(Math.random() * (range + 1));
+	return min + rand;
+}
+
 /**
  * Returns a function that gets the given property on any object passed in
  */
@@ -176,9 +182,9 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 };
 
 module.exports = {
-	emptyFrozenArray, sameArrayValues, prop, shortISO, pad, numberWithCommas, getParentPath,
-	getBaseName, catchAndLog, ol, comparator, comparedBy, hasKey,
-	readFileAsync, writeFileAsync, mkdirpAsync, statAsync,
-	writeObjectToConfigFile, readObjectFromConfigFile, clone,
-	makeConfigFileInitializer
+	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
+	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
+	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
+	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
+	clone, makeConfigFileInitializer
 };

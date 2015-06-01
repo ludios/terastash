@@ -177,6 +177,10 @@ class GDriver {
 	 * Returns a Promise that is resolved with the response from Google,
 	 * mostly importantly containing an "id" property with the file ID that
 	 * Google has assigned to it.
+	 *
+	 * Note: Google Drive may replace your opts.mimeType with their own
+	 * mimeType after sniffing the bytes in your file.  This is not documented
+	 * in their API docs, and there doesn't appear to be a way to turn it off.
 	 */
 	*createFile(name, opts, stream, requestCb) {
 		T(
@@ -243,11 +247,6 @@ class GDriver {
 					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
 				);
 			}
-			if(obj.mimeType !== mimeType) {
-				throw new UploadError(`Expected Google Drive to create a` +
-					` file with mimeType=${inspect(mimeType)} but was ${inspect(obj.mimeType)}`
-				);
-			}
 			if(parents.length !== 0) {
 				const parentsInDrive = obj.parents.map(idProp).sort();
 				if(!utils.sameArrayValues(parentsInDrive, parents)) {
@@ -264,6 +263,7 @@ class GDriver {
 					` but was ${inspect(obj.md5Checksum)}`
 				);
 			}
+			// obj.mimeType may not match what we wanted, so don't check it
 			return obj;
 		});
 	}
