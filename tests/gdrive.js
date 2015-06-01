@@ -15,7 +15,7 @@ const assert = require('assert');
 
 describe('GDriver', function() {
 	it('can upload a file', Promise.coroutine(function*() {
-		this.timeout(8000);
+		this.timeout(20000);
 
 		const config = yield terastash.getChunkStores();
 		const chunkStore = config.stores["terastash-tests-gdrive"];
