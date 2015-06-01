@@ -85,7 +85,7 @@ class GDriver {
 			} else {
 				return metadataCb(new Error('Access token is expired.'), null);
 			}
-		}
+		};
 	}
 
 	getAuthUrl() {
@@ -137,6 +137,18 @@ class GDriver {
 		return utils.writeObjectToConfigFile("google-tokens.json", config);
 	}
 
+	refreshAccessToken() {
+		return new Promise(function(resolve, reject) {
+			this._oauth2Client.refreshAccessToken(function(err) {
+				if(err) {
+					reject(err);
+				} else {
+					resolve(null);
+				}
+			});
+		}.bind(this));
+	}
+
 	// TODO: make this call createFile which supports parentFolder and
 	// verifies stuff
 	createFolder(name, requestCb) {
@@ -166,7 +178,7 @@ class GDriver {
 	 * mostly importantly containing an "id" property with the file ID that
 	 * Google has assigned to it.
 	 */
-	createFile(name, opts, stream, requestCb) {
+	*createFile(name, opts, stream, requestCb) {
 		T(
 			name, T.string,
 			opts, T.shape({
@@ -176,6 +188,9 @@ class GDriver {
 			stream, T.object,
 			requestCb, T.optional(T.object)
 		);
+
+		// TODO: refresh only if we have < 50 minutes on the clock
+		yield this.refreshAccessToken();
 
 		const parents = opts.parents.concat().sort() || utils.emptyFrozenArray;
 		const mimeType = opts.mimeType || "application/octet-stream";
@@ -254,6 +269,7 @@ class GDriver {
 	}
 }
 
+GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);
 GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCredentials);
 GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
 
