@@ -1,4 +1,4 @@
-/node_modules
+/node_modules/blake2/build
 /.terastash.json
 /test/*.err
 /trash
