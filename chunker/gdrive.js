@@ -40,6 +40,7 @@ class GDriver {
 		// after a request, because a request may be retried by googleapis internally
 		// if the credentials are expired, and we want to capture the updated
 		// credentials as soon as possible so that other processes can use them.
+		// XXX ^ Not actually true?  How would it retry a request given that we have streams?
 		Object.defineProperty(this._oauth2Client, 'credentials', {
 			get: function() {
 				return this._realCredentials;
