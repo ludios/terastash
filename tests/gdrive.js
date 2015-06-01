@@ -27,7 +27,7 @@ describe('GDriver', function() {
 		yield gdriver.loadCredentials();
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + Math.random());
-		const buf = crypto.pseudoRandomBytes(utils.randInt(0, 5) * 1024);
+		const buf = crypto.pseudoRandomBytes(utils.randInt(0, 5*1024));
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
 		const result = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
