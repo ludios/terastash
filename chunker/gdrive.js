@@ -19,6 +19,8 @@ const getAllCredentials = utils.makeConfigFileInitializer(
 	}
 );
 
+const idProp = utils.prop('id');
+
 class UploadError extends Error {
 	get name() {
 		return this.constructor.name;
@@ -143,8 +145,8 @@ class GDriver {
 			requestCb, T.optional(T.object)
 		);
 
-		opts.parents = opts.parents || utils.emptyFrozenArray;
-		opts.mimeType = opts.mimeType || "application/octet-stream";
+		const parents = opts.parents.concat().sort() || utils.emptyFrozenArray;
+		const mimeType = opts.mimeType || "application/octet-stream";
 
 		const md5 = crypto.createHash('md5');
 		let length = 0;
@@ -160,16 +162,16 @@ class GDriver {
 			const requestObj = drive.files.insert({
 				resource: {
 					title: name,
-					parents: opts.parents.map(function(parentId) {
+					parents: parents.map(function(parentId) {
 						return {
 							"kind": "drive#fileLink",
 							"id": parentId
 						};
 					}),
-					mimeType: opts.mimeType
+					mimeType: mimeType
 				},
 				media: {
-					mimeType: opts.mimeType,
+					mimeType: mimeType,
 					body: passthrough
 				}
 			}, function(err, obj) {
@@ -194,12 +196,20 @@ class GDriver {
 					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
 				);
 			}
-			if(obj.mimeType !== opts.mimeType) {
+			if(obj.mimeType !== mimeType) {
 				throw new UploadError(`Expected Google Drive to create a` +
-					` file with mimeType=${inspect(opts.mimeType)} but was ${inspect(obj.mimeType)}`
+					` file with mimeType=${inspect(mimeType)} but was ${inspect(obj.mimeType)}`
 				);
 			}
-			// TODO: check that it has the expected parents
+			if(parents.length !== 0) {
+				const parentsInDrive = obj.parents.map(idProp).sort();
+				if(!utils.sameArrayValues(parentsInDrive, parents)) {
+					throw new UploadError(`Expected Google Drive to create a file` +
+						` with parents=${inspect(parents)} but was ${inspect(parentsInDrive)}.\n` +
+						`Make sure you specified the correct folder IDs.`
+					);
+				}
+			}
 			const expectedHexDigest = md5.digest('hex');
 			if(obj.md5Checksum !== expectedHexDigest) {
 				throw new UploadError(`Expected Google Drive to create a` +

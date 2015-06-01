@@ -13,6 +13,29 @@ const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
 
 /**
+ * Returns a function that gets the given property on any object passed in
+ */
+function prop(name) {
+	return function(obj) {
+		return obj[name];
+	};
+};
+
+function sameArrayValues(arr1, arr2) {
+	T(arr1, Array, arr2, Array);
+	const length = arr1.length;
+	if(length !== arr2.length) {
+		return false;
+	}
+	for(let i=0; i < length; i++) {
+		if(!Object.is(arr1[i], arr2[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/**
  * ISO-ish string without the seconds
  */
 function shortISO(d) {
@@ -131,7 +154,7 @@ const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
 	return JSON.parse(buf);
 });
 
-// Beware: undefined converted to null
+// Beware: clone converts undefined to null
 function clone(obj) {
 	return JSON.parse(JSON.stringify(obj));
 }
@@ -153,8 +176,8 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 };
 
 module.exports = {
-	emptyFrozenArray, shortISO, pad, numberWithCommas, getParentPath, getBaseName,
-	catchAndLog, ol, comparator, comparedBy, hasKey,
+	emptyFrozenArray, sameArrayValues, prop, shortISO, pad, numberWithCommas, getParentPath,
+	getBaseName, catchAndLog, ol, comparator, comparedBy, hasKey,
 	readFileAsync, writeFileAsync, mkdirpAsync, statAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer
