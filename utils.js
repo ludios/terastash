@@ -19,7 +19,7 @@ function prop(name) {
 	return function(obj) {
 		return obj[name];
 	};
-};
+}
 
 function sameArrayValues(arr1, arr2) {
 	T(arr1, Array, arr2, Array);

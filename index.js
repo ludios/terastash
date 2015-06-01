@@ -586,7 +586,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 });
 
 module.exports = {
-	initStash, destroyKeyspace, getStashes, authorizeGDrive, listTerastashKeyspaces,
+	initStash, destroyKeyspace, getStashes, getChunkStores, authorizeGDrive, listTerastashKeyspaces,
 	listChunkStores, defineChunkStore, putFile, putFiles, getFile, getFiles, catFile, catFiles,
 	dropFile, dropFiles, lsPath, KEYSPACE_PREFIX
 };

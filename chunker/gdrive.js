@@ -105,12 +105,13 @@ class GDriver {
 		return utils.writeObjectToConfigFile("google-tokens.json", config);
 	}
 
-	// TODO: allow specifying parent folder
+	// TODO: make this call createFile which supports parentFolder and
+	// verifies stuff
 	createFolder(name, requestCb) {
 		T(name, T.string, requestCb, T.optional(T.object));
 		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
 		return new Promise(function(resolve, reject) {
-			drive.files.insert({
+			const requestObj = drive.files.insert({
 				resource: {
 					title: name,
 					mimeType: 'application/vnd.google-apps.folder'
@@ -128,7 +129,6 @@ class GDriver {
 		});
 	}
 
-	// TODO: allow specifying parent folder
 	/**
 	 * Returns a Promise that is resolved with the response from Google,
 	 * mostly importantly containing an "id" property with the file ID that
@@ -139,7 +139,7 @@ class GDriver {
 			name, T.string,
 			opts, T.shape({
 				parents: T.optional(T.list(T.string)),
-				mimeType: T.optional(T.string),
+				mimeType: T.optional(T.string)
 			}),
 			stream, T.object,
 			requestCb, T.optional(T.object)
