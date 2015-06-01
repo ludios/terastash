@@ -54,6 +54,38 @@ class GDriver {
 			enumerable: true,
 			configurable: false
 		});
+
+		// Work around https://github.com/google/google-api-nodejs-client/issues/260
+		// by patching getRequestMetadata with something that never returns an
+		// auth request to googleapis/lib/apirequest.js:createAPIRequest
+		//
+		// If we don't patch this, the buggy googleapis/google-auth-library interaction
+		// will hang terastash forever when we try to upload a file when our access token
+		// is expired.  (createAPIRequest decides to pipe the stream into the auth request
+		// instead of the subsequent request.)
+		//
+		// We could always refresh the access token ourselves, but we prefer to also
+		// patch the buggy code to prevent bugs from compounding.
+		this._oauth2Client.getRequestMetadata = function(opt_uri, metadataCb) {
+			const that = this;
+			const thisCreds = this.credentials;
+
+			if (!thisCreds.access_token && !thisCreds.refresh_token) {
+				return metadataCb(new Error('No access or refresh token is set.'), null);
+			}
+
+			// if no expiry time, assume it's not expired
+			const expiryDate = thisCreds.expiry_date;
+			const isTokenExpired = expiryDate ? expiryDate <= (new Date()).getTime() : false;
+
+			if (thisCreds.access_token && !isTokenExpired) {
+				thisCreds.token_type = thisCreds.token_type || 'Bearer';
+				const headers = {'Authorization': thisCreds.token_type + ' ' + thisCreds.access_token};
+				return metadataCb(null, headers, null);
+			} else {
+				return metadataCb(new Error('Access token is expired.'), null);
+			}
+		}
 	}
 
 	getAuthUrl() {
