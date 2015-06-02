@@ -1,0 +1,2 @@
+export DEPS_BLACKLIST="googleapis/request google-auth-library/request gtoken/request gapitoken/request"
+npm-hax "$@"
