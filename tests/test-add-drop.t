@@ -1,7 +1,7 @@
 Can add and drop a file
 
   $ export CHUNKS_DIR=/tmp/mychunks
-  $ ts destroy unit_tests > /dev/null 2>&1 # In case the last test run was ctrl-c'ed
+  $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
   $ ts init unit_tests
   Created Cassandra keyspace and updated stashes.json.
   $ ts list-chunk-stores
