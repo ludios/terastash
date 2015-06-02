@@ -1,0 +1,1 @@
+iojs --harmony --harmony-rest-parameters --strong-mode -e "require('cache-require-paths'); rt=require('require-times')(); rt.start(); require('./index'); require('cassandra-driver'); require('googleapis').drive({'version':'v2'}); rt.end()" | less 

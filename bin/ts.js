@@ -3,6 +3,7 @@
 
 /* eslint-disable no-process-exit */
 
+require('cache-require-paths');
 require('better-buffer-inspect');
 
 const terastash = require('..');
