@@ -1,0 +1,8 @@
+set -e
+
+rm -rf node_modules || true
+./dev/npm install
+./dev/npm dedupe
+# Re-patch node_modules/
+git diff 356ffa39c636e031976418cfa57ec4df8c390f30^\! | patch -p1
+git diff 97dcb37f01977dbd590718f7038369d69a6ab62c^\! | patch -p1
