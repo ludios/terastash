@@ -3,7 +3,13 @@
 
 /* eslint-disable no-process-exit */
 
+const mkdirp = require('mkdirp');
+const basedir = require('xdg').basedir;
+mkdirp.sync(basedir.configPath("terastash"));
+process.env.CACHE_REQUIRE_PATHS_FILE =
+	basedir.configPath("terastash/internal-require-cache.json");
 require('cache-require-paths');
+
 require('better-buffer-inspect');
 
 const terastash = require('..');
