@@ -1,2 +1,0 @@
-USE terastash;
-DESCRIBE SCHEMA;
