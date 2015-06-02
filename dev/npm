@@ -1,2 +1,9 @@
-export DEPS_BLACKLIST="googleapis/request google-auth-library/request gtoken/request gapitoken/request"
+export DEPS_BLACKLIST="\
+googleapis/request \
+google-auth-library/request \
+gtoken/request \
+gapitoken/request \
+tap/mkdirp \
+mocha/mkdirp \
+jade/mkdirp"
 npm-hax "$@"
