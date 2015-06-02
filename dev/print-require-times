@@ -1,1 +1,7 @@
-iojs --harmony --harmony-rest-parameters --strong-mode -e "rt=require('require-times')(); rt.start(); require('./index'); require('cassandra-driver'); require('googleapis').drive({'version':'v2'}); rt.end()"
+iojs --harmony --harmony-rest-parameters --strong-mode -e "\
+rt = require('require-times-tree')();\
+rt.start();\
+require('./index');\
+require('cassandra-driver');\
+require('googleapis').drive({'version':'v2'});\
+rt.end()"
