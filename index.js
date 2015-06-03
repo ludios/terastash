@@ -1,13 +1,13 @@
 "use strong";
 "use strict";
 
+const A = require('ayy');
+const T = require('notmytype');
 const Promise = require('bluebird');
 const fs = require('fs');
-const assert = require('assert');
 const path = require('path');
 const crypto = require('crypto');
 const chalk = require('chalk');
-const T = require('notmytype');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
@@ -101,7 +101,7 @@ function userPathToDatabasePath(base, p) {
 		return "";
 	} else {
 		const dbPath = resolved.replace(base + "/", "").replace(/\\/g, "/");
-		assert(!dbPath.startsWith('/'), dbPath);
+		A(!dbPath.startsWith('/'), dbPath);
 		return dbPath;
 	}
 }
@@ -172,7 +172,7 @@ const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {
 	}
 
 	const parentPath = utils.getParentPath(dbPath);
-	assert(!parentPath.startsWith('/'), parentPath);
+	A(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
 	return fn(client, stashInfo, dbPath, parentPath);
@@ -333,8 +333,8 @@ function getFile(client, stashName, p) {
 				yield utils.mkdirpAsync(path.dirname(outputFilename));
 
 				if(row.chunks) {
-					assert.strictEqual(row.content, null);
-					assert.strictEqual(row.blake2b224, null);
+					A.eq(row.content, null);
+					A.eq(row.blake2b224, null);
 					const readStream = localfs.readChunks(process.env.CHUNKS_DIR, row.key, row.chunks);
 					const writeStream = fs.createWriteStream(outputFilename);
 					readStream.pipe(writeStream);
@@ -530,7 +530,7 @@ const authorizeGDrive = Promise.coroutine(function*(name) {
 
 function assertName(name) {
 	T(name, T.string);
-	assert(name, "Name must not be empty");
+	A(name, "Name must not be empty");
 }
 
 function destroyKeyspace(name) {

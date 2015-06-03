@@ -1,27 +1,27 @@
 "use strong";
 "use strict";
 
+const A = require('ayy');
+const T = require('notmytype');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const assert = require('assert');
 const stream = require('stream');
 const blake2 = require('blake2');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
-const T = require('notmytype');
 
 const CHUNK_SIZE = 100 * 1024;
 // Chunk size must be a multiple of an AES block, for our convenience.
-assert.strictEqual(CHUNK_SIZE % 128/8, 0);
+A.eq(CHUNK_SIZE % 128/8, 0);
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
-assert.strictEqual(iv0.length, 128/8);
+A.eq(iv0.length, 128/8);
 
 const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	T(directory, T.string, key, Buffer, p, T.string);
-	assert.strictEqual(key.length, 128/8);
+	A.eq(key.length, 128/8);
 
 	const expectedTotalSize = fs.statSync(p).size;
 	const inputStream = fs.createReadStream(p);
@@ -43,7 +43,7 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', function() {
 				const size = fs.statSync(tempFname).size;
-				assert(size <= CHUNK_SIZE, size);
+				A.lte(size, CHUNK_SIZE);
 				totalSize += size;
 				const digest = blake2b.digest().slice(0, 224/8);
 				chunkDigests.push(digest);
@@ -55,7 +55,7 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 			});
 		});
 	}
-	assert.equal(totalSize, expectedTotalSize,
+	A.eq(totalSize, expectedTotalSize,
 		`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
 		`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
 	return chunkDigests;
@@ -72,7 +72,7 @@ class BadChunk extends Error {
  */
 function readChunks(directory, key, chunkDigests) {
 	T(directory, T.string, key, Buffer, chunkDigests, T.list(Buffer));
-	assert.strictEqual(key.length, 128/8);
+	A.eq(key.length, 128/8);
 
 	const cipherStream = new Combine();
 	const clearStream = crypto.createCipheriv('aes-128-ctr', key, iv0);

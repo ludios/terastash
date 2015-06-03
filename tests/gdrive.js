@@ -3,6 +3,7 @@
 
 require('better-buffer-inspect');
 
+const A = require('ayy');
 const terastash = require('..');
 const fs = require('fs');
 const os = require('os');
@@ -11,7 +12,6 @@ const path = require('path');
 const utils = require('../utils');
 const Promise = require('bluebird');
 const gdrive = require('../chunker/gdrive');
-const assert = require('assert');
 
 describe('GDriver', function() {
 	it('can upload a file', Promise.coroutine(function*() {
@@ -22,7 +22,7 @@ describe('GDriver', function() {
 		if(!chunkStore) {
 			throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
 		}
-		assert.strictEqual(chunkStore.type, "gdrive");
+		A.eq(chunkStore.type, "gdrive");
 		const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 		yield gdriver.loadCredentials();
 
@@ -31,6 +31,6 @@ describe('GDriver', function() {
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
 		const result = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
-		assert.strictEqual(typeof result.id, "string");
+		A.eq(typeof result.id, "string");
 	}));
 });
