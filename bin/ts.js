@@ -3,6 +3,18 @@
 
 /* eslint-disable no-process-exit */
 
+// We use bluebird Promises in terastash, which report unhandled rejections
+// without an explicit unhandledRejection handler.  But platform code or
+// dependencies might use native Promises, so we need to attach this handler
+// to see all unhandled rejections.
+process.on("unhandledRejection", function(err) {
+	const red = "\u001b[31m";
+	const reset = "\u001b[39m";
+	process.stderr.write(
+		`${red}Unhandled rejection in a native or bluebird Promise:\n` +
+		`${err.stack}${reset}\n`);
+});
+
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 mkdirp.sync(basedir.configPath("terastash"));
