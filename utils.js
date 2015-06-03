@@ -1,6 +1,7 @@
 "use strong";
 "use strict";
 
+const A = require('ayy');
 const T = require('notmytype');
 const NativePromise = global.Promise;
 const Promise = require('bluebird');
@@ -8,7 +9,6 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const basedir = require('xdg').basedir;
-const assert = require('assert');
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
@@ -184,8 +184,8 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 
 function roundUpToNearest(n, nearest) {
 	T(n, T.number, nearest, T.number);
-	assert(Number.isInteger(n), String(n));
-	assert(Number.isInteger(nearest), String(nearest));
+	A(Number.isInteger(n), n);
+	A(Number.isInteger(nearest), nearest);
 	return Math.ceil(n/nearest) * nearest;
 }
 
@@ -195,12 +195,12 @@ function roundUpToNearest(n, nearest) {
  */
 function getConcealmentSize(n) {
 	T(n, T.number);
-	assert(Number.isInteger(n), String(n));
-	let averageWasteage = 1/128; // ~= .78%
+	A(Number.isInteger(n), n);
+	const averageWasteage = 1/128; // ~= .78%
 	let ret = Math.pow(2, Math.floor(Math.log2(n))) * (averageWasteage*2);
 	// This also takes care of non-integers we get out of the above fn
 	ret = Math.max(16, ret);
-	assert(Number.isInteger(ret), String(ret));
+	A(Number.isInteger(ret), ret);
 	return ret;
 }
 
@@ -210,7 +210,7 @@ function getConcealmentSize(n) {
  */
 function concealSize(n) {
 	T(n, T.number);
-	assert(Number.isInteger(n), String(n));
+	A(Number.isInteger(n), n);
 	return roundUpToNearest(Math.max(1, n), getConcealmentSize(n));
 }
 
