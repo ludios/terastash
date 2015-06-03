@@ -10,10 +10,21 @@
 process.on("unhandledRejection", function(err) {
 	const red = "\u001b[31m";
 	const reset = "\u001b[39m";
-	process.stderr.write(
-		`${red}Unhandled rejection in a native or bluebird Promise:\n` +
-		`${err.stack}${reset}\n`);
+	if(typeof err.stack === "string") {
+		process.stderr.write(
+			`${red}Unhandled rejection in a native or bluebird Promise:\n` +
+			`${err.stack}${reset}\n`);
+	} else {
+		process.stderr.write(
+			`${red}Unhandled rejection in a native or bluebird Promise:\n` +
+			`${err}\n` +
+			`[no stack trace available]${reset}\n`);
+	}
 });
+
+// For testing the unhandledRejection handler
+//new Promise(function(){ throw new Error("boom"); });
+//new Promise(function(){ throw 3; });
 
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
