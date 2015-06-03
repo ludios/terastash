@@ -46,3 +46,45 @@ describe('sameArrayValues', function() {
 		assert(!utils.sameArrayValues([NaN], []));
 	});
 });
+
+describe('getConcealmentSize', function() {
+	it('returns the amount to round up to', function() {
+		assert.equal(utils.getConcealmentSize(0), 16);
+		assert.equal(utils.getConcealmentSize(1), 16);
+		assert.equal(utils.getConcealmentSize(128), 16);
+		assert.equal(utils.getConcealmentSize(256), 16);
+		assert.equal(utils.getConcealmentSize(1024), 16);
+		assert.equal(utils.getConcealmentSize(1.5*1024), 16);
+		assert.equal(utils.getConcealmentSize(2*1024), 32);
+		assert.equal(utils.getConcealmentSize(128*1024), 2048);
+
+		assert.equal(utils.getConcealmentSize(1024), 1024/64);
+
+		assert.equal(utils.getConcealmentSize(1024*1024), 1024*1024/64);
+
+		assert.equal(utils.getConcealmentSize(1024*1024*1024 - 1), 1024*1024*1024/128);
+		assert.equal(utils.getConcealmentSize(1024*1024*1024), 1024*1024*1024/64);
+		assert.equal(utils.getConcealmentSize(1024*1024*1024 + 1), 1024*1024*1024/64);
+		assert.equal(utils.getConcealmentSize(1024*1024*1024 + 1024*1024), 1024*1024*1024/64);
+	});
+});
+
+
+describe('concealSize', function() {
+	it('returns the concealed file size', function() {
+		assert.equal(utils.concealSize(0), 16);
+		assert.equal(utils.concealSize(1), 16);
+		assert.equal(utils.concealSize(128), 128);
+		assert.equal(utils.concealSize(256), 256);
+		assert.equal(utils.concealSize(1024), 1024);
+		assert.equal(utils.concealSize(1025), 1024 + 16);
+		assert.equal(utils.concealSize(1.5*1024), 1.5*1024);
+		assert.equal(utils.concealSize(2*1024), 2*1024);
+		assert.equal(utils.concealSize(2*1024+1), 2*1024 + 32);
+
+		assert.equal(utils.concealSize(1024*1024*1024 - 1), 1024*1024*1024);
+		assert.equal(utils.concealSize(1024*1024*1024), 1024*1024*1024);
+		assert.equal(utils.concealSize(1024*1024*1024 + 1), 1024*1024*1024 + 1024*1024*1024/64);
+		assert.equal(utils.concealSize(1024*1024*1024 + 1024*1024), 1024*1024*1024 + 1024*1024*1024/64);
+	});
+});

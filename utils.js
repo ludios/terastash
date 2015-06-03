@@ -8,6 +8,7 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const basedir = require('xdg').basedir;
+const assert = require('assert');
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
@@ -181,10 +182,42 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 	});
 };
 
+function roundUpToNearest(n, nearest) {
+	T(n, T.number, nearest, T.number);
+	assert(Number.isInteger(n), String(n));
+	assert(Number.isInteger(nearest), String(nearest));
+	return Math.ceil(n/nearest) * nearest;
+}
+
+/**
+ * For tiny files (< 2KB), return 16
+ * For non-tiny files, return (2^floor(log2(n)))/64
+ */
+function getConcealmentSize(n) {
+	T(n, T.number);
+	assert(Number.isInteger(n), String(n));
+	let averageWasteage = 1/128; // ~= .78%
+	let ret = Math.pow(2, Math.floor(Math.log2(n))) * (averageWasteage*2);
+	// This also takes care of non-integers we get out of the above fn
+	ret = Math.max(16, ret);
+	assert(Number.isInteger(ret), String(ret));
+	return ret;
+}
+
+/**
+ * Conceal a file size by rounding the size up log2-proportionally,
+ * to a size 0% to 1.5625% of the original size.
+ */
+function concealSize(n) {
+	T(n, T.number);
+	assert(Number.isInteger(n), String(n));
+	return roundUpToNearest(Math.max(1, n), getConcealmentSize(n));
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
-	clone, makeConfigFileInitializer
+	clone, makeConfigFileInitializer, getConcealmentSize, concealSize
 };
