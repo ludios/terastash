@@ -211,7 +211,9 @@ function getConcealmentSize(n) {
 function concealSize(n) {
 	T(n, T.number);
 	A(Number.isInteger(n), n);
-	return roundUpToNearest(Math.max(1, n), getConcealmentSize(n));
+	const ret = roundUpToNearest(Math.max(1, n), getConcealmentSize(n));
+	A.gte(ret, n);
+	return ret;
 }
 
 module.exports = {
