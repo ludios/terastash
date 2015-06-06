@@ -1,5 +1,6 @@
 Can add and drop a file
 
+  $ mkdir -p /tmp/mychunks
   $ export CHUNKS_DIR=/tmp/mychunks
   $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
   $ ts init unit_tests
