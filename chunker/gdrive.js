@@ -197,7 +197,7 @@ class GDriver {
 		// TODO: refresh only if we have < 50 minutes on the clock
 		yield this.refreshAccessToken();
 
-		const parents = opts.parents.concat().sort() || utils.emptyFrozenArray;
+		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
 
 		const md5 = crypto.createHash('md5');
