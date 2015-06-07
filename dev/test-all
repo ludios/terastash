@@ -5,4 +5,4 @@ iojs --harmony --harmony-rest-parameters --strong-mode ./node_modules/.bin/_moch
 ./node_modules/.bin/eslint .
 echo 'Now running integration tests...'
 cd tests
-python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh
+PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh
