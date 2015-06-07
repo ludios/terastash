@@ -279,6 +279,31 @@ class GDriver {
 			}
 		}.bind(this));
 	}
+
+	getMetadata(fileId, requestCb) {
+		T(
+			fileId, T.string,
+			requestCb, T.optional(T.object)
+		);
+		return new Promise(function(resolve, reject) {
+			const requestObj = this._drive.files.get(
+				{
+					fileId,
+					updateViewedDate: false
+				},
+				function(err, obj) {
+					if(err) {
+						reject(err);
+					} else {
+						resolve(obj);
+					}
+				}
+			);
+			if(requestCb) {
+				requestCb(requestObj);
+			}
+		}.bind(this));
+	}
 }
 
 GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);

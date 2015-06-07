@@ -14,7 +14,7 @@ const Promise = require('bluebird');
 const gdrive = require('../chunker/gdrive');
 
 describe('GDriver', function() {
-	it('can upload a file, create folder', Promise.coroutine(function*() {
+	it('can upload a file, create folder, get file, delete both', Promise.coroutine(function*() {
 		this.timeout(20000);
 
 		const config = yield terastash.getChunkStores();
@@ -36,6 +36,9 @@ describe('GDriver', function() {
 		const testFolderResult = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
 		A.eq(typeof testFolderResult.id, "string");
 		//console.log(`Created folder with id ${testFolderResult.id}`);
+
+		const getFileResult = yield gdriver.getMetadata(testFileResult.id);
+		A.eq(getFileResult.md5Checksum, testFileResult.md5Checksum);
 
 		yield gdriver.deleteFile(testFileResult.id);
 		yield gdriver.deleteFile(testFolderResult.id);
