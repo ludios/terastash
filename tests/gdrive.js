@@ -30,11 +30,14 @@ describe('GDriver', function() {
 		const buf = crypto.pseudoRandomBytes(utils.randInt(0, 5*1024));
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
-		const result = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
-		A.eq(typeof result.id, "string");
+		const testFileResult = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
+		A.eq(typeof testFileResult.id, "string");
 
-		const result2 = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
-		A.eq(typeof result2.id, "string");
-		//console.log(`Created folder with id ${result2.id}`);
+		const testFolderResult = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
+		A.eq(typeof testFolderResult.id, "string");
+		//console.log(`Created folder with id ${testFolderResult.id}`);
+
+		yield gdriver.deleteFile(testFileResult.id);
+		yield gdriver.deleteFile(testFolderResult.id);
 	}));
 });

@@ -66,6 +66,8 @@ class GDriver {
 				return metadataCb(new Error('Access token is expired.'), null);
 			}
 		};
+
+		this._drive = google.drive({version: 'v2', auth: this._oauth2Client});
 	}
 
 	getAuthUrl() {
@@ -196,9 +198,8 @@ class GDriver {
 			};
 		}
 
-		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
 		return new Promise(function(resolve, reject) {
-			const requestObj = drive.files.insert(insertOpts, function(err, obj) {
+			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
 					reject(err);
 				} else {
@@ -208,7 +209,7 @@ class GDriver {
 			if(requestCb) {
 				requestCb(requestObj);
 			}
-		}).then(function(obj) {
+		}.bind(this)).then(function(obj) {
 			T(obj, T.object);
 			if(obj.kind !== "drive#file") {
 				throw new UploadError(`Expected Google Drive to create an` +
@@ -255,6 +256,28 @@ class GDriver {
 		opts = utils.clone(opts);
 		opts.mimeType = "application/vnd.google-apps.folder";
 		return this.createFile(name, opts, null, requestCb);
+	}
+
+	/**
+	 * Delete a file or folder by ID
+	 */
+	deleteFile(fileId, requestCb) {
+		T(
+			fileId, T.string,
+			requestCb, T.optional(T.object)
+		);
+		return new Promise(function(resolve, reject) {
+			const requestObj = this._drive.files.delete({fileId}, function(err, obj) {
+				if(err) {
+					reject(err);
+				} else {
+					resolve(obj);
+				}
+			});
+			if(requestCb) {
+				requestCb(requestObj);
+			}
+		}.bind(this));
 	}
 }
 
