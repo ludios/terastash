@@ -258,11 +258,18 @@ function requireBlake2() {
 		}
 		const cwd = path.join(__dirname, 'node_modules', 'blake2');
 		const child_process = require('child_process');
-		child_process.execFileSync(
-			nodeGyp,
-			['clean', 'configure', 'build'],
-			{stdio: [0, 1, 2], cwd}
-		);
+		try {
+			child_process.execFileSync(
+				nodeGyp,
+				['clean', 'configure', 'build'],
+				{stdio: [0, 1, 2], cwd}
+			);
+			console.error("");
+		} catch(err) {
+			console.error("\nBuild failed; you may need to install additional tools.  See");
+			console.error("https://github.com/TooTallNate/node-gyp#installation\n");
+			throw err;
+		}
 	}
 }
 
