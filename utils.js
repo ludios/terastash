@@ -247,8 +247,11 @@ function streamToBuffer(stream) {
 function requireBlake2() {
 	try {
 		return require('blake2');
-	} catch(err) {
-		console.log("blake2 doesn't appear to be built; building it...");
+	} catch(requireErr) {
+		if(!(/^Error: Cannot find module /.test(String(requireErr)))) {
+			console.error(requireErr.stack + "\n");
+		}
+		console.error("blake2 doesn't appear to be built; building it...\n");
 		const nodeGyp = path.join(
 			path.dirname(path.dirname(process.execPath)),
 			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
