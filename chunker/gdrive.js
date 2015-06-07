@@ -129,38 +129,14 @@ class GDriver {
 		}.bind(this));
 	}
 
-	// TODO: make this call createFile which supports parentFolder and
-	// verifies stuff
-	createFolder(name, requestCb) {
-		T(name, T.string, requestCb, T.optional(T.object));
-		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
-		return new Promise(function(resolve, reject) {
-			const requestObj = drive.files.insert({
-				resource: {
-					title: name,
-					mimeType: 'application/vnd.google-apps.folder'
-				}
-			}, function(err, obj) {
-				if(err) {
-					reject(err);
-				} else {
-					resolve(obj);
-				}
-			});
-			if(requestCb) {
-				requestCb(requestObj);
-			}
-		});
-	}
-
 	*_maybeRefreshAndSaveToken() {
 		// Access tokens last for 60 minutes; make sure we have at least 50 minutes
 		// left on the clock, in case our upload takes a while.
 		const minMinutes = 50;
-		if(!(this._oauth2Client.credentials.expiry_date >= Date.now() - (minMinutes * 60 * 1000))) {
+		if(!(this._oauth2Client.credentials.expiry_date >= Date.now() + (minMinutes * 60 * 1000))) {
 			//console.log("Refreshing access token...");
 			yield this.refreshAccessToken();
-			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() - (minMinutes * 60 * 1000));
+			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() + (minMinutes * 60 * 1000));
 			yield this.saveCredentials();
 		}
 	}
@@ -181,7 +157,7 @@ class GDriver {
 				parents: T.optional(T.list(T.string)),
 				mimeType: T.optional(T.string)
 			}),
-			stream, T.object,
+			stream, T.maybe(T.object),
 			requestCb, T.optional(T.object)
 		);
 
@@ -190,33 +166,38 @@ class GDriver {
 		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
 
-		const md5 = crypto.createHash('md5');
+		let passthrough;
 		let length = 0;
-		const passthrough = new PassThrough();
-		stream.pipe(passthrough);
-		passthrough.on('data', function(data) {
-			length += data.length;
-			md5.update(data);
-		});
+		const md5 = crypto.createHash('md5');
+		const insertOpts = {
+			resource: {
+				title: name,
+				parents: parents.map(function(parentId) {
+					return {
+						"kind": "drive#fileLink",
+						"id": parentId
+					};
+				}),
+				mimeType: mimeType
+			}
+		};
+		if(stream !== null) {
+			passthrough = new PassThrough();
+			stream.pipe(passthrough);
+			passthrough.on('data', function(data) {
+				length += data.length;
+				md5.update(data);
+			});
+
+			insertOpts.media = {
+				mimeType: mimeType,
+				body: passthrough
+			};
+		}
 
 		const drive = google.drive({version: 'v2', auth: this._oauth2Client});
 		return new Promise(function(resolve, reject) {
-			const requestObj = drive.files.insert({
-				resource: {
-					title: name,
-					parents: parents.map(function(parentId) {
-						return {
-							"kind": "drive#fileLink",
-							"id": parentId
-						};
-					}),
-					mimeType: mimeType
-				},
-				media: {
-					mimeType: mimeType,
-					body: passthrough
-				}
-			}, function(err, obj) {
+			const requestObj = drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
 					reject(err);
 				} else {
@@ -233,7 +214,7 @@ class GDriver {
 					` object with kind='drive#file' but was ${inspect(obj.kind)}`
 				);
 			}
-			if(obj.fileSize !== String(length)) {
+			if(stream && obj.fileSize !== String(length)) {
 				throw new UploadError(`Expected Google Drive to create a` +
 					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
 				);
@@ -247,16 +228,32 @@ class GDriver {
 					);
 				}
 			}
-			const expectedHexDigest = md5.digest('hex');
-			if(obj.md5Checksum !== expectedHexDigest) {
-				throw new UploadError(`Expected Google Drive to create a` +
-					` file with md5Checksum=${inspect(expectedHexDigest)}` +
-					` but was ${inspect(obj.md5Checksum)}`
-				);
+			if(stream) {
+				const expectedHexDigest = md5.digest('hex');
+				if(obj.md5Checksum !== expectedHexDigest) {
+					throw new UploadError(`Expected Google Drive to create a` +
+						` file with md5Checksum=${inspect(expectedHexDigest)}` +
+						` but was ${inspect(obj.md5Checksum)}`
+					);
+				}
 			}
 			// obj.mimeType may not match what we wanted, so don't check it
 			return obj;
 		});
+	}
+
+	createFolder(name, opts, requestCb) {
+		T(
+			name, T.string,
+			opts, T.shape({
+				parents: T.optional(T.list(T.string)),
+				mimeType: T.optional(T.string)
+			}),
+			requestCb, T.optional(T.object)
+		);
+		opts = utils.clone(opts);
+		opts.mimeType = "application/vnd.google-apps.folder";
+		return this.createFile(name, opts, null, requestCb);
 	}
 }
 
