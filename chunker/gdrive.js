@@ -244,28 +244,24 @@ class GDriver {
 		});
 	}
 
-	createFolder(name, opts, requestCb) {
+	createFolder(name, opts) {
 		T(
 			name, T.string,
 			opts, T.shape({
 				parents: T.optional(T.list(T.string)),
 				mimeType: T.optional(T.string)
-			}),
-			requestCb, T.optional(T.object)
+			})
 		);
 		opts = utils.clone(opts);
 		opts.mimeType = "application/vnd.google-apps.folder";
-		return this.createFile(name, opts, null, requestCb);
+		return this.createFile(name, opts, null);
 	}
 
 	/**
 	 * Delete a file or folder by ID
 	 */
-	*deleteFile(fileId, requestCb) {
-		T(
-			fileId, T.string,
-			requestCb, T.optional(T.object)
-		);
+	*deleteFile(fileId) {
+		T(fileId, T.string);
 		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.delete({fileId}, function(err, obj) {
@@ -275,17 +271,11 @@ class GDriver {
 					resolve(obj);
 				}
 			});
-			if(requestCb) {
-				requestCb(requestObj);
-			}
 		}.bind(this));
 	}
 
-	*getMetadata(fileId, requestCb) {
-		T(
-			fileId, T.string,
-			requestCb, T.optional(T.object)
-		);
+	*getMetadata(fileId) {
+		T(fileId, T.string);
 		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.get(
@@ -301,9 +291,6 @@ class GDriver {
 					}
 				}
 			);
-			if(requestCb) {
-				requestCb(requestObj);
-			}
 		}.bind(this));
 	}
 }
