@@ -27,7 +27,8 @@ describe('GDriver', function() {
 		yield gdriver.loadCredentials();
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + Math.random());
-		const buf = crypto.pseudoRandomBytes(utils.randInt(0, 5*1024));
+		const fileLength = utils.randInt(0, 5*1024);
+		const buf = crypto.pseudoRandomBytes(fileLength);
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
 		const testFileResult = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
@@ -39,6 +40,13 @@ describe('GDriver', function() {
 
 		const getFileResult = yield gdriver.getMetadata(testFileResult.id);
 		A.eq(getFileResult.md5Checksum, testFileResult.md5Checksum);
+
+		// Make sure getData gives us bytes that match what we uploaded
+		const dataResponse = yield gdriver.getData(testFileResult.id);
+		const data = yield utils.streamToBuffer(dataResponse);
+		A.eq(data.length, fileLength);
+		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
+		A.eq(dataDigest, testFileResult.md5Checksum);
 
 		yield gdriver.deleteFile(testFileResult.id);
 		yield gdriver.deleteFile(testFolderResult.id);

@@ -228,11 +228,23 @@ function makeHttpsRequest(options) {
 	});
 }
 
+function streamToBuffer(stream) {
+	return new Promise(function(resolve) {
+		let buf = new Buffer(0);
+		stream.on('data', function(data) {
+			buf = Buffer.concat([buf, data]);
+		});
+		stream.once('end', function() {
+			resolve(buf);
+		});
+	});
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
 	clone, makeConfigFileInitializer, getConcealmentSize, concealSize,
-	makeHttpsRequest
+	makeHttpsRequest, streamToBuffer
 };

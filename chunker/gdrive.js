@@ -28,6 +28,12 @@ class UploadError extends Error {
 	}
 }
 
+class DownloadError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 class GDriver {
 	constructor(clientId, clientSecret) {
 		T(clientId, T.string, clientSecret, T.string);
@@ -293,6 +299,44 @@ class GDriver {
 			);
 		}.bind(this));
 	}
+
+	_getHeaders() {
+		const credentials = this._oauth2Client.credentials;
+		if(!credentials) {
+			throw new Error("Lack credentials");
+		}
+		if(!credentials.token_type) {
+			throw new Error("Credentials lack token_type");
+		}
+		if(!credentials.access_token) {
+			throw new Error("Credentials lack access_token");
+		}
+		return {"Authorization": `${credentials.token_type} ${credentials.access_token}`};
+	}
+
+	*getData(fileId) {
+		T(fileId, T.string);
+		yield this._maybeRefreshAndSaveToken();
+		return utils.makeHttpsRequest({
+			host: "www.googleapis.com",
+			path: `/drive/v2/files/${fileId}?alt=media`,
+			headers: this._getHeaders()
+		}).then(function(res) {
+			if(res.statusCode !== 200) {
+				return utils.streamToBuffer(res).then(function(body) {
+					try {
+						body = JSON.parse(body);
+					} catch(e) {
+						// Leave body as-is
+					}
+					throw new DownloadError(
+						`Got response with status ${res.statusCode} and body ${inspect(body)}`);
+				});
+			} else {
+				return res;
+			}
+		});
+	}
 }
 
 GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);
@@ -300,6 +344,7 @@ GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCred
 GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
 GDriver.prototype.deleteFile = Promise.coroutine(GDriver.prototype.deleteFile);
 GDriver.prototype.getMetadata = Promise.coroutine(GDriver.prototype.getMetadata);
+GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 module.exports = {GDriver};
