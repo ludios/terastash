@@ -52,8 +52,7 @@ class GDriver {
 		//
 		// We could always refresh the access token ourselves, but we prefer to also
 		// patch the buggy code to prevent bugs from compounding.
-		this._oauth2Client.getRequestMetadata = function(opt_uri, metadataCb) {
-			const that = this;
+		this._oauth2Client.getRequestMetadata = function(optUri, metadataCb) {
 			const thisCreds = this.credentials;
 
 			if (!thisCreds.access_token && !thisCreds.refresh_token) {
@@ -270,7 +269,7 @@ class GDriver {
 		T(fileId, T.string);
 		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
-			const requestObj = this._drive.files.delete({fileId}, function(err, obj) {
+			this._drive.files.delete({fileId}, function(err, obj) {
 				if(err) {
 					reject(err);
 				} else {
@@ -284,7 +283,7 @@ class GDriver {
 		T(fileId, T.string);
 		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
-			const requestObj = this._drive.files.get(
+			this._drive.files.get(
 				{
 					fileId,
 					updateViewedDate: false
