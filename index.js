@@ -262,7 +262,7 @@ const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 function putFile(client, p) {
 	return doWithPath(client, null, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
 		const type = 'f';
-		const stat = fs.statSync(p);
+		const stat = yield utils.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 		let content;
@@ -448,16 +448,16 @@ function listTerastashKeyspaces() {
 
 const listChunkStores = Promise.coroutine(function*() {
 	const config = yield getChunkStores();
-	for(const name of Object.keys(config.stores)) {
-		console.log(name);
+	for(const storeName of Object.keys(config.stores)) {
+		console.log(storeName);
 	}
 });
 
-const defineChunkStore = Promise.coroutine(function*(name, opts) {
-	T(name, T.string, opts, T.object);
+const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
+	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
-	if(utils.hasKey(config.stores, name)) {
-		throw new Error(`${name} is already defined in chunk-stores.json`);
+	if(utils.hasKey(config.stores, storeName)) {
+		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
 	const storeDef = {type: opts.type};
 	if(opts.type === "localfs") {
@@ -562,19 +562,36 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + name}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
 
+		// An individual chunk
+		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + name}".chunk (
+			idx int,
+			md5 blob,
+			size bigint
+		)`, []);
+
+		// Chunk info for a single chunk store
+		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + name}".chunkInfo (
+			key blob,
+			chunkList list<frozen<chunk>>
+		)`, []);
+
 		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + name}".fs (
 			pathname text PRIMARY KEY,
 			type ascii,
 			parent text,
 			size bigint,
 			content blob,
-			chunks list<blob>,
 			blake2b224 blob,
 			key blob,
 			mtime timestamp,
 			crtime timestamp,
 			executable boolean
 		);`, []);
+
+		// Note: chunks_in_* columns are added by defineChunkStore.
+		// We use column-per-chunk-store instead of having a map of
+		// <chunkStore, chunkInfo> because non-frozen, nested collections
+		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
 
 		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
 			ON "${KEYSPACE_PREFIX + name}".fs (parent);`, []);
