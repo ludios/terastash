@@ -3,6 +3,7 @@
 
 const google = require('googleapis');
 const Promise = require('bluebird');
+const A = require('ayy');
 const T = require('notmytype');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
@@ -152,6 +153,18 @@ class GDriver {
 		});
 	}
 
+	*_maybeRefreshAndSaveToken() {
+		// Access tokens last for 60 minutes; make sure we have at least 50 minutes
+		// left on the clock, in case our upload takes a while.
+		const minMinutes = 50;
+		if(!(this._oauth2Client.credentials.expiry_date >= Date.now() - (minMinutes * 60 * 1000))) {
+			//console.log("Refreshing access token...");
+			yield this.refreshAccessToken();
+			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() - (minMinutes * 60 * 1000));
+			yield this.saveCredentials();
+		}
+	}
+
 	/**
 	 * Returns a Promise that is resolved with the response from Google,
 	 * mostly importantly containing an "id" property with the file ID that
@@ -172,9 +185,7 @@ class GDriver {
 			requestCb, T.optional(T.object)
 		);
 
-		// TODO: refresh only if we have < 50 minutes on the clock
-		yield this.refreshAccessToken();
-		yield this.saveCredentials();
+		yield this._maybeRefreshAndSaveToken();
 
 		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
@@ -252,5 +263,6 @@ class GDriver {
 GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);
 GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCredentials);
 GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
+GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 module.exports = {GDriver};
