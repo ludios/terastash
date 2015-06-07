@@ -9,6 +9,7 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const basedir = require('xdg').basedir;
+let https;
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
@@ -216,10 +217,22 @@ function concealSize(n) {
 	return ret;
 }
 
+function makeHttpsRequest(options) {
+	if(!https) {
+		https = require('https');
+	}
+	return new Promise(function(resolve, reject) {
+		https.get(options, resolve).on('error', function(err) {
+			reject(err);
+		});
+	});
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
-	clone, makeConfigFileInitializer, getConcealmentSize, concealSize
+	clone, makeConfigFileInitializer, getConcealmentSize, concealSize,
+	makeHttpsRequest
 };
