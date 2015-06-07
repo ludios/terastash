@@ -31,24 +31,24 @@ describe('GDriver', function() {
 		const buf = crypto.pseudoRandomBytes(fileLength);
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
-		const testFileResult = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
-		A.eq(typeof testFileResult.id, "string");
+		const createFileResponse = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
+		A.eq(typeof createFileResponse.id, "string");
 
-		const testFolderResult = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
-		A.eq(typeof testFolderResult.id, "string");
-		//console.log(`Created folder with id ${testFolderResult.id}`);
+		const createFolderResponse = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
+		A.eq(typeof createFolderResponse.id, "string");
+		//console.log(`Created folder with id ${createFolderResponse.id}`);
 
-		const getFileResult = yield gdriver.getMetadata(testFileResult.id);
-		A.eq(getFileResult.md5Checksum, testFileResult.md5Checksum);
+		const getMetadataResponse = yield gdriver.getMetadata(createFileResponse.id);
+		A.eq(getMetadataResponse.md5Checksum, createFileResponse.md5Checksum);
 
 		// Make sure getData gives us bytes that match what we uploaded
-		const dataResponse = yield gdriver.getData(testFileResult.id);
-		const data = yield utils.streamToBuffer(dataResponse);
+		const getDataResponse = yield gdriver.getData(createFileResponse.id);
+		const data = yield utils.streamToBuffer(getDataResponse);
 		A.eq(data.length, fileLength);
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
-		A.eq(dataDigest, testFileResult.md5Checksum);
+		A.eq(dataDigest, createFileResponse.md5Checksum);
 
-		yield gdriver.deleteFile(testFileResult.id);
-		yield gdriver.deleteFile(testFolderResult.id);
+		yield gdriver.deleteFile(createFileResponse.id);
+		yield gdriver.deleteFile(createFolderResponse.id);
 	}));
 });
