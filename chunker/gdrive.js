@@ -33,28 +33,6 @@ class GDriver {
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
 		this._oauth2Client = new OAuth2(clientId, clientSecret, REDIRECT_URL);
-		this._oauth2Client._realCredentials = this._oauth2Client.credentials;
-		const that = this;
-		// Replace OAuth2Client.credentials with a setter that automatically
-		// saves the credentials.  We do this instead of saving the credentials
-		// after a request, because a request may be retried by googleapis internally
-		// if the credentials are expired, and we want to capture the updated
-		// credentials as soon as possible so that other processes can use them.
-		// XXX ^ Not actually true?  How would it retry a request given that we have streams?
-		Object.defineProperty(this._oauth2Client, 'credentials', {
-			get: function() {
-				return this._realCredentials;
-			},
-			set: function(credentials) {
-				this._realCredentials = credentials;
-				that.saveCredentials().catch(function(err) {
-					console.log("Error in GDriver.saveCredentials():");
-					console.error(err.stack);
-				});
-			},
-			enumerable: true,
-			configurable: false
-		});
 
 		// Work around https://github.com/google/google-api-nodejs-client/issues/260
 		// by patching getRequestMetadata with something that never returns an
@@ -116,7 +94,7 @@ class GDriver {
 				if(err) {
 					reject(err);
 				} else {
-					this._oauth2Client._realCredentials = tokens;
+					this._oauth2Client.setCredentials(tokens);
 					resolve(this.saveCredentials());
 				}
 			}.bind(this));
@@ -127,7 +105,7 @@ class GDriver {
 		const config = yield getAllCredentials();
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
-			this._oauth2Client._realCredentials = credentials;
+			this._oauth2Client.setCredentials(credentials);
 		}
 	}
 
@@ -196,6 +174,7 @@ class GDriver {
 
 		// TODO: refresh only if we have < 50 minutes on the clock
 		yield this.refreshAccessToken();
+		yield this.saveCredentials();
 
 		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
