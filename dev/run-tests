@@ -1,8 +1,38 @@
-#!/bin/sh
+#!/bin/bash
 
 export BLUEBIRD_DEBUG=1
+
+integration_tests_log="$(mktemp)"
+integration_ret_file="$(mktemp)"
+# Run integration tests in a subshell so that unit tests and integration tests run in parallel
+(
+	cd tests
+	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh
+	echo -E -n "$?" >> "$integration_ret_file"
+) > "$integration_tests_log" 2>&1 &
+integration_pid=$!
+
 ./node_modules/.bin/eslint .
+eslint_ret="$?"
+
 iojs --harmony --harmony-rest-parameters --strong-mode ./node_modules/.bin/_mocha tests/*.js
-echo 'Now running integration tests...'
-cd tests
-PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh
+mocha_ret="$?"
+
+echo 'Waiting for integration tests to finish...'
+wait "$integration_pid"
+cat "$integration_tests_log"
+
+integration_ret="$(cat "$integration_ret_file")"
+
+rm -f "$integration_tests_log"
+rm -f "$integration_ret_file"
+
+if [[ mocha_ret -eq 0 && eslint_ret -eq 0 && integration_ret -eq 0 ]]; then
+	exit 0
+else
+	echo "One or more test programs returned non-0 exit code:"
+	echo "mocha:       $mocha_ret"
+	echo "eslint:      $eslint_ret"
+	echo "integration: $integration_ret"
+	exit 1
+fi
