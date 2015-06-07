@@ -20,7 +20,9 @@ const KEYSPACE_PREFIX = "ts_";
 
 function blake2b224Buffer(buf) {
 	T(buf, Buffer);
-	if(!blake2) { blake2 = require('blake2'); }
+	if(!blake2) {
+		blake2 = utils.requireBlake2();
+	}
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
 }
 

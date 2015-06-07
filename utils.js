@@ -8,6 +8,7 @@ const Promise = require('bluebird');
 const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
+const process = require('process');
 const basedir = require('xdg').basedir;
 let https;
 
@@ -240,11 +241,36 @@ function streamToBuffer(stream) {
 	});
 }
 
+/**
+ * Require blake2, building it if necessary
+ */
+function requireBlake2() {
+	try {
+		return require('blake2');
+	} catch(err) {
+		console.log("blake2 doesn't appear to be built; building it...");
+		const nodeGyp = path.join(
+			path.dirname(path.dirname(process.execPath)),
+			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
+		);
+		if(!fs.existsSync(nodeGyp)) {
+			throw new Error("Could not find node-gyp");
+		}
+		const cwd = path.join(__dirname, 'node_modules', 'blake2');
+		const child_process = require('child_process');
+		child_process.execFileSync(
+			nodeGyp,
+			['clean', 'configure', 'build'],
+			{stdio: [0, 1, 2], cwd}
+		);
+	}
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
 	clone, makeConfigFileInitializer, getConcealmentSize, concealSize,
-	makeHttpsRequest, streamToBuffer
+	makeHttpsRequest, streamToBuffer, requireBlake2
 };
