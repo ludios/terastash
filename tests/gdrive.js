@@ -15,7 +15,7 @@ const gdrive = require('../chunker/gdrive');
 
 describe('GDriver', function() {
 	it('can upload a file, create folder, get file, delete both', Promise.coroutine(function*() {
-		this.timeout(20000);
+		this.timeout(30000);
 
 		const config = yield terastash.getChunkStores();
 		const chunkStore = config.stores["terastash-tests-gdrive"];
@@ -48,6 +48,7 @@ describe('GDriver', function() {
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
 		A.eq(dataDigest, createFileResponse.md5Checksum);
 
+		// TODO: delete both in parallel
 		yield gdriver.deleteFile(createFileResponse.id);
 		yield gdriver.deleteFile(createFolderResponse.id);
 	}));

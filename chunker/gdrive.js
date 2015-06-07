@@ -11,8 +11,6 @@ const inspect = require('util').inspect;
 const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 
-const REDIRECT_URL = 'urn:ietf:wg:oauth:2.0:oob';
-
 const getAllCredentials = utils.makeConfigFileInitializer(
 	"google-tokens.json", {
 		credentials: {},
@@ -39,7 +37,8 @@ class GDriver {
 		T(clientId, T.string, clientSecret, T.string);
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
-		this._oauth2Client = new OAuth2(clientId, clientSecret, REDIRECT_URL);
+		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
+		this._oauth2Client = new OAuth2(clientId, clientSecret, redirectUrl);
 
 		// Work around https://github.com/google/google-api-nodejs-client/issues/260
 		// by patching getRequestMetadata with something that never returns an
