@@ -22,12 +22,12 @@ describe('A', function() {
 			assert.strictEqual(e.toString(), "AyyError: A(...): 0 not truthy: explanation");
 		}
 		try {
-			A(0, ()=>"explanation");
+			A(0, A.fn, ()=>"explanation");
 		} catch(e) {
 			assert.strictEqual(e.toString(), "AyyError: A(...): 0 not truthy: explanation");
 		}
 		try {
-			A(0, ()=>undefined);
+			A(0, A.fn, ()=>undefined);
 		} catch(e) {
 			assert.strictEqual(e.toString(), "AyyError: A(...): 0 not truthy: undefined");
 		}
