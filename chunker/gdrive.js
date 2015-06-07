@@ -261,11 +261,12 @@ class GDriver {
 	/**
 	 * Delete a file or folder by ID
 	 */
-	deleteFile(fileId, requestCb) {
+	*deleteFile(fileId, requestCb) {
 		T(
 			fileId, T.string,
 			requestCb, T.optional(T.object)
 		);
+		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.delete({fileId}, function(err, obj) {
 				if(err) {
@@ -280,11 +281,12 @@ class GDriver {
 		}.bind(this));
 	}
 
-	getMetadata(fileId, requestCb) {
+	*getMetadata(fileId, requestCb) {
 		T(
 			fileId, T.string,
 			requestCb, T.optional(T.object)
 		);
+		yield this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.get(
 				{
@@ -309,6 +311,8 @@ class GDriver {
 GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);
 GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCredentials);
 GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
+GDriver.prototype.deleteFile = Promise.coroutine(GDriver.prototype.deleteFile);
+GDriver.prototype.getMetadata = Promise.coroutine(GDriver.prototype.getMetadata);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 module.exports = {GDriver};
