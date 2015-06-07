@@ -168,7 +168,7 @@ class GDriver {
 
 		let passthrough;
 		let length = 0;
-		const md5 = crypto.createHash('md5');
+		let md5;
 		const insertOpts = {
 			resource: {
 				title: name,
@@ -182,6 +182,7 @@ class GDriver {
 			}
 		};
 		if(stream !== null) {
+			md5 = crypto.createHash('md5');
 			passthrough = new PassThrough();
 			stream.pipe(passthrough);
 			passthrough.on('data', function(data) {

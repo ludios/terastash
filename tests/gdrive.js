@@ -35,5 +35,6 @@ describe('GDriver', function() {
 
 		const result2 = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
 		A.eq(typeof result2.id, "string");
+		//console.log(`Created folder with id ${result2.id}`);
 	}));
 });
