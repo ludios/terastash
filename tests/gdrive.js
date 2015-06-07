@@ -15,7 +15,7 @@ const gdrive = require('../chunker/gdrive');
 
 describe('GDriver', function() {
 	it('can upload a file, create folder, get file, delete both', Promise.coroutine(function*() {
-		this.timeout(30000);
+		this.timeout(20000);
 
 		const config = yield terastash.getChunkStores();
 		const chunkStore = config.stores["terastash-tests-gdrive"];
@@ -31,25 +31,37 @@ describe('GDriver', function() {
 		const buf = crypto.pseudoRandomBytes(fileLength);
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
-		const createFileResponse = yield gdriver.createFile("test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname));
+		let _;
+		_ = yield Promise.all([
+			gdriver.createFile(
+				"test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname)
+			),
+			gdriver.createFolder(
+				"test-folder", {parents: chunkStore.parents}
+			)
+		]);
+		const createFileResponse = _[0];
+		const createFolderResponse = _[1];
 		A.eq(typeof createFileResponse.id, "string");
-
-		const createFolderResponse = yield gdriver.createFolder("test-folder", {parents: chunkStore.parents});
 		A.eq(typeof createFolderResponse.id, "string");
-		//console.log(`Created folder with id ${createFolderResponse.id}`);
 
-		const getMetadataResponse = yield gdriver.getMetadata(createFileResponse.id);
+		_ = yield Promise.all([
+			gdriver.getMetadata(createFileResponse.id),
+			gdriver.getData(createFileResponse.id)
+		]);
+		const getMetadataResponse = _[0];
 		A.eq(getMetadataResponse.md5Checksum, createFileResponse.md5Checksum);
 
 		// Make sure getData gives us bytes that match what we uploaded
-		const getDataResponse = yield gdriver.getData(createFileResponse.id);
+		const getDataResponse = _[1];
 		const data = yield utils.streamToBuffer(getDataResponse);
 		A.eq(data.length, fileLength);
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
 		A.eq(dataDigest, createFileResponse.md5Checksum);
 
-		// TODO: delete both in parallel
-		yield gdriver.deleteFile(createFileResponse.id);
-		yield gdriver.deleteFile(createFolderResponse.id);
+		yield Promise.all([
+			gdriver.deleteFile(createFileResponse.id),
+			gdriver.deleteFile(createFolderResponse.id)
+		]);
 	}));
 });
