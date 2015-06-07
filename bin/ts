@@ -4,4 +4,4 @@
 export BLUEBIRD_DEBUG=1
 
 SELF="$(dirname "${BASH_SOURCE[0]}")"
-iojs --harmony --harmony_rest_parameters --strong_mode "$SELF/ts.js" "$@"
+iojs --harmony --harmony-rest-parameters --strong-mode "$SELF/ts.js" "$@"

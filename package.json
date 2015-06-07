@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "iojs --harmony --harmony-rest-parameters --strong_mode ./node_modules/.bin/_mocha tests/*.js && ./node_modules/.bin/eslint .; echo 'Now running integration tests...'; cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh"
+    "test": "./dev/test-all"
   },
   "bin": {
     "ts": "./bin/ts"
