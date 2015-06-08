@@ -94,7 +94,7 @@ function readChunks(directory, key, chunks) {
 		for(const chunk of chunks) {
 			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
 
-			// What a coincidence, the digest is the filename...
+			// For localfs, the filename is the digest
 			const digest = Buffer(chunk.file_id, "hex");
 			A.eq(digest.length, 224/8);
 

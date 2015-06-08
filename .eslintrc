@@ -45,7 +45,10 @@
 		"no-new": 0,
 
 		/* For T() */
-		"new-cap": 0
+		"new-cap": 0,
+
+		/* allow: const x = undefined; */
+		"no-undef-init": 0
 	},
 	"env": {
 		"es6": true,
