@@ -47,7 +47,7 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 				A.lte(size, CHUNK_SIZE);
 				totalSize += size;
 				const digest = blake2b.digest().slice(0, 224/8);
-				chunkInfo.push({idx, fileId: digest.toString('hex'), size});
+				chunkInfo.push({idx, file_id: digest.toString('hex'), size});
 				yield utils.renameAsync(
 					tempFname,
 					path.join(directory, digest.toString('hex'))

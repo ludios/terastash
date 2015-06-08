@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const chalk = require('chalk');
+const inspect = require('util').inspect;
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
@@ -114,7 +115,7 @@ function userPathToDatabasePath(base, p) {
  */
 function runQuery(client, statement, args) {
 	T(client, CassandraClientType, statement, T.string, args, T.optional(Array));
-	console.log('runQuery(%s, %s, %s)', client, statement, args);
+	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(args)})`);
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
@@ -297,9 +298,11 @@ function putFile(client, p) {
 				client, stashInfo.name, `key_in_${storeName}`, 'blob');
 			const blake2b224 = undefined;
 			const key = crypto.randomBytes(128/8);
+			const config = yield getChunkStores();
+			const chunksDir = config.stores[storeName].directory;
 			// TODO: give writeChunks a stream instead so that we can get our
 			// own blake2b224
-			const chunkInfo = yield localfs.writeChunks(process.env.CHUNKS_DIR, key, p);
+			const chunkInfo = yield localfs.writeChunks(chunksDir, key, p);
 			T(chunkInfo, Array);
 			const size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
@@ -593,7 +596,7 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 		// An individual chunk
 		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + name}".chunk (
 			idx int,
-			fileId text,
+			file_id text,
 			md5 blob,
 			size bigint
 		)`);
