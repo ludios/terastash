@@ -23,13 +23,14 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	T(directory, T.string, key, Buffer, p, T.string);
 	A.eq(key.length, 128/8);
 
-	const expectedTotalSize = fs.statSync(p).size;
+	const expectedTotalSize = (yield utils.statAsync(p)).size;
 	const inputStream = fs.createReadStream(p);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	inputStream.pipe(cipherStream);
 	let totalSize = 0;
-	const chunkDigests = [];
+	const chunkInfo = [];
 
+	let idx = 0;
 	for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 		const tempFname = path.join(directory, 'temp-' + Math.random());
 		const writeStream = fs.createWriteStream(tempFname);
@@ -41,24 +42,25 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 		});
 		passthrough.pipe(writeStream);
 		yield new Promise(function(resolve) {
-			writeStream.once('finish', function() {
-				const size = fs.statSync(tempFname).size;
+			writeStream.once('finish', Promise.coroutine(function*() {
+				const size = (yield utils.statAsync(tempFname)).size;
 				A.lte(size, CHUNK_SIZE);
 				totalSize += size;
 				const digest = blake2b.digest().slice(0, 224/8);
-				chunkDigests.push(digest);
-				fs.renameSync(
+				chunkInfo.push({idx, fileId: digest.toString('hex'), size});
+				yield utils.renameAsync(
 					tempFname,
 					path.join(directory, digest.toString('hex'))
 				);
 				resolve();
-			});
+			}));
 		});
+		idx += 1;
 	}
 	A.eq(totalSize, expectedTotalSize,
 		`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
 		`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
-	return chunkDigests;
+	return chunkInfo;
 });
 
 class BadChunk extends Error {

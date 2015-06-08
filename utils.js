@@ -148,6 +148,7 @@ const readFileAsync = Promise.promisify(fs.readFile);
 const writeFileAsync = Promise.promisify(fs.writeFile);
 const mkdirpAsync = Promise.promisify(mkdirp);
 const statAsync = Promise.promisify(fs.stat);
+const renameAsync = Promise.promisify(fs.rename);
 
 const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
 	T(fname, T.string, object, T.object);
@@ -280,7 +281,8 @@ module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
-	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
-	clone, makeConfigFileInitializer, getConcealmentSize, concealSize,
-	makeHttpsRequest, streamToBuffer, requireBlake2
+	mkdirpAsync, statAsync, renameAsync, writeObjectToConfigFile,
+	readObjectFromConfigFile, clone, makeConfigFileInitializer,
+	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
+	requireBlake2
 };
