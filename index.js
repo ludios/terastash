@@ -353,13 +353,28 @@ function getFile(client, stashName, p) {
 			throw new Error("stash info doesn't specify chunk-store key");
 		}
 
-		const result = yield runQuery(
-			client,
-			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content
-			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath]
-		);
+		let result;
+		try {
+			result = yield runQuery(
+				client,
+				`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, executable
+				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+				WHERE pathname = ?;`,
+				[dbPath]
+			);
+		} catch(err) {
+			if(!(/^ResponseError: Undefined name .* in selection clause/.test(String(err)))) {
+				throw err;
+			}
+			// chunks_in_${storeName} doesn't exist, try the query without it
+			result = yield runQuery(
+				client,
+				`SELECT pathname, size, key, blake2b224, content, executable
+				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+				WHERE pathname = ?;`,
+				[dbPath]
+			);
+		}
 
 		const config = yield getChunkStores();
 		const chunksDir = config.stores[storeName].directory;
@@ -383,10 +398,10 @@ function getFile(client, stashName, p) {
 				const writeStream = fs.createWriteStream(outputFilename);
 				readStream.pipe(writeStream);
 				// TODO: check file length
-				const p = new Promise(function(resolve, reject) {
-					writeStream.once('finish', function() {
+				yield new Promise(function(resolve, reject) {
+					writeStream.once('finish', Promise.coroutine(function*() {
 						resolve();
-					});
+					}));
 					writeStream.once('error', function(err) {
 						reject(err);
 					});
@@ -394,7 +409,6 @@ function getFile(client, stashName, p) {
 						reject(err);
 					});
 				});
-				return p;
 			} else {
 				let blake2b224 = blake2b224Buffer(row.content);
 				if(Number(row.size) !== row.content.length) {
@@ -406,7 +420,11 @@ function getFile(client, stashName, p) {
 						`${row.blake2b224.toString('hex')} but content was \n` +
 						`${blake2b224.toString('hex')}`);
 				}
-				return utils.writeFileAsync(outputFilename, row.content);
+				yield utils.writeFileAsync(outputFilename, row.content);
+			}
+			if(row.executable) {
+				// TODO: setting for 0o700 instead?
+				yield utils.chmodAsync(outputFilename, 0o770);
 			}
 		}
 	}));

@@ -74,6 +74,12 @@ Can add and drop a file
   $ ts drop sample1 bigfile
   $ ts ls
                   14 1980-01-01 00:00 sample2*
+  $ ls -1F sample2
+  sample2*
+  $ rm sample2
+  $ ts get sample2
+  $ ls -1F sample2
+  sample2*
   $ ts drop sample2
   $ ts ls
 
