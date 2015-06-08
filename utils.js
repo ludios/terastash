@@ -9,6 +9,7 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
+const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 let https;
@@ -280,22 +281,31 @@ function requireBlake2() {
 
 let blake2;
 /**
- * Take input stream, return [
- *		an output stream into which input is piped,
- *		Hash object into which input stream is piped
- * ]
+ * Take input stream, return {
+ *		stream: an output stream into which input is piped,
+ *		hash: Hash object that hashes input stream as it is read,
+ *		length: number of bytes read from input stream
+ * }
  */
 function streamHasher(inputStream, algo) {
-	if(!blake2) {
-		blake2 = requireBlake2();
+	let hash;
+	if(/^blake2/.test(algo)) {
+		if(!blake2) {
+			blake2 = requireBlake2();
+		}
+		hash = blake2.createHash(algo);
+	} else {
+		hash = crypto.createHash(algo);
 	}
-	const blake2b = blake2.createHash('blake2b');
-	const passthrough = new PassThrough();
-	inputStream.pipe(passthrough);
-	passthrough.on('data', function(data) {
-		blake2b.update(data);
+
+	const stream = new PassThrough();
+	inputStream.pipe(stream);
+	const out = {stream, hash, length: 0};
+	stream.on('data', function(data) {
+		out.length += data.length;
+		hash.update(data);
 	});
-	return [passthrough, blake2b];
+	return out;
 }
 
 module.exports = {

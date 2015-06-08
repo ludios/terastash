@@ -35,17 +35,15 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 		const tempFname = path.join(directory, 'temp-' + Math.random());
 		const writeStream = fs.createWriteStream(tempFname);
 
-		const _ = utils.streamHasher(chunkStream, 'blake2b');
-		const passthrough = _[0];
-		const blake2b = _[1];
-		passthrough.pipe(writeStream);
+		const hasher = utils.streamHasher(chunkStream, 'blake2b');
+		hasher.stream.pipe(writeStream);
 
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				const size = (yield utils.statAsync(tempFname)).size;
 				A.lte(size, CHUNK_SIZE);
 				totalSize += size;
-				const digest = blake2b.digest().slice(0, 224/8);
+				const digest = hasher.hash.digest().slice(0, 224/8);
 				chunkInfo.push({idx, file_id: digest.toString('hex'), size});
 				yield utils.renameAsync(
 					tempFname,
@@ -97,14 +95,12 @@ function readChunks(directory, key, chunks) {
 			const digest = Buffer(chunk.file_id, "hex");
 			A.eq(digest.length, 224/8);
 
-			const _ = utils.streamHasher(chunkStream, 'blake2b');
-			const passthrough = _[0];
-			const blake2b = _[1];
-			cipherStream.append(passthrough);
+			const hasher = utils.streamHasher(chunkStream, 'blake2b');
+			cipherStream.append(hasher.stream);
 
 			yield new Promise(function(resolve, reject) {
 				chunkStream.once('end', function() {
-					const readDigest = blake2b.digest().slice(0, 224/8);
+					const readDigest = hasher.hash.digest().slice(0, 224/8);
 					if(readDigest.equals(digest)) {
 						resolve();
 					} else {
