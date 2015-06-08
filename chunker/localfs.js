@@ -72,8 +72,18 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
-function readChunks(directory, key, chunkDigests) {
-	T(directory, T.string, key, Buffer, chunkDigests, T.list(Buffer));
+function readChunks(directory, key, chunks) {
+	T(
+		directory, T.string,
+		key, Buffer,
+		chunks, T.list(
+			T.shape({
+				"idx": T.number,
+				"file_id": T.string,
+				"size": T.object /* bigint */
+			})
+		)
+	);
 	A.eq(key.length, 128/8);
 
 	const cipherStream = new Combine();
@@ -81,8 +91,12 @@ function readChunks(directory, key, chunkDigests) {
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
-		for(const digest of chunkDigests) {
-			const chunkStream = fs.createReadStream(path.join(directory, digest.toString('hex')));
+		for(const chunk of chunks) {
+			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
+
+			// What a coincidence, the digest is the filename...
+			const digest = Buffer(chunk.file_id, "hex");
+			A.eq(digest.length, 224/8);
 
 			const blake2b = blake2.createHash('blake2b');
 			const passthrough = new stream.PassThrough();

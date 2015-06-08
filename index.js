@@ -348,60 +348,70 @@ function putFiles(pathnames) {
  * Get a file or directory from the Cassandra database.
  */
 function getFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return runQuery(
+	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+		// TODO: instead of checking just this one stash, check all stashes
+		const storeName = stashInfo['chunk-store'];
+		if(!storeName) {
+			throw new Error("stash info doesn't specify chunk-store key");
+		}
+
+		const result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, blake2b224, chunks, content
+			`SELECT pathname, size, key_in_${storeName}, chunks_in_${storeName}, blake2b224, content
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
-		).then(Promise.coroutine(function*(result) {
-			//console.log(result);
-			for(const row of result.rows) {
-				let outputFilename;
-				// If stashName was given, write file to current directory
-				if(stashName) {
-					outputFilename = row.pathname;
-				} else {
-					outputFilename = stashInfo.path + '/' + row.pathname;
-				}
-				yield utils.mkdirpAsync(path.dirname(outputFilename));
+		);
 
-				if(row.chunks) {
-					A.eq(row.content, null);
-					A.eq(row.blake2b224, null);
-					const readStream = localfs.readChunks(process.env.CHUNKS_DIR, row.key, row.chunks);
-					const writeStream = fs.createWriteStream(outputFilename);
-					readStream.pipe(writeStream);
-					// TODO: check file length
-					const p = new Promise(function(resolve, reject) {
-						writeStream.once('finish', function() {
-							resolve();
-						});
-						writeStream.once('error', function(err) {
-							reject(err);
-						});
-						readStream.once('error', function(err) {
-							reject(err);
-						});
-					});
-					return p;
-				} else {
-					let blake2b224 = blake2b224Buffer(row.content);
-					if(Number(row.size) !== row.content.length) {
-						throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
-					}
-					if(!row.blake2b224.equals(blake2b224)) {
-						throw new Error(
-							`Database says BLAKE2b-224 of ${row.pathname} is\n` +
-							`${row.blake2b224.toString('hex')} but content was \n` +
-							`${blake2b224.toString('hex')}`);
-					}
-					return utils.writeFileAsync(outputFilename, row.content);
-				}
+		const config = yield getChunkStores();
+		const chunksDir = config.stores[storeName].directory;
+
+		//console.log(result);
+		for(const row of result.rows) {
+			let outputFilename;
+			// If stashName was given, write file to current directory
+			if(stashName) {
+				outputFilename = row.pathname;
+			} else {
+				outputFilename = stashInfo.path + '/' + row.pathname;
 			}
-		}));
-	});
+			yield utils.mkdirpAsync(path.dirname(outputFilename));
+
+			const chunks = row['chunks_in_' + storeName];
+			if(chunks) {
+				A.eq(row.content, null);
+				A.eq(row.blake2b224, null);
+				const readStream = localfs.readChunks(chunksDir, row['key_in_' + storeName], chunks);
+				const writeStream = fs.createWriteStream(outputFilename);
+				readStream.pipe(writeStream);
+				// TODO: check file length
+				const p = new Promise(function(resolve, reject) {
+					writeStream.once('finish', function() {
+						resolve();
+					});
+					writeStream.once('error', function(err) {
+						reject(err);
+					});
+					readStream.once('error', function(err) {
+						reject(err);
+					});
+				});
+				return p;
+			} else {
+				let blake2b224 = blake2b224Buffer(row.content);
+				if(Number(row.size) !== row.content.length) {
+					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
+				}
+				if(!row.blake2b224.equals(blake2b224)) {
+					throw new Error(
+						`Database says BLAKE2b-224 of ${row.pathname} is\n` +
+						`${row.blake2b224.toString('hex')} but content was \n` +
+						`${blake2b224.toString('hex')}`);
+				}
+				return utils.writeFileAsync(outputFilename, row.content);
+			}
+		}
+	}));
 }
 
 function getFiles(stashName, pathnames) {
