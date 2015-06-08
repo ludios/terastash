@@ -8,8 +8,6 @@ const T = require('notmytype');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
 const inspect = require('util').inspect;
-const crypto = require('crypto');
-const PassThrough = require('stream').PassThrough;
 
 const getAllCredentials = utils.makeConfigFileInitializer(
 	"google-tokens.json", {
