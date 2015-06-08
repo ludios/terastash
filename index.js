@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const chalk = require('chalk');
 const inspect = require('util').inspect;
+const streamifier = require('streamifier');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
@@ -343,89 +344,91 @@ function putFiles(pathnames) {
 }
 
 /**
+ * Get a readable stream with the file contents, whether the file is in the db
+ * or in a chunk store.
+ */
+const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
+	// TODO: instead of checking just this one stash, check all stashes
+	const storeName = stashInfo['chunk-store'];
+	if(!storeName) {
+		throw new Error("stash info doesn't specify chunk-store key");
+	}
+
+	let result;
+	try {
+		result = yield runQuery(
+			client,
+			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, executable
+			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath]
+		);
+	} catch(err) {
+		if(!(/^ResponseError: Undefined name .* in selection clause/.test(String(err)))) {
+			throw err;
+		}
+		// chunks_in_${storeName} doesn't exist, try the query without it
+		result = yield runQuery(
+			client,
+			`SELECT pathname, size, key, blake2b224, content, executable
+			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+			WHERE pathname = ?;`,
+			[dbPath]
+		);
+	}
+	A.eq(result.rows.length, 1);
+	const row = result.rows[0];
+
+	const config = yield getChunkStores();
+	const chunksDir = config.stores[storeName].directory;
+
+	const chunks = row['chunks_in_' + storeName];
+	// TODO: check blake2b224 in both cases
+	if(chunks) {
+		A.eq(row.content, null);
+		A.eq(row.blake2b224, null);
+		return [row, localfs.readChunks(chunksDir, row.key, chunks)];
+	} else {
+		return [row, streamifier.createReadStream(row.content)];
+	}
+});
+
+/**
  * Get a file or directory from the Cassandra database.
  */
 function getFile(client, stashName, p) {
 	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
-		// TODO: instead of checking just this one stash, check all stashes
-		const storeName = stashInfo['chunk-store'];
-		if(!storeName) {
-			throw new Error("stash info doesn't specify chunk-store key");
+		const _ = yield streamFile(client, stashInfo, dbPath);
+		const row = _[0];
+		const readStream = _[1];
+
+		let outputFilename;
+		// If stashName was given, write file to current directory
+		if(stashName) {
+			outputFilename = row.pathname;
+		} else {
+			outputFilename = stashInfo.path + '/' + row.pathname;
 		}
 
-		let result;
-		try {
-			result = yield runQuery(
-				client,
-				`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, executable
-				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				WHERE pathname = ?;`,
-				[dbPath]
-			);
-		} catch(err) {
-			if(!(/^ResponseError: Undefined name .* in selection clause/.test(String(err)))) {
-				throw err;
-			}
-			// chunks_in_${storeName} doesn't exist, try the query without it
-			result = yield runQuery(
-				client,
-				`SELECT pathname, size, key, blake2b224, content, executable
-				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				WHERE pathname = ?;`,
-				[dbPath]
-			);
-		}
+		yield utils.mkdirpAsync(path.dirname(outputFilename));
 
-		const config = yield getChunkStores();
-		const chunksDir = config.stores[storeName].directory;
-
-		//console.log(result);
-		for(const row of result.rows) {
-			let outputFilename;
-			// If stashName was given, write file to current directory
-			if(stashName) {
-				outputFilename = row.pathname;
-			} else {
-				outputFilename = stashInfo.path + '/' + row.pathname;
-			}
-			yield utils.mkdirpAsync(path.dirname(outputFilename));
-
-			const chunks = row['chunks_in_' + storeName];
-			if(chunks) {
-				A.eq(row.content, null);
-				A.eq(row.blake2b224, null);
-				const readStream = localfs.readChunks(chunksDir, row.key, chunks);
-				const writeStream = fs.createWriteStream(outputFilename);
-				readStream.pipe(writeStream);
-				// TODO: check file length
-				yield new Promise(function(resolve, reject) {
-					writeStream.once('finish', Promise.coroutine(function*() {
-						resolve();
-					}));
-					writeStream.once('error', function(err) {
-						reject(err);
-					});
-					readStream.once('error', function(err) {
-						reject(err);
-					});
-				});
-			} else {
-				let blake2b224 = blake2b224Buffer(row.content);
-				if(Number(row.size) !== row.content.length) {
-					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
-				}
-				if(!row.blake2b224.equals(blake2b224)) {
-					throw new Error(
-						`Database says BLAKE2b-224 of ${row.pathname} is\n` +
-						`${row.blake2b224.toString('hex')} but content was \n` +
-						`${blake2b224.toString('hex')}`);
-				}
-				yield utils.writeFileAsync(outputFilename, row.content);
-			}
-			if(row.executable) {
-				// TODO: setting for 0o700 instead?
-				yield utils.chmodAsync(outputFilename, 0o770);
-			}
+		const writeStream = fs.createWriteStream(outputFilename);
+		readStream.pipe(writeStream);
+		// TODO: check file length
+		yield new Promise(function(resolve, reject) {
+			writeStream.once('finish', Promise.coroutine(function*() {
+				resolve();
+			}));
+			writeStream.once('error', function(err) {
+				reject(err);
+			});
+			readStream.once('error', function(err) {
+				reject(err);
+			});
+		});
+		if(row.executable) {
+			// TODO: setting for 0o700 instead?
+			yield utils.chmodAsync(outputFilename, 0o770);
 		}
 	}));
 }
@@ -439,18 +442,12 @@ function getFiles(stashName, pathnames) {
 }
 
 function catFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return runQuery(
-			client,
-			`SELECT content FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath]
-		).then(function(result) {
-			for(const row of result.rows) {
-				process.stdout.write(row.content);
-			}
-		});
-	});
+	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+		const _ = yield streamFile(client, stashInfo, dbPath);
+		const row = _[0];
+		const readStream = _[1];
+		readStream.pipe(process.stdout);
+	}));
 }
 
 function catFiles(stashName, pathnames) {

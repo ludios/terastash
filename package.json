@@ -25,6 +25,7 @@
     "mkdirp": "^0.5.1",
     "notmytype": "^0.1.4",
     "request": "^2.57.0",
+    "streamifier": "^0.1.1",
     "xdg": "^0.1.1"
   },
   "devDependencies": {
