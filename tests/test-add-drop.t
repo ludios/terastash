@@ -68,6 +68,9 @@ Can add and drop a file
   hello
   world
   $ rm bigfile
+  $ ts cat bigfile > bigfile.copy
+  $ cat bigfile.copy | md5sum | cut -f 1 -d " "
+  b6d81b360a5672d80c27430f39153e2c
   $ ts get bigfile
   $ cat bigfile | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
