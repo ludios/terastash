@@ -291,11 +291,9 @@ function putFile(client, p) {
 
 		if(shouldStoreInChunks(p, stat)) {
 			// TODO: validate storeName
-			// TODO: do these two queries only if we fail to add a file
+			// TODO: do this query only if we fail to add a file
 			yield tryCreateColumnOnStashTable(
 				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
-			yield tryCreateColumnOnStashTable(
-				client, stashInfo.name, `key_in_${storeName}`, 'blob');
 			const blake2b224 = undefined;
 			const key = crypto.randomBytes(128/8);
 			const config = yield getChunkStores();
@@ -312,7 +310,7 @@ function putFile(client, p) {
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(pathname, parent, type, key_in_${storeName}, chunks_in_${storeName}, size, blake2b224, mtime, executable)
+				(pathname, parent, type, key, chunks_in_${storeName}, size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 				[dbPath, parentPath, type, key, chunkInfo, size, blake2b224, mtime, executable]
 			);
@@ -357,7 +355,7 @@ function getFile(client, stashName, p) {
 
 		const result = yield runQuery(
 			client,
-			`SELECT pathname, size, key_in_${storeName}, chunks_in_${storeName}, blake2b224, content
+			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
@@ -381,7 +379,7 @@ function getFile(client, stashName, p) {
 			if(chunks) {
 				A.eq(row.content, null);
 				A.eq(row.blake2b224, null);
-				const readStream = localfs.readChunks(chunksDir, row['key_in_' + storeName], chunks);
+				const readStream = localfs.readChunks(chunksDir, row.key, chunks);
 				const writeStream = fs.createWriteStream(outputFilename);
 				readStream.pipe(writeStream);
 				// TODO: check file length
