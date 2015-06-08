@@ -313,7 +313,7 @@ class GDriver {
 		}).then(function(res) {
 			if(res.statusCode !== 200) {
 				return utils.streamToBuffer(res).then(function(body) {
-					if(res.headers['content-type'].toLowerCase() === 'application/json; charset=utf-8') {
+					if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 						try {
 							body = JSON.parse(body);
 						} catch(e) {
