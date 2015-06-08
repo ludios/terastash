@@ -6,12 +6,10 @@ const T = require('notmytype');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const stream = require('stream');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
-const blake2 = utils.requireBlake2();
 
 const CHUNK_SIZE = 100 * 1024;
 // Chunk size must be a multiple of an AES block, for our convenience.
