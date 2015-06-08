@@ -577,14 +577,14 @@ function assertName(name) {
 	A(name, "Name must not be empty");
 }
 
-function destroyKeyspace(name) {
-	assertName(name);
+function destroyKeyspace(stashName) {
+	assertName(stashName);
 	return doWithClient(function(client) {
 		return runQuery(
 			client,
-			`DROP KEYSPACE "${KEYSPACE_PREFIX + name}";`
+			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
 		).then(function() {
-			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + name}.`);
+			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + stashName}.`);
 		});
 	});
 }
@@ -592,26 +592,27 @@ function destroyKeyspace(name) {
 /**
  * Initialize a new stash
  */
-const initStash = Promise.coroutine(function*(stashPath, name) {
-	assertName(name);
+const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
+	T(stashPath, T.string, stashName, T.string, storeName, T.string);
+	assertName(stashName);
 
 	if(yield getStashInfoByPath(stashPath)) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
 	return doWithClient(Promise.coroutine(function*(client) {
-		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + name}"
+		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`);
 
 		// An individual chunk
-		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + name}".chunk (
+		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + stashName}".chunk (
 			idx int,
 			file_id text,
 			md5 blob,
 			size bigint
 		)`);
 
-		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + name}".fs (
+		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
 			pathname text PRIMARY KEY,
 			type ascii,
 			parent text,
@@ -630,13 +631,15 @@ const initStash = Promise.coroutine(function*(stashPath, name) {
 		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
 
 		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
-			ON "${KEYSPACE_PREFIX + name}".fs (parent);`);
+			ON "${KEYSPACE_PREFIX + stashName}".fs (parent);`);
 
 		const config = yield getStashes();
-		config.stashes.push({name, path: path.resolve(stashPath)});
+		config.stashes.push({
+			"name": stashName,
+			"path": path.resolve(stashPath),
+			"chunk-store": storeName
+		});
 		yield utils.writeObjectToConfigFile("stashes.json", config);
-
-		console.log("Created Cassandra keyspace and updated stashes.json.");
 	}));
 });
 
