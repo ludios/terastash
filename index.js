@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const chalk = require('chalk');
+const inspect = require('util').inspect;
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
@@ -113,8 +114,8 @@ function userPathToDatabasePath(base, p) {
  * with the query results.
  */
 function runQuery(client, statement, args) {
-	T(client, CassandraClientType, statement, T.string, args, Array);
-	//console.log('runQuery(%s, %s, %s)', client, statement, args);
+	T(client, CassandraClientType, statement, T.string, args, T.optional(Array));
+	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(args)})`);
 	return new Promise(function(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
@@ -256,47 +257,79 @@ const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 	);
 });
 
+const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashName, columnName, type) {
+	T(client, CassandraClientType, stashName, T.string, columnName, T.string, type, T.string);
+	try {
+		yield runQuery(client,
+			`ALTER TABLE "${KEYSPACE_PREFIX + stashName}".fs ADD
+			"${columnName}" ${type}`
+		);
+	} catch(err) {
+		if(!(/^ResponseError: Invalid column name.*conflicts with an existing column$/.test(String(err)))) {
+			throw err;
+		}
+	}
+});
+
 /**
  * Put a file or directory into the Cassandra database.
  */
 function putFile(client, p) {
 	return doWithPath(client, null, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
 		const type = 'f';
-		const stat = fs.statSync(p);
+		const stat = yield utils.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
-		let content;
-		let size;
-		let blake2b224;
-		let key;
-		let chunks;
-		if(shouldStoreInChunks(p, stat)) {
-			content = null;
-			key = crypto.randomBytes(128/8);
-			chunks = yield localfs.writeChunks(process.env.CHUNKS_DIR, key, p);
-			T(chunks, Array);
-			size = stat.size;
-			/* TODO: later need to make sure that size is consistent with
-			    what we've actually read from the file. */
-		} else {
-			content = yield utils.readFileAsync(p);
-			key = null;
-			chunks = null;
-			blake2b224 = blake2b224Buffer(content);
-			size = content.length;
+		const storeName = stashInfo['chunk-store'];
+		if(!storeName) {
+			throw new Error("stash info doesn't specify chunk-store key");
 		}
 
 		if(parentPath) {
 			yield makeDirs(client, stashInfo, path.dirname(p), parentPath);
 		}
 
-		// TODO: make sure it does not already exist? require additional flag to update?
-		yield runQuery(
-			client,
-			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(pathname, parent, type, content, key, chunks, size, blake2b224, mtime, executable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[dbPath, parentPath, type, content, key, chunks, size, blake2b224, mtime, executable]
-		);
+		if(shouldStoreInChunks(p, stat)) {
+			// TODO: validate storeName
+			// TODO: do these two queries only if we fail to add a file
+			yield tryCreateColumnOnStashTable(
+				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
+			yield tryCreateColumnOnStashTable(
+				client, stashInfo.name, `key_in_${storeName}`, 'blob');
+			const blake2b224 = undefined;
+			const key = crypto.randomBytes(128/8);
+			const config = yield getChunkStores();
+			const chunksDir = config.stores[storeName].directory;
+			// TODO: give writeChunks a stream instead so that we can get our
+			// own blake2b224
+			const chunkInfo = yield localfs.writeChunks(chunksDir, key, p);
+			T(chunkInfo, Array);
+			const size = stat.size;
+			/* TODO: later need to make sure that size is consistent with
+			    what we've actually read from the file. */
+
+			// TODO: make sure file does not already exist? require additional flag to update?
+			yield runQuery(
+				client,
+				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+				(pathname, parent, type, key_in_${storeName}, chunks_in_${storeName}, size, blake2b224, mtime, executable)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+				[dbPath, parentPath, type, key, chunkInfo, size, blake2b224, mtime, executable]
+			);
+		} else {
+			const content = yield utils.readFileAsync(p);
+			const blake2b224 = blake2b224Buffer(content);
+			const size = content.length;
+
+			// TODO: make sure file does not already exist? require additional flag to update?
+			yield runQuery(
+				client,
+				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+				(pathname, parent, type, content, size, blake2b224, mtime, executable)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+				[dbPath, parentPath, type, content, size, blake2b224, mtime, executable]
+			);
+		}
 	}));
 }
 
@@ -315,60 +348,70 @@ function putFiles(pathnames) {
  * Get a file or directory from the Cassandra database.
  */
 function getFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
-		return runQuery(
+	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+		// TODO: instead of checking just this one stash, check all stashes
+		const storeName = stashInfo['chunk-store'];
+		if(!storeName) {
+			throw new Error("stash info doesn't specify chunk-store key");
+		}
+
+		const result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, blake2b224, chunks, content
+			`SELECT pathname, size, key_in_${storeName}, chunks_in_${storeName}, blake2b224, content
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
-		).then(Promise.coroutine(function*(result) {
-			//console.log(result);
-			for(const row of result.rows) {
-				let outputFilename;
-				// If stashName was given, write file to current directory
-				if(stashName) {
-					outputFilename = row.pathname;
-				} else {
-					outputFilename = stashInfo.path + '/' + row.pathname;
-				}
-				yield utils.mkdirpAsync(path.dirname(outputFilename));
+		);
 
-				if(row.chunks) {
-					A.eq(row.content, null);
-					A.eq(row.blake2b224, null);
-					const readStream = localfs.readChunks(process.env.CHUNKS_DIR, row.key, row.chunks);
-					const writeStream = fs.createWriteStream(outputFilename);
-					readStream.pipe(writeStream);
-					// TODO: check file length
-					const p = new Promise(function(resolve, reject) {
-						writeStream.once('finish', function() {
-							resolve();
-						});
-						writeStream.once('error', function(err) {
-							reject(err);
-						});
-						readStream.once('error', function(err) {
-							reject(err);
-						});
-					});
-					return p;
-				} else {
-					let blake2b224 = blake2b224Buffer(row.content);
-					if(Number(row.size) !== row.content.length) {
-						throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
-					}
-					if(!row.blake2b224.equals(blake2b224)) {
-						throw new Error(
-							`Database says BLAKE2b-224 of ${row.pathname} is\n` +
-							`${row.blake2b224.toString('hex')} but content was \n` +
-							`${blake2b224.toString('hex')}`);
-					}
-					return utils.writeFileAsync(outputFilename, row.content);
-				}
+		const config = yield getChunkStores();
+		const chunksDir = config.stores[storeName].directory;
+
+		//console.log(result);
+		for(const row of result.rows) {
+			let outputFilename;
+			// If stashName was given, write file to current directory
+			if(stashName) {
+				outputFilename = row.pathname;
+			} else {
+				outputFilename = stashInfo.path + '/' + row.pathname;
 			}
-		}));
-	});
+			yield utils.mkdirpAsync(path.dirname(outputFilename));
+
+			const chunks = row['chunks_in_' + storeName];
+			if(chunks) {
+				A.eq(row.content, null);
+				A.eq(row.blake2b224, null);
+				const readStream = localfs.readChunks(chunksDir, row['key_in_' + storeName], chunks);
+				const writeStream = fs.createWriteStream(outputFilename);
+				readStream.pipe(writeStream);
+				// TODO: check file length
+				const p = new Promise(function(resolve, reject) {
+					writeStream.once('finish', function() {
+						resolve();
+					});
+					writeStream.once('error', function(err) {
+						reject(err);
+					});
+					readStream.once('error', function(err) {
+						reject(err);
+					});
+				});
+				return p;
+			} else {
+				let blake2b224 = blake2b224Buffer(row.content);
+				if(Number(row.size) !== row.content.length) {
+					throw new Error(`Size of ${row.pathname} should be ${row.size} but was ${row.content.length}`);
+				}
+				if(!row.blake2b224.equals(blake2b224)) {
+					throw new Error(
+						`Database says BLAKE2b-224 of ${row.pathname} is\n` +
+						`${row.blake2b224.toString('hex')} but content was \n` +
+						`${blake2b224.toString('hex')}`);
+				}
+				return utils.writeFileAsync(outputFilename, row.content);
+			}
+		}
+	}));
 }
 
 function getFiles(stashName, pathnames) {
@@ -433,8 +476,7 @@ function listTerastashKeyspaces() {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 		return runQuery(
 			client,
-			`SELECT keyspace_name FROM System.schema_keyspaces;`,
-			[]
+			`SELECT keyspace_name FROM System.schema_keyspaces;`
 		).then(function(result) {
 			for(const row of result.rows) {
 				const name = row.keyspace_name;
@@ -448,16 +490,16 @@ function listTerastashKeyspaces() {
 
 const listChunkStores = Promise.coroutine(function*() {
 	const config = yield getChunkStores();
-	for(const name of Object.keys(config.stores)) {
-		console.log(name);
+	for(const storeName of Object.keys(config.stores)) {
+		console.log(storeName);
 	}
 });
 
-const defineChunkStore = Promise.coroutine(function*(name, opts) {
-	T(name, T.string, opts, T.object);
+const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
+	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
-	if(utils.hasKey(config.stores, name)) {
-		throw new Error(`${name} is already defined in chunk-stores.json`);
+	if(utils.hasKey(config.stores, storeName)) {
+		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
 	const storeDef = {type: opts.type};
 	if(opts.type === "localfs") {
@@ -483,7 +525,7 @@ const defineChunkStore = Promise.coroutine(function*(name, opts) {
 	} else {
 		throw new Error(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
 	}
-	config.stores[name] = storeDef;
+	config.stores[storeName] = storeDef;
 	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
 });
 
@@ -535,15 +577,14 @@ function assertName(name) {
 	A(name, "Name must not be empty");
 }
 
-function destroyKeyspace(name) {
-	assertName(name);
+function destroyKeyspace(stashName) {
+	assertName(stashName);
 	return doWithClient(function(client) {
 		return runQuery(
 			client,
-			`DROP KEYSPACE "${KEYSPACE_PREFIX + name}";`,
-			[]
+			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
 		).then(function() {
-			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + name}.`);
+			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + stashName}.`);
 		});
 	});
 }
@@ -551,39 +592,54 @@ function destroyKeyspace(name) {
 /**
  * Initialize a new stash
  */
-const initStash = Promise.coroutine(function*(stashPath, name) {
-	assertName(name);
+const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
+	T(stashPath, T.string, stashName, T.string, storeName, T.string);
+	assertName(stashName);
 
 	if(yield getStashInfoByPath(stashPath)) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
 	return doWithClient(Promise.coroutine(function*(client) {
-		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + name}"
-			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`, []);
+		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
+			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`);
 
-		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + name}".fs (
+		// An individual chunk
+		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + stashName}".chunk (
+			idx int,
+			file_id text,
+			md5 blob,
+			size bigint
+		)`);
+
+		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
 			pathname text PRIMARY KEY,
 			type ascii,
 			parent text,
 			size bigint,
 			content blob,
-			chunks list<blob>,
 			blake2b224 blob,
 			key blob,
 			mtime timestamp,
 			crtime timestamp,
 			executable boolean
-		);`, []);
+		);`);
+
+		// Note: chunks_in_* columns are added by defineChunkStore.
+		// We use column-per-chunk-store instead of having a map of
+		// <chunkStore, chunkInfo> because non-frozen, nested collections
+		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
 
 		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
-			ON "${KEYSPACE_PREFIX + name}".fs (parent);`, []);
+			ON "${KEYSPACE_PREFIX + stashName}".fs (parent);`);
 
 		const config = yield getStashes();
-		config.stashes.push({name, path: path.resolve(stashPath)});
+		config.stashes.push({
+			"name": stashName,
+			"path": path.resolve(stashPath),
+			"chunk-store": storeName
+		});
 		yield utils.writeObjectToConfigFile("stashes.json", config);
-
-		console.log("Created Cassandra keyspace and updated stashes.json.");
 	}));
 });
 

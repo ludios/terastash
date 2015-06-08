@@ -9,6 +9,8 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
+const crypto = require('crypto');
+const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 let https;
 
@@ -148,6 +150,7 @@ const readFileAsync = Promise.promisify(fs.readFile);
 const writeFileAsync = Promise.promisify(fs.writeFile);
 const mkdirpAsync = Promise.promisify(mkdirp);
 const statAsync = Promise.promisify(fs.stat);
+const renameAsync = Promise.promisify(fs.rename);
 
 const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
 	T(fname, T.string, object, T.object);
@@ -276,11 +279,41 @@ function requireBlake2() {
 	}
 }
 
+let blake2;
+/**
+ * Take input stream, return {
+ *		stream: an output stream into which input is piped,
+ *		hash: Hash object that hashes input stream as it is read,
+ *		length: number of bytes read from input stream
+ * }
+ */
+function streamHasher(inputStream, algo) {
+	let hash;
+	if(/^blake2/.test(algo)) {
+		if(!blake2) {
+			blake2 = requireBlake2();
+		}
+		hash = blake2.createHash(algo);
+	} else {
+		hash = crypto.createHash(algo);
+	}
+
+	const stream = new PassThrough();
+	inputStream.pipe(stream);
+	const out = {stream, hash, length: 0};
+	stream.on('data', function(data) {
+		out.length += data.length;
+		hash.update(data);
+	});
+	return out;
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
 	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
-	mkdirpAsync, statAsync, writeObjectToConfigFile, readObjectFromConfigFile,
-	clone, makeConfigFileInitializer, getConcealmentSize, concealSize,
-	makeHttpsRequest, streamToBuffer, requireBlake2
+	mkdirpAsync, statAsync, renameAsync, writeObjectToConfigFile,
+	readObjectFromConfigFile, clone, makeConfigFileInitializer,
+	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
+	requireBlake2, streamHasher
 };

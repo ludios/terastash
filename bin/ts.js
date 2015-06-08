@@ -74,12 +74,13 @@ program
 
 program
 	.command('init <name>')
+	.option('-c, --chunk-store <store-name>', 'Store large files in this chunk store')
 	.description(d(`
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
-	.action(a(function(name) {
-		T(name, T.string);
-		catchAndLog(terastash.initStash(process.cwd(), name));
+	.action(a(function(name, options) {
+		T(name, T.string, options, T.shape({chunkStore: T.optional(T.string)}));
+		catchAndLog(terastash.initStash(process.cwd(), name, options.chunkStore));
 	}));
 
 program

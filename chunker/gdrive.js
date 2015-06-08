@@ -172,9 +172,6 @@ class GDriver {
 		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
 
-		let passthrough;
-		let length = 0;
-		let md5;
 		const insertOpts = {
 			resource: {
 				title: name,
@@ -187,18 +184,12 @@ class GDriver {
 				mimeType: mimeType
 			}
 		};
+		let hasher;
 		if(stream !== null) {
-			md5 = crypto.createHash('md5');
-			passthrough = new PassThrough();
-			stream.pipe(passthrough);
-			passthrough.on('data', function(data) {
-				length += data.length;
-				md5.update(data);
-			});
-
+			hasher = utils.streamHasher(stream, 'md5');
 			insertOpts.media = {
 				mimeType: mimeType,
-				body: passthrough
+				body: hasher.stream
 			};
 		}
 
@@ -220,9 +211,9 @@ class GDriver {
 					` object with kind='drive#file' but was ${inspect(obj.kind)}`
 				);
 			}
-			if(stream && obj.fileSize !== String(length)) {
+			if(stream && obj.fileSize !== String(hasher.length)) {
 				throw new UploadError(`Expected Google Drive to create a` +
-					` file with fileSize=${inspect(String(length))} but was ${inspect(obj.fileSize)}`
+					` file with fileSize=${inspect(String(hasher.length))} but was ${inspect(obj.fileSize)}`
 				);
 			}
 			if(parents.length !== 0) {
@@ -235,7 +226,7 @@ class GDriver {
 				}
 			}
 			if(stream) {
-				const expectedHexDigest = md5.digest('hex');
+				const expectedHexDigest = hasher.hash.digest('hex');
 				if(obj.md5Checksum !== expectedHexDigest) {
 					throw new UploadError(`Expected Google Drive to create a` +
 						` file with md5Checksum=${inspect(expectedHexDigest)}` +
@@ -322,10 +313,12 @@ class GDriver {
 		}).then(function(res) {
 			if(res.statusCode !== 200) {
 				return utils.streamToBuffer(res).then(function(body) {
-					try {
-						body = JSON.parse(body);
-					} catch(e) {
-						// Leave body as-is
+					if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
+						try {
+							body = JSON.parse(body);
+						} catch(e) {
+							// Leave body as-is
+						}
 					}
 					throw new DownloadError(
 						`Got response with status ${res.statusCode} and body ${inspect(body)}`);

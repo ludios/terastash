@@ -23,42 +23,41 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	T(directory, T.string, key, Buffer, p, T.string);
 	A.eq(key.length, 128/8);
 
-	const expectedTotalSize = fs.statSync(p).size;
+	const expectedTotalSize = (yield utils.statAsync(p)).size;
 	const inputStream = fs.createReadStream(p);
 	const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	inputStream.pipe(cipherStream);
 	let totalSize = 0;
-	const chunkDigests = [];
+	const chunkInfo = [];
 
+	let idx = 0;
 	for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 		const tempFname = path.join(directory, 'temp-' + Math.random());
 		const writeStream = fs.createWriteStream(tempFname);
-		const blake2b = blake2.createHash('blake2b');
-		const passthrough = new stream.PassThrough();
-		chunkStream.pipe(passthrough);
-		passthrough.on('data', function(data) {
-			blake2b.update(data);
-		});
-		passthrough.pipe(writeStream);
+
+		const hasher = utils.streamHasher(chunkStream, 'blake2b');
+		hasher.stream.pipe(writeStream);
+
 		yield new Promise(function(resolve) {
-			writeStream.once('finish', function() {
-				const size = fs.statSync(tempFname).size;
+			writeStream.once('finish', Promise.coroutine(function*() {
+				const size = (yield utils.statAsync(tempFname)).size;
 				A.lte(size, CHUNK_SIZE);
 				totalSize += size;
-				const digest = blake2b.digest().slice(0, 224/8);
-				chunkDigests.push(digest);
-				fs.renameSync(
+				const digest = hasher.hash.digest().slice(0, 224/8);
+				chunkInfo.push({idx, file_id: digest.toString('hex'), size});
+				yield utils.renameAsync(
 					tempFname,
 					path.join(directory, digest.toString('hex'))
 				);
 				resolve();
-			});
+			}));
 		});
+		idx += 1;
 	}
 	A.eq(totalSize, expectedTotalSize,
 		`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
 		`${utils.numberWithCommas(expectedTotalSize)} bytes; did file change during reading?`);
-	return chunkDigests;
+	return chunkInfo;
 });
 
 class BadChunk extends Error {
@@ -70,8 +69,18 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
-function readChunks(directory, key, chunkDigests) {
-	T(directory, T.string, key, Buffer, chunkDigests, T.list(Buffer));
+function readChunks(directory, key, chunks) {
+	T(
+		directory, T.string,
+		key, Buffer,
+		chunks, T.list(
+			T.shape({
+				"idx": T.number,
+				"file_id": T.string,
+				"size": T.object /* bigint */
+			})
+		)
+	);
 	A.eq(key.length, 128/8);
 
 	const cipherStream = new Combine();
@@ -79,20 +88,19 @@ function readChunks(directory, key, chunkDigests) {
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
-		for(const digest of chunkDigests) {
-			const chunkStream = fs.createReadStream(path.join(directory, digest.toString('hex')));
+		for(const chunk of chunks) {
+			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
 
-			const blake2b = blake2.createHash('blake2b');
-			const passthrough = new stream.PassThrough();
-			chunkStream.pipe(passthrough);
-			passthrough.on('data', function(data) {
-				blake2b.update(data);
-			});
+			// For localfs, the filename is the digest
+			const digest = Buffer(chunk.file_id, "hex");
+			A.eq(digest.length, 224/8);
 
-			cipherStream.append(passthrough);
+			const hasher = utils.streamHasher(chunkStream, 'blake2b');
+			cipherStream.append(hasher.stream);
+
 			yield new Promise(function(resolve, reject) {
 				chunkStream.once('end', function() {
-					const readDigest = blake2b.digest().slice(0, 224/8);
+					const readDigest = hasher.hash.digest().slice(0, 224/8);
 					if(readDigest.equals(digest)) {
 						resolve();
 					} else {

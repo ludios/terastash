@@ -1,11 +1,12 @@
 Can add and drop a file
 
   $ mkdir -p /tmp/mychunks
-  $ export CHUNKS_DIR=/tmp/mychunks
-  $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
-  $ ts init unit_tests
-  Created Cassandra keyspace and updated stashes.json.
   $ ts list-chunk-stores
+  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks
+  $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
+  $ ts init unit_tests --chunk-store=mychunks
+  $ ts list-chunk-stores
+  mychunks
   $ echo -e "hello\nworld" > sample1
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2
