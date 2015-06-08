@@ -34,13 +34,12 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
 		const tempFname = path.join(directory, 'temp-' + Math.random());
 		const writeStream = fs.createWriteStream(tempFname);
-		const blake2b = blake2.createHash('blake2b');
-		const passthrough = new stream.PassThrough();
-		chunkStream.pipe(passthrough);
-		passthrough.on('data', function(data) {
-			blake2b.update(data);
-		});
+
+		const _ = utils.streamHasher(chunkStream, 'blake2b');
+		const passthrough = _[0];
+		const blake2b = _[1];
 		passthrough.pipe(writeStream);
+
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				const size = (yield utils.statAsync(tempFname)).size;
@@ -98,14 +97,11 @@ function readChunks(directory, key, chunks) {
 			const digest = Buffer(chunk.file_id, "hex");
 			A.eq(digest.length, 224/8);
 
-			const blake2b = blake2.createHash('blake2b');
-			const passthrough = new stream.PassThrough();
-			chunkStream.pipe(passthrough);
-			passthrough.on('data', function(data) {
-				blake2b.update(data);
-			});
-
+			const _ = utils.streamHasher(chunkStream, 'blake2b');
+			const passthrough = _[0];
+			const blake2b = _[1];
 			cipherStream.append(passthrough);
+
 			yield new Promise(function(resolve, reject) {
 				chunkStream.once('end', function() {
 					const readDigest = blake2b.digest().slice(0, 224/8);

@@ -9,6 +9,7 @@ const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
+const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 let https;
 
@@ -277,6 +278,26 @@ function requireBlake2() {
 	}
 }
 
+let blake2;
+/**
+ * Take input stream, return [
+ *		an output stream into which input is piped,
+ *		Hash object into which input stream is piped
+ * ]
+ */
+function streamHasher(inputStream, algo) {
+	if(!blake2) {
+		blake2 = requireBlake2();
+	}
+	const blake2b = blake2.createHash('blake2b');
+	const passthrough = new PassThrough();
+	inputStream.pipe(passthrough);
+	passthrough.on('data', function(data) {
+		blake2b.update(data);
+	});
+	return [passthrough, blake2b];
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
@@ -284,5 +305,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, writeObjectToConfigFile,
 	readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	requireBlake2
+	requireBlake2, streamHasher
 };
