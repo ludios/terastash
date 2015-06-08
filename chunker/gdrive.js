@@ -313,10 +313,12 @@ class GDriver {
 		}).then(function(res) {
 			if(res.statusCode !== 200) {
 				return utils.streamToBuffer(res).then(function(body) {
-					try {
-						body = JSON.parse(body);
-					} catch(e) {
-						// Leave body as-is
+					if(res.headers['content-type'].toLowerCase() === 'application/json; charset=utf-8') {
+						try {
+							body = JSON.parse(body);
+						} catch(e) {
+							// Leave body as-is
+						}
 					}
 					throw new DownloadError(
 						`Got response with status ${res.statusCode} and body ${inspect(body)}`);
