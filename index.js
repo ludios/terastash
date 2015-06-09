@@ -20,10 +20,11 @@ let readline;
 
 const KEYSPACE_PREFIX = "ts_";
 
+// TODO: get rid of this, use streamifier
 function blake2b224Buffer(buf) {
 	T(buf, Buffer);
 	if(!blake2) {
-		blake2 = utils.requireBlake2();
+		blake2 = utils.maybeCompileAndRequire('blake2');
 	}
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
 }

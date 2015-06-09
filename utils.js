@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 let https;
+let blake2;
 let sse4_crc32;
 
 const emptyFrozenArray = [];
@@ -251,16 +252,13 @@ function streamToBuffer(stream) {
 }
 
 /**
- * Require blake2, building it if necessary
+ * Require a module, building it first if necessary
  */
-function requireBlake2() {
+function maybeCompileAndRequire(name) {
 	try {
-		return require('blake2');
+		return require(name);
 	} catch(requireErr) {
-		if(!(/^Error: Cannot find module /.test(String(requireErr)))) {
-			console.error(requireErr.stack + "\n");
-		}
-		console.error("blake2 doesn't appear to be built; building it...\n");
+		console.error(`${name} doesn't appear to be built; building it...\n`);
 		const nodeGyp = path.join(
 			path.dirname(path.dirname(process.execPath)),
 			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
@@ -268,7 +266,7 @@ function requireBlake2() {
 		if(!fs.existsSync(nodeGyp)) {
 			throw new Error("Could not find node-gyp");
 		}
-		const cwd = path.join(__dirname, 'node_modules', 'blake2');
+		const cwd = path.join(__dirname, 'node_modules', name);
 		const child_process = require('child_process');
 		try {
 			child_process.execFileSync(
@@ -277,15 +275,18 @@ function requireBlake2() {
 				{stdio: [0, 1, 2], cwd}
 			);
 			console.error("");
+			return require(name);
 		} catch(err) {
 			console.error("\nBuild failed; you may need to install additional tools.  See");
 			console.error("https://github.com/TooTallNate/node-gyp#installation\n");
+			console.error("");
+			console.error("Before building, require error was:");
+			console.error(requireErr.stack + "\n");
 			throw err;
 		}
 	}
 }
 
-let blake2;
 /**
  * Take input stream, return {
  *		stream: an output stream into which input is piped,
@@ -297,12 +298,12 @@ function streamHasher(inputStream, algo) {
 	let hash;
 	if(/^blake2/.test(algo)) {
 		if(!blake2) {
-			blake2 = requireBlake2();
+			blake2 = maybeCompileAndRequire('blake2');
 		}
 		hash = blake2.createHash(algo);
 	} else if(algo === "crc32c") {
 		if(!sse4_crc32) {
-			sse4_crc32 = require('sse4_crc32');
+			sse4_crc32 = maybeCompileAndRequire('sse4_crc32');
 		}
 		hash = new sse4_crc32.CRC32();
 	} else {
@@ -326,5 +327,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	requireBlake2, streamHasher
+	maybeCompileAndRequire, streamHasher
 };
