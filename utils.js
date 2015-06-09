@@ -226,6 +226,7 @@ function concealSize(n) {
 }
 
 function makeHttpsRequest(options) {
+	T(options, T.object);
 	if(!https) {
 		https = require('https');
 	}
@@ -237,6 +238,7 @@ function makeHttpsRequest(options) {
 }
 
 function streamToBuffer(stream) {
+	T(stream, T.object);
 	return new Promise(function(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
@@ -254,11 +256,14 @@ function streamToBuffer(stream) {
 /**
  * Require a module, building it first if necessary
  */
-function maybeCompileAndRequire(name) {
+function maybeCompileAndRequire(name, verbose) {
+	T(name, T.string, verbose, T.optional(T.boolean));
 	try {
 		return require(name);
 	} catch(requireErr) {
-		console.error(`${name} doesn't appear to be built; building it...\n`);
+		if(verbose) {
+			console.error(`${name} doesn't appear to be built; building it...\n`);
+		}
 		const nodeGyp = path.join(
 			path.dirname(path.dirname(process.execPath)),
 			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
@@ -272,9 +277,11 @@ function maybeCompileAndRequire(name) {
 			child_process.execFileSync(
 				nodeGyp,
 				['clean', 'configure', 'build'],
-				{stdio: [0, 1, 2], cwd}
+				{stdio: verbose ? [0, 1, 2] : [0, 'pipe', 'pipe'], cwd}
 			);
-			console.error("");
+			if(verbose) {
+				console.error("");
+			}
 			return require(name);
 		} catch(err) {
 			console.error("\nBuild failed; you may need to install additional tools.  See");
