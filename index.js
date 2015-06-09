@@ -358,7 +358,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	try {
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, executable
+			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
@@ -370,7 +370,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		// chunks_in_${storeName} doesn't exist, try the query without it
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, blake2b224, content, executable
+			`SELECT pathname, size, key, blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
@@ -426,6 +426,7 @@ function getFile(client, stashName, p) {
 				reject(err);
 			});
 		});
+		yield utils.utimesAsync(outputFilename, row.mtime, row.mtime);
 		if(row.executable) {
 			// TODO: setting for 0o700 instead?
 			yield utils.chmodAsync(outputFilename, 0o770);

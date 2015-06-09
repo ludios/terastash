@@ -62,8 +62,8 @@ Can add and drop a file
   ls: cannot access sample1: No such file or directory
   [2]
   $ ts get sample1
-  $ ls -1 sample1
-  sample1
+  $ stat -c %y sample1
+  1970-01-01 00:00:00.000000000 +0000
   $ cat sample1
   hello
   world
@@ -72,6 +72,8 @@ Can add and drop a file
   $ cat bigfile.copy | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
   $ ts get bigfile
+  $ stat -c %y bigfile
+  1990-01-01 00:00:00.000000000 +0000
   $ cat bigfile | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
   $ ts drop sample1 bigfile
