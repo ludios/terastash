@@ -67,11 +67,13 @@ Can add and drop a file
   $ cat sample1
   hello
   world
-  $ rm bigfile
+  $ rm sample1 bigfile
   $ ts cat bigfile > bigfile.copy
   $ cat bigfile.copy | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
-  $ ts get bigfile
+  $ ts get sample1 bigfile # Make sure 'ts get' works with > 1 file
+  $ stat -c %y sample1
+  1970-01-01 00:00:00.000000000 +0000
   $ stat -c %y bigfile
   1990-01-01 00:00:00.000000000 +0000
   $ cat bigfile | md5sum | cut -f 1 -d " "
