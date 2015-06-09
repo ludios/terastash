@@ -322,6 +322,20 @@ class GDriver {
 						`Got response with status ${res.statusCode} and body ${inspect(body)}`);
 				});
 			} else {
+				const hasher = utils.streamHasher(res, 'crc32c');
+				const googHash = res.headers['x-goog-hash'];
+				A(googHash.startsWith("crc32c="), googHash);
+				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				hasher.stream.once('finish', function() {
+					const computedCRC = new Buffer(4);
+					computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
+					if(!computedCRC.equals(googCRC)) {
+						hasher.stream.emit('error', new Error(
+							`CRC32c check failed: expected ${googCRC.toString("hex")}, ` +
+							`got ${computedCRC.toString("hex")}`
+						));
+					}
+				});
 				return res;
 			}
 		});

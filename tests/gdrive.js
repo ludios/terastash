@@ -53,8 +53,8 @@ describe('GDriver', function() {
 		A.eq(getMetadataResponse.md5Checksum, createFileResponse.md5Checksum);
 
 		// Make sure getData gives us bytes that match what we uploaded
-		const getDataResponse = _[1];
-		const data = yield utils.streamToBuffer(getDataResponse);
+		const dataStream = _[1];
+		const data = yield utils.streamToBuffer(dataStream);
 		A.eq(data.length, fileLength);
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
 		A.eq(dataDigest, createFileResponse.md5Checksum);

@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 let https;
+let sse4_crc32;
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
@@ -296,6 +297,11 @@ function streamHasher(inputStream, algo) {
 			blake2 = requireBlake2();
 		}
 		hash = blake2.createHash(algo);
+	} else if(algo === "crc32c") {
+		if(!sse4_crc32) {
+			sse4_crc32 = require('sse4_crc32');
+		}
+		hash = new sse4_crc32.CRC32();
 	} else {
 		hash = crypto.createHash(algo);
 	}

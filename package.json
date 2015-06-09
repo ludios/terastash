@@ -25,6 +25,7 @@
     "mkdirp": "^0.5.1",
     "notmytype": "^0.1.4",
     "request": "^2.57.0",
+    "sse4_crc32": "^3.1.2",
     "streamifier": "^0.1.1",
     "xdg": "^0.1.1"
   },
