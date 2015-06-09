@@ -12,6 +12,7 @@ const process = require('process');
 const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
+const chalk = require('chalk');
 let https;
 let blake2;
 let sse4_crc32;
@@ -273,23 +274,33 @@ function maybeCompileAndRequire(name, verbose) {
 		}
 		const cwd = path.join(__dirname, 'node_modules', name);
 		const child_process = require('child_process');
-		try {
-			child_process.execFileSync(
-				nodeGyp,
-				['clean', 'configure', 'build'],
-				{stdio: verbose ? [0, 1, 2] : [0, 'pipe', 'pipe'], cwd}
-			);
-			if(verbose) {
-				console.error("");
+		let child;
+
+		child = child_process.spawnSync(
+			nodeGyp,
+			['clean', 'configure', 'build'],
+			{
+				stdio: verbose ?
+					[0, 1, 2] :
+					[0, 'pipe', 'pipe'],
+				cwd,
+				maxBuffer: 4*1024*1024
 			}
+		);
+		if(child.status === 0) {
 			return require(name);
-		} catch(err) {
-			console.error("\nBuild failed; you may need to install additional tools.  See");
-			console.error("https://github.com/TooTallNate/node-gyp#installation\n");
+		} else {
+			console.error(chalk.bold(`\nFailed to build ${name}; you may need to install additional tools.`));
+			console.error("See https://github.com/TooTallNate/node-gyp#installation");
 			console.error("");
-			console.error("Before building, require error was:");
-			console.error(requireErr.stack + "\n");
-			throw err;
+			console.error(chalk.bold("Build error was:"));
+			process.stderr.write(child.stdout);
+			process.stderr.write(child.stderr);
+			console.error("");
+			console.error(chalk.bold("Before building, require error was:"));
+			console.error(requireErr.stack);
+			console.error("");
+			throw new Error(`Could not build module ${name}`);
 		}
 	}
 }
