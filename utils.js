@@ -236,13 +236,16 @@ function makeHttpsRequest(options) {
 }
 
 function streamToBuffer(stream) {
-	return new Promise(function(resolve) {
+	return new Promise(function(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
 			buf = Buffer.concat([buf, data]);
 		});
 		stream.once('end', function() {
 			resolve(buf);
+		});
+		stream.once('error', function(err) {
+			reject(err);
 		});
 	});
 }
