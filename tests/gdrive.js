@@ -3,6 +3,7 @@
 
 require('better-buffer-inspect');
 
+const assert = require('assert');
 const A = require('ayy');
 const terastash = require('..');
 const fs = require('fs');
@@ -27,12 +28,14 @@ describe('GDriver', function() {
 		yield gdriver.loadCredentials();
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + Math.random());
-		const fileLength = utils.randInt(0, 5*1024);
+		const fileLength = utils.randInt(1*1024, 5*1024);
 		const buf = crypto.pseudoRandomBytes(fileLength);
+		//const buf0To8000 = buf.slice(0, 8000);
+		A.eq(buf.length, fileLength);
+		//const buf = fs.readFileSync("/etc/passwd");
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
-		let _;
-		_ = yield Promise.all([
+		let _ = yield Promise.all([
 			gdriver.createFile(
 				"test-file", {parents: chunkStore.parents}, fs.createReadStream(tempFname)
 			),
@@ -47,7 +50,8 @@ describe('GDriver', function() {
 
 		_ = yield Promise.all([
 			gdriver.getMetadata(createFileResponse.id),
-			gdriver.getData(createFileResponse.id)
+			gdriver.getData(createFileResponse.id),
+			gdriver.getData(createFileResponse.id, [0, 100])
 		]);
 		const getMetadataResponse = _[0];
 		A.eq(getMetadataResponse.md5Checksum, createFileResponse.md5Checksum);
@@ -55,9 +59,13 @@ describe('GDriver', function() {
 		// Make sure getData gives us bytes that match what we uploaded
 		const dataStream = _[1];
 		const data = yield utils.streamToBuffer(dataStream);
-		A.eq(data.length, fileLength);
+		A.eq(data.length, buf.length);
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
 		A.eq(dataDigest, createFileResponse.md5Checksum);
+
+		const partialDataStream = _[2];
+		const partialData = yield utils.streamToBuffer(partialDataStream);
+		assert.deepEquals(partialData, buf.slice(0, 100));
 
 		yield Promise.all([
 			gdriver.deleteFile(createFileResponse.id),
