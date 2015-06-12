@@ -239,7 +239,7 @@ function makeHttpsRequest(options) {
 }
 
 function streamToBuffer(stream) {
-	T(stream, T.object);
+	T(stream, T.shape({on: T.function, once: T.function, resume: T.function}));
 	return new Promise(function(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
