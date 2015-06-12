@@ -2,7 +2,7 @@ Can add and drop a file
 
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
-  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks
+  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
   $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
   $ ts init unit_tests --chunk-store=mychunks
   $ ts list-chunk-stores

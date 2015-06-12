@@ -292,6 +292,17 @@ function streamHasher(inputStream, algo) {
 	return out;
 }
 
+function evalMultiplications(s) {
+	T(s, T.string);
+	if(/^[\d\*]+$/.test(s)) {
+		/* eslint-disable no-new-func */
+		return new Function(`return (${s});`)();
+		/* eslint-enable no-new-func */
+	} else {
+		throw new Error(`${s} contained something other than digits and '*'`);
+	}
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
@@ -299,5 +310,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	streamHasher
+	streamHasher, evalMultiplications
 };

@@ -11,15 +11,14 @@ const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
 
-const CHUNK_SIZE = 100 * 1024;
-// Chunk size must be a multiple of an AES block, for our convenience.
-A.eq(CHUNK_SIZE % 128/8, 0);
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 A.eq(iv0.length, 128/8);
 
-const writeChunks = Promise.coroutine(function*(directory, key, p) {
-	T(directory, T.string, key, Buffer, p, T.string);
+const writeChunks = Promise.coroutine(function*(directory, key, p, chunkSize) {
+	T(directory, T.string, key, Buffer, p, T.string, chunkSize, T.number);
 	A.eq(key.length, 128/8);
+	// Chunk size must be a multiple of an AES block, for implementation convenience.
+	A.eq(chunkSize % 128/8, 0);
 
 	const expectedTotalSize = (yield utils.statAsync(p)).size;
 	const inputStream = fs.createReadStream(p);
@@ -29,7 +28,7 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 	const chunkInfo = [];
 
 	let idx = 0;
-	for(const chunkStream of chopshop.chunk(cipherStream, CHUNK_SIZE)) {
+	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
 		const tempFname = path.join(directory, 'temp-' + Math.random());
 		const writeStream = fs.createWriteStream(tempFname);
 
@@ -39,7 +38,7 @@ const writeChunks = Promise.coroutine(function*(directory, key, p) {
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				const size = (yield utils.statAsync(tempFname)).size;
-				A.lte(size, CHUNK_SIZE);
+				A.lte(size, chunkSize);
 				totalSize += size;
 				const digest = hasher.hash.digest().slice(0, 224/8);
 				chunkInfo.push({idx, file_id: digest.toString('hex'), size});

@@ -300,10 +300,11 @@ function putFile(client, p) {
 			const blake2b224 = undefined;
 			const key = crypto.randomBytes(128/8);
 			const config = yield getChunkStores();
-			const chunksDir = config.stores[storeName].directory;
+			const storeConfig = config.stores[storeName];
+			const chunksDir = storeConfig.directory;
 			// TODO: give writeChunks a stream instead so that we can get our
 			// own blake2b224
-			const chunkInfo = yield localfs.writeChunks(chunksDir, key, p);
+			const chunkInfo = yield localfs.writeChunks(chunksDir, key, p, storeConfig.chunkSize);
 			T(chunkInfo, Array);
 			const size = stat.size;
 			/* TODO: later need to make sure that size is consistent with
@@ -517,7 +518,10 @@ const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
 	if(utils.hasKey(config.stores, storeName)) {
 		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
-	const storeDef = {type: opts.type};
+	if(typeof opts.chunkSize !== "number") {
+		throw new Error(`.chunkSize is missing or not a number on ${inspect(opts)}`);
+	}
+	const storeDef = {type: opts.type, chunkSize: opts.chunkSize};
 	if(opts.type === "localfs") {
 		if(typeof opts.directory !== "string") {
 			throw new Error(`Chunk store type localfs requires a -d/--directory ` +
