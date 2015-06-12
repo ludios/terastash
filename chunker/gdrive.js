@@ -324,7 +324,15 @@ class GDriver {
 			headers: reqHeaders
 		});
 		if((!range && res.statusCode === 200) || (range && res.statusCode === 206)) {
-			// TODO: verify content-range on 206 e.g. 'content-range': 'bytes 0-99/5054',
+			if(res.statusCode === 206) {
+				const contentRange = res.headers['content-range'];
+				const expectedContentRange = `bytes ${range[0]}-${range[1] - 1}/`;
+				if(!contentRange.startsWith(expectedContentRange)) {
+					throw new Error(`Expected 'content-range' header to start with`
+						` ${expectedContentRange} but was ${contentRange}`
+					);
+				}
+			}
 			const hasher = utils.streamHasher(res, 'crc32c');
 			const googHash = res.headers['x-goog-hash'];
 			let googCRC;
