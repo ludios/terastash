@@ -240,15 +240,19 @@ function makeHttpsRequest(options) {
 
 function streamToBuffer(stream) {
 	T(stream, T.object);
+	console.log("streamToBuffer", stream.headers);
 	return new Promise(function(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
+			console.log('data', stream.headers, data);
 			buf = Buffer.concat([buf, data]);
 		});
 		stream.once('end', function() {
+			console.log('end', stream.headers);
 			resolve(buf);
 		});
 		stream.once('error', function(err) {
+			console.log('error', stream.headers, err);
 			reject(err);
 		});
 	});
