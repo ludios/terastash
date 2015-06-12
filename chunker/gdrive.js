@@ -301,44 +301,69 @@ class GDriver {
 		return {"Authorization": `${credentials.token_type} ${credentials.access_token}`};
 	}
 
-	*getData(fileId) {
-		T(fileId, T.string);
+	/**
+	 * fileId is the file's fileId on Google Drive (not the filename)
+	 * range is an optional [start, end] where start is inclusive and end is exclusive
+	 */
+	*getData(fileId, range) {
+		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])));
+		if(range) {
+			A(Number.isInteger(range[0]), range[0], "must be an integer");
+			A(Number.isInteger(range[1]), range[1], "must be an integer");
+			A.gte(range[0], 0);
+			A.gte(range[1], range[0], "end must be >= start in range [start, end]");
+		}
 		yield this._maybeRefreshAndSaveToken();
-		return utils.makeHttpsRequest({
+		const reqHeaders = this._getHeaders();
+		if(range) {
+			reqHeaders["Range"] = `bytes=${range[0]}-${range[1] - 1}`;
+		}
+		const res = yield utils.makeHttpsRequest({
 			host: "www.googleapis.com",
 			path: `/drive/v2/files/${fileId}?alt=media`,
-			headers: this._getHeaders()
-		}).then(function(res) {
-			if(res.statusCode !== 200) {
-				return utils.streamToBuffer(res).then(function(body) {
-					if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
-						try {
-							body = JSON.parse(body);
-						} catch(e) {
-							// Leave body as-is
-						}
-					}
-					throw new DownloadError(
-						`Got response with status ${res.statusCode} and body ${inspect(body)}`);
-				});
-			} else {
-				const hasher = utils.streamHasher(res, 'crc32c');
-				const googHash = res.headers['x-goog-hash'];
-				A(googHash.startsWith("crc32c="), googHash);
-				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
-				hasher.stream.once('finish', function() {
-					const computedCRC = new Buffer(4);
-					computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
-					if(!computedCRC.equals(googCRC)) {
-						hasher.stream.emit('error', new Error(
-							`CRC32c check failed: expected ${googCRC.toString("hex")}, ` +
-							`got ${computedCRC.toString("hex")}`
-						));
-					}
-				});
-				return res;
-			}
+			headers: reqHeaders
 		});
+		if((!range && res.statusCode === 200) || (range && res.statusCode === 206)) {
+			// TODO: verify content-range on 206 e.g. 'content-range': 'bytes 0-99/5054',
+			const hasher = utils.streamHasher(res, 'crc32c');
+			const googHash = res.headers['x-goog-hash'];
+			let googCRC;
+			if(res.statusCode === 200 && !googHash) {
+				throw new Error("x-goog-hash header was missing on a 200 response");
+			}
+			// Note: x-goog-hash header is present on a 206 response only if you
+			// requested all of the bytes.
+			if(googHash) {
+				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				A(googHash.startsWith("crc32c="), googHash);
+			}
+			hasher.stream.once('end', function() {
+				const computedCRC = new Buffer(4);
+				computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
+				if(googCRC && !computedCRC.equals(googCRC)) {
+					hasher.stream.emit('error', new Error(
+						`CRC32c check failed: expected ${googCRC.toString("hex")}, ` +
+						`got ${computedCRC.toString("hex")}`
+					));
+				}
+			});
+			// We might be able to return req instead, but we would have to .pause()
+			// because hasher above attaches a 'data' event and puts it into flowing
+			// mode.
+			return hasher.stream;
+		} else {
+			const body = yield utils.streamToBuffer(res);
+			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
+				try {
+					body = JSON.parse(body);
+				} catch(e) {
+					// Leave body as-is
+				}
+			}
+			throw new DownloadError(
+				`Got response with status ${res.statusCode} and body ${inspect(body)}`
+			);
+		}
 	}
 }
 

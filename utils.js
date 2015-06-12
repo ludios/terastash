@@ -251,6 +251,7 @@ function streamToBuffer(stream) {
 		stream.once('error', function(err) {
 			reject(err);
 		});
+		stream.resume();
 	});
 }
 
@@ -335,6 +336,10 @@ function streamHasher(inputStream, algo) {
 		out.length += data.length;
 		hash.update(data);
 	});
+	// We attached a 'data' handler, but don't let that put us into
+	// flowing mode yet, because the user hasn't attached their own
+	// 'data' handler yet.
+	stream.pause();
 	return out;
 }
 

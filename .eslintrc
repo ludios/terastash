@@ -48,7 +48,10 @@
 		"new-cap": 0,
 
 		/* allow: const x = undefined; */
-		"no-undef-init": 0
+		"no-undef-init": 0,
+
+		/* allow: headers["Range"] = */
+		"dot-notation": 0
 	},
 	"env": {
 		"es6": true,
