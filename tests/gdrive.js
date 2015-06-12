@@ -30,9 +30,7 @@ describe('GDriver', function() {
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + Math.random());
 		const fileLength = utils.randInt(1*1024, 5*1024);
 		const buf = crypto.pseudoRandomBytes(fileLength);
-		//const buf0To8000 = buf.slice(0, 8000);
 		A.eq(buf.length, fileLength);
-		//const buf = fs.readFileSync("/etc/passwd");
 		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
 
 		let _ = yield Promise.all([

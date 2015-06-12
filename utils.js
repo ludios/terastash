@@ -232,12 +232,7 @@ function makeHttpsRequest(options) {
 		https = require('https');
 	}
 	return new Promise(function(resolve, reject) {
-		https.get(options, function(response) {
-			// Do not .pause() here - unless you .resume() yourself
-			response.pause();
-			//response.on('data', function(d) {console.log('data in makeHttpsRequest', response.headers, d)});
-			resolve(response);
-		}).on('error', function(err) {
+		https.get(options, resolve).on('error', function(err) {
 			reject(err);
 		});
 	});
@@ -245,19 +240,15 @@ function makeHttpsRequest(options) {
 
 function streamToBuffer(stream) {
 	T(stream, T.object);
-	console.log("streamToBuffer", stream.headers);
 	return new Promise(function(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
-			console.log('data', stream.headers, data);
 			buf = Buffer.concat([buf, data]);
 		});
 		stream.once('end', function() {
-			console.log('end', stream.headers);
 			resolve(buf);
 		});
 		stream.once('error', function(err) {
-			console.log('error', stream.headers, err);
 			reject(err);
 		});
 		stream.resume();
@@ -345,6 +336,10 @@ function streamHasher(inputStream, algo) {
 		out.length += data.length;
 		hash.update(data);
 	});
+	// We attached a 'data' handler, but don't let that put us into
+	// flowing mode yet, because the user hasn't attached their own
+	// 'data' handler yet.
+	stream.pause();
 	return out;
 }
 

@@ -321,19 +321,15 @@ class GDriver {
 		const res = yield utils.makeHttpsRequest({
 			host: "www.googleapis.com",
 			path: `/drive/v2/files/${fileId}?alt=media`,
-			headers: reqHeaders,
-			agent: false /* Not really needed? */
+			headers: reqHeaders
 		});
-		console.log(res.statusCode, res.headers);
 		if((!range && res.statusCode === 200) || (range && res.statusCode === 206)) {
 			// TODO: verify content-range on 206 e.g. 'content-range': 'bytes 0-99/5054',
 			const hasher = utils.streamHasher(res, 'crc32c');
 			const googHash = res.headers['x-goog-hash'];
 			let googCRC;
-			if(res.statusCode === 200) {
-				if(!googHash) {
-					throw new Error("x-goog-hash header was missing on a 200 response");
-				}
+			if(res.statusCode === 200 && !googHash) {
+				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
 			// Note: x-goog-hash header is present on a 206 response only if you
 			// requested all of the bytes.
@@ -341,7 +337,7 @@ class GDriver {
 				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 				A(googHash.startsWith("crc32c="), googHash);
 			}
-			res.once('finish', function() {
+			hasher.stream.once('end', function() {
 				const computedCRC = new Buffer(4);
 				computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
 				if(googCRC && !computedCRC.equals(googCRC)) {
@@ -351,10 +347,11 @@ class GDriver {
 					));
 				}
 			});
-			res.pause();
-			return res;
+			// We might be able to return req instead, but we would have to .pause()
+			// because hasher above attaches a 'data' event and puts it into flowing
+			// mode.
+			return hasher.stream;
 		} else {
-			console.log("Doing internal streamToBuffer");
 			const body = yield utils.streamToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 				try {
