@@ -350,8 +350,9 @@ class GDriver {
 				computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
 				if(googCRC && !computedCRC.equals(googCRC)) {
 					hasher.stream.emit('error', new Error(
-						`CRC32c check failed: expected ${googCRC.toString("hex")}, ` +
-						`got ${computedCRC.toString("hex")}`
+						`CRC32c check failed on fileId=${inspect(fileId)}:` +
+						` expected ${googCRC.toString("hex")},` +
+						` got ${computedCRC.toString("hex")}`
 					));
 				}
 			});
