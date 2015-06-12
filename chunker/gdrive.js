@@ -336,11 +336,11 @@ class GDriver {
 			const hasher = utils.streamHasher(res, 'crc32c');
 			const googHash = res.headers['x-goog-hash'];
 			let googCRC;
+			// x-goog-hash header should always be present on 200 responses;
+			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {
 				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
-			// Note: x-goog-hash header is present on a 206 response only if you
-			// requested all of the bytes.
 			if(googHash) {
 				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 				A(googHash.startsWith("crc32c="), googHash);
