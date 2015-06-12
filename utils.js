@@ -314,6 +314,7 @@ function maybeCompileAndRequire(name, verbose) {
  * }
  */
 function streamHasher(inputStream, algo) {
+	T(inputStream, T.shape({pipe: T.function}), algo, T.string);
 	let hash;
 	if(/^blake2/.test(algo)) {
 		if(!blake2) {
