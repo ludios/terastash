@@ -232,7 +232,12 @@ function makeHttpsRequest(options) {
 		https = require('https');
 	}
 	return new Promise(function(resolve, reject) {
-		https.get(options, resolve).on('error', function(err) {
+		https.get(options, function(response) {
+			// Do not .pause() here - unless you .resume() yourself
+			response.pause();
+			//response.on('data', function(d) {console.log('data in makeHttpsRequest', response.headers, d)});
+			resolve(response);
+		}).on('error', function(err) {
 			reject(err);
 		});
 	});
@@ -255,6 +260,7 @@ function streamToBuffer(stream) {
 			console.log('error', stream.headers, err);
 			reject(err);
 		});
+		stream.resume();
 	});
 }
 

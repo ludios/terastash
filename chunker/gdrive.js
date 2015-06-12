@@ -351,6 +351,7 @@ class GDriver {
 					));
 				}
 			});
+			res.pause();
 			return res;
 		} else {
 			console.log("Doing internal streamToBuffer");

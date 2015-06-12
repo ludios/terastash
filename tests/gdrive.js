@@ -49,29 +49,25 @@ describe('GDriver', function() {
 		A.eq(typeof createFolderResponse.id, "string");
 
 		_ = yield Promise.all([
-			/*gdriver.getMetadata(createFileResponse.id),*/
-			gdriver.getData(createFileResponse.id).then(function(o) {console.log("got res 0");return o;}),
-			gdriver.getData(createFileResponse.id, [0, 10000]).then(function(o) {console.log("got res 1");return o;})
+			gdriver.getMetadata(createFileResponse.id),
+			gdriver.getData(createFileResponse.id),
+			gdriver.getData(createFileResponse.id, [0, 100])
 		]);
-		/*
+
 		const getMetadataResponse = _[0];
 		A.eq(getMetadataResponse.md5Checksum, createFileResponse.md5Checksum);
-*/
 
 		// Make sure getData gives us bytes that match what we uploaded
-		const dataStream = _[0];
+		const dataStream = _[1];
 		const data = yield utils.streamToBuffer(dataStream);
 		A.eq(data.length, buf.length);
 		const dataDigest = crypto.createHash("md5").update(data).digest("hex");
 		A.eq(dataDigest, createFileResponse.md5Checksum);
 
-		console.log("asserts for res 0 done");
-
-		const partialDataStream = _[1];
+		const partialDataStream = _[2];
+		A.neq(dataStream, partialDataStream);
 		const partialData = yield utils.streamToBuffer(partialDataStream);
 		assert.deepStrictEqual(partialData, buf.slice(0, 100));
-
-		console.log("asserts for res 1 done");
 
 		yield Promise.all([
 			gdriver.deleteFile(createFileResponse.id),
