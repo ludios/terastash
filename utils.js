@@ -8,11 +8,10 @@ const Promise = require('bluebird');
 const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
-const process = require('process');
 const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
-const chalk = require('chalk');
+const compile_require = require('./compile_require');
 let https;
 let blake2;
 let sse4_crc32;
@@ -256,57 +255,6 @@ function streamToBuffer(stream) {
 }
 
 /**
- * Require a module, building it first if necessary
- */
-function maybeCompileAndRequire(name, verbose) {
-	T(name, T.string, verbose, T.optional(T.boolean));
-	try {
-		return require(name);
-	} catch(requireErr) {
-		if(verbose) {
-			console.error(`${name} doesn't appear to be built; building it...\n`);
-		}
-		const nodeGyp = path.join(
-			path.dirname(path.dirname(process.execPath)),
-			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
-		);
-		if(!fs.existsSync(nodeGyp)) {
-			throw new Error("Could not find node-gyp");
-		}
-		const cwd = path.join(__dirname, 'node_modules', name);
-		const child_process = require('child_process');
-		let child;
-
-		child = child_process.spawnSync(
-			nodeGyp,
-			['clean', 'configure', 'build'],
-			{
-				stdio: verbose ?
-					[0, 1, 2] :
-					[0, 'pipe', 'pipe'],
-				cwd,
-				maxBuffer: 4*1024*1024
-			}
-		);
-		if(child.status === 0) {
-			return require(name);
-		} else {
-			console.error(chalk.bold(`\nFailed to build ${name}; you may need to install additional tools.`));
-			console.error("See https://github.com/TooTallNate/node-gyp#installation");
-			console.error("");
-			console.error(chalk.bold("Build error was:"));
-			process.stderr.write(child.stdout);
-			process.stderr.write(child.stderr);
-			console.error("");
-			console.error(chalk.bold("Before building, require error was:"));
-			console.error(requireErr.stack);
-			console.error("");
-			throw new Error(`Could not build module ${name}`);
-		}
-	}
-}
-
-/**
  * Take input stream, return {
  *		stream: an output stream into which input is piped,
  *		hash: Hash object that hashes input stream as it is read,
@@ -318,12 +266,12 @@ function streamHasher(inputStream, algo) {
 	let hash;
 	if(/^blake2/.test(algo)) {
 		if(!blake2) {
-			blake2 = maybeCompileAndRequire('blake2');
+			blake2 = compile_require('blake2');
 		}
 		hash = blake2.createHash(algo);
 	} else if(algo === "crc32c") {
 		if(!sse4_crc32) {
-			sse4_crc32 = maybeCompileAndRequire('sse4_crc32');
+			sse4_crc32 = compile_require('sse4_crc32');
 		}
 		hash = new sse4_crc32.CRC32();
 	} else {
@@ -351,5 +299,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	maybeCompileAndRequire, streamHasher
+	streamHasher
 };

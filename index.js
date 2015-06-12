@@ -13,6 +13,7 @@ const streamifier = require('streamifier');
 
 const utils = require('./utils');
 const localfs = require('./chunker/localfs');
+const compile_require = require('./compile_require');
 let cassandra;
 let blake2;
 let gdrive;
@@ -24,7 +25,7 @@ const KEYSPACE_PREFIX = "ts_";
 function blake2b224Buffer(buf) {
 	T(buf, Buffer);
 	if(!blake2) {
-		blake2 = utils.maybeCompileAndRequire('blake2');
+		blake2 = compile_require('blake2');
 	}
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
 }
