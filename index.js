@@ -489,7 +489,7 @@ function getFiles(stashName, pathnames) {
 function catFile(client, stashName, p) {
 	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
-		const row = _[0];
+		//const row = _[0];
 		const readStream = _[1];
 		readStream.pipe(process.stdout);
 	}));
