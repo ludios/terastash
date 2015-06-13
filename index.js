@@ -274,6 +274,9 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashNam
 	}
 });
 
+const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
+A.eq(iv0.length, 128/8);
+
 /**
  * Put a file or directory into the Cassandra database.
  */
@@ -297,26 +300,32 @@ function putFile(client, p) {
 			// TODO: do this query only if we fail to add a file
 			yield tryCreateColumnOnStashTable(
 				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
-			const blake2b224 = undefined;
 			const key = crypto.randomBytes(128/8);
 			const config = yield getChunkStores();
 			const storeConfig = config.stores[storeName];
 			const chunksDir = storeConfig.directory;
-			// TODO: give writeChunks a stream instead so that we can get our
-			// own blake2b224
-			const chunkInfo = yield localfs.writeChunks(chunksDir, key, p, storeConfig.chunkSize);
-			T(chunkInfo, Array);
-			const size = stat.size;
-			/* TODO: later need to make sure that size is consistent with
-			    what we've actually read from the file. */
 
+			const inputStream = fs.createReadStream(p);
+			const hasher = utils.streamHasher(inputStream, 'blake2b');
+			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+			hasher.stream.pipe(cipherStream);
+
+			const _ = yield localfs.writeChunks(chunksDir, cipherStream, storeConfig.chunkSize);
+			const totalSize = _[0];
+			const chunkInfo = _[1];
+			A.eq(totalSize, stat.size,
+				`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
+				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
+			T(chunkInfo, Array);
+
+			const blake2b224 = hasher.hash.digest().slice(0, 224/8);
 			// TODO: make sure file does not already exist? require additional flag to update?
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
 				(pathname, parent, type, key, chunks_in_${storeName}, size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-				[dbPath, parentPath, type, key, chunkInfo, size, blake2b224, mtime, executable]
+				[dbPath, parentPath, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
 			);
 		} else {
 			const content = yield utils.readFileAsync(p);
@@ -389,8 +398,14 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	// TODO: check blake2b224 in both cases
 	if(chunks) {
 		A.eq(row.content, null);
-		A.eq(row.blake2b224, null);
-		return [row, localfs.readChunks(chunksDir, row.key, chunks)];
+		A.eq(row.key.length, 128/8);
+		const cipherStream = localfs.readChunks(chunksDir, chunks);
+		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
+		cipherStream.pipe(clearStream);
+		cipherStream.on('error', function(err) {
+			clearStream.emit('error', err);
+		});
+		return [row, clearStream];
 	} else {
 		return [row, streamifier.createReadStream(row.content)];
 	}

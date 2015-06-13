@@ -254,6 +254,16 @@ function streamToBuffer(stream) {
 	});
 }
 
+function crc32$digest(encoding) {
+	const buf = new Buffer(4);
+	buf.writeUIntBE(this.crc(), 0, 4);
+	if(encoding === undefined) {
+		return buf;
+	} else {
+		return buf.toString(encoding);
+	}
+}
+
 /**
  * Take input stream, return {
  *		stream: an output stream into which input is piped,
@@ -274,6 +284,7 @@ function streamHasher(inputStream, algo) {
 			sse4_crc32 = compile_require('sse4_crc32');
 		}
 		hash = new sse4_crc32.CRC32();
+		hash.digest = crc32$digest;
 	} else {
 		hash = crypto.createHash(algo);
 	}
@@ -303,6 +314,13 @@ function evalMultiplications(s) {
 	}
 }
 
+function makeChunkFilename() {
+	const seconds_s = String(Date.now()/1000).split('.')[0];
+	const nanos_s = String(process.hrtime()[1]);
+	const random_s = crypto.randomBytes(128/8).toString('hex');
+	return `${seconds_s}-${nanos_s}-${random_s}`;
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
@@ -310,5 +328,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	streamHasher, evalMultiplications
+	streamHasher, evalMultiplications, makeChunkFilename
 };

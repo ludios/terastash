@@ -346,8 +346,7 @@ class GDriver {
 				A(googHash.startsWith("crc32c="), googHash);
 			}
 			hasher.stream.once('end', function() {
-				const computedCRC = new Buffer(4);
-				computedCRC.writeUIntBE(hasher.hash.crc(), 0, 4);
+				const computedCRC = hasher.hash.digest();
 				if(googCRC && !computedCRC.equals(googCRC)) {
 					hasher.stream.emit('error', new Error(
 						`CRC32c check failed on fileId=${inspect(fileId)}:` +
