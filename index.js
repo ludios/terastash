@@ -12,9 +12,9 @@ const inspect = require('util').inspect;
 const streamifier = require('streamifier');
 
 const utils = require('./utils');
-const localfs = require('./chunker/localfs');
 const compile_require = require('./compile_require');
 let cassandra;
+let localfs;
 let blake2;
 let gdrive;
 let readline;
@@ -310,6 +310,9 @@ function putFile(client, p) {
 			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 			hasher.stream.pipe(cipherStream);
 
+			if(!localfs) {
+				localfs = require('./chunker/localfs');
+			}
 			const _ = yield localfs.writeChunks(chunksDir, cipherStream, storeConfig.chunkSize);
 			const totalSize = _[0];
 			const chunkInfo = _[1];
@@ -391,15 +394,27 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	A.eq(result.rows.length, 1);
 	const row = result.rows[0];
 
-	const config = yield getChunkStores();
-	const chunksDir = config.stores[storeName].directory;
-
+	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = row['chunks_in_' + storeName];
 	// TODO: check blake2b224 in both cases
 	if(chunks) {
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
-		const cipherStream = localfs.readChunks(chunksDir, chunks);
+		let cipherStream;
+		if(chunkStore.type === "localfs") {
+			if(!localfs) {
+				localfs = require('./chunker/localfs');
+			}
+			const chunksDir = chunkStore.directory;
+			cipherStream = localfs.readChunks(chunksDir, chunks);
+		} else {
+			if(!gdrive) {
+				gdrive = require('./chunker/gdrive');
+			}
+			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+			yield gdriver.loadCredentials();
+			cipherStream = gdrive.readChunks(gdriver, chunks);
+		}
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
 		cipherStream.pipe(clearStream);
 		cipherStream.on('error', function(err) {
@@ -644,6 +659,7 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
 			idx int,
 			file_id text,
 			md5 blob,
+			crc32c blob,
 			size bigint
 		)`);
 

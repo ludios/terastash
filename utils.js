@@ -304,6 +304,9 @@ function streamHasher(inputStream, algo) {
 		out.length += data.length;
 		hash.update(data);
 	});
+	inputStream.on('error', function(err) {
+		stream.emit('error', err);
+	});
 	// We attached a 'data' handler, but don't let that put us into
 	// flowing mode yet, because the user hasn't attached their own
 	// 'data' handler yet.

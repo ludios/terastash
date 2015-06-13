@@ -3,8 +3,10 @@
 
 const google = require('googleapis');
 const Promise = require('bluebird');
+const chopshop = require('chopshop');
 const A = require('ayy');
 const T = require('notmytype');
+const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
 const inspect = require('util').inspect;
@@ -209,6 +211,11 @@ class GDriver {
 					` object with kind='drive#file' but was ${inspect(obj.kind)}`
 				);
 			}
+			if(typeof obj.id !== "string") {
+				throw new UploadError(`Expected Google Drive to create a` +
+					` file with id=(string) but was id=${inspect(obj.id)}`
+				);
+			}
 			if(stream && obj.fileSize !== String(hasher.length)) {
 				throw new UploadError(`Expected Google Drive to create a` +
 					` file with fileSize=${inspect(String(hasher.length))} but was ${inspect(obj.fileSize)}`
@@ -384,4 +391,75 @@ GDriver.prototype.getMetadata = Promise.coroutine(GDriver.prototype.getMetadata)
 GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
-module.exports = {GDriver};
+
+const writeChunks = Promise.coroutine(function*(gdriver, parents, cipherStream, chunkSize) {
+	T(gdriver, GDriver, parents, T.list(T.string), cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
+
+	// Chunk size must be a multiple of an AES block, for implementation convenience.
+	A.eq(chunkSize % 128/8, 0);
+
+	let totalSize = 0;
+	let idx = 0;
+	const chunkInfo = [];
+
+	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
+		const fname = utils.makeChunkFilename();
+		const crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
+		const response = yield gdriver.createFile(fname, {parents}, crc32Hasher.stream);
+		// We can trust the md5Checksum in response; createFile checked it for us
+		const md5Digest = new Buffer(response['md5Checksum'], 'hex');
+		chunkInfo.push({
+			idx,
+			file_id: response.id,
+			crc32c: crc32Hasher.hash.digest(),
+			md5: md5Digest.hash.digest(),
+			size: crc32Hasher.length
+		});
+		totalSize += crc32Hasher.length;
+		idx += 1;
+	}
+	return [totalSize, chunkInfo];
+});
+
+class BadChunk extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
+/**
+ * Returns a readable stream by decrypting and concatenating the chunks.
+ */
+function readChunks(gdriver, chunks) {
+	T(
+		gdriver, GDriver,
+		chunks, T.list(
+			T.shape({
+				"idx": T.number,
+				"file_id": T.string,
+				"crc32c": Buffer,
+				"size": T.object /* Long */
+			})
+		)
+	);
+
+	const cipherStream = new Combine();
+	// We don't return this Promise; we return the stream and
+	// the coroutine does the work of writing to the stream.
+	Promise.coroutine(function*() {
+		for(const chunk of chunks) {
+			A.eq(chunk.crc32c.length, 32/8);
+			const chunkStream = gdriver.getData(chunk.file_id);
+			cipherStream.append(chunkStream);
+			yield new Promise(function(resolve) {
+				chunkStream.once('end', resolve);
+			});
+		}
+		cipherStream.append(null);
+	})().catch(function(err) {
+		cipherStream.emit('error', err);
+	});
+	return cipherStream;
+}
+
+module.exports = {GDriver, writeChunks, readChunks};

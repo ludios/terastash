@@ -12,7 +12,7 @@ const utils = require('../utils');
 const inspect = require('util').inspect;
 
 const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSize) {
-	T(directory, T.string, cipherStream, T.object, chunkSize, T.number);
+	T(directory, T.string, cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
 
 	// Chunk size must be a multiple of an AES block, for implementation convenience.
 	A.eq(chunkSize % 128/8, 0);
