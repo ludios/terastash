@@ -302,18 +302,28 @@ function putFile(client, p) {
 				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
 			const key = crypto.randomBytes(128/8);
 			const config = yield getChunkStores();
-			const storeConfig = config.stores[storeName];
-			const chunksDir = storeConfig.directory;
+			const chunkStore = config.stores[storeName];
 
 			const inputStream = fs.createReadStream(p);
 			const hasher = utils.streamHasher(inputStream, 'blake2b');
 			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 			hasher.stream.pipe(cipherStream);
 
-			if(!localfs) {
-				localfs = require('./chunker/localfs');
+			let _;
+			if(chunkStore.type === "localfs") {
+				if(!localfs) {
+					localfs = require('./chunker/localfs');
+				}
+				_ = yield localfs.writeChunks(chunkStore.directory, cipherStream, chunkStore.chunkSize);
+			} else {
+				if(!gdrive) {
+					gdrive = require('./chunker/gdrive');
+				}
+				const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+				yield gdriver.loadCredentials();
+				_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, cipherStream, chunkStore.chunkSize);
 			}
-			const _ = yield localfs.writeChunks(chunksDir, cipherStream, storeConfig.chunkSize);
+
 			const totalSize = _[0];
 			const chunkInfo = _[1];
 			A.eq(totalSize, stat.size,
