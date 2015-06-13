@@ -3,8 +3,8 @@ Can add and drop a file
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
-  $ ts destroy unit_tests > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
-  $ ts init unit_tests --chunk-store=mychunks
+  $ ts destroy unit_tests_a > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
+  $ ts init unit_tests_a --chunk-store=mychunks
   $ ts list-chunk-stores
   mychunks
   $ echo -e "hello\nworld" > sample1
@@ -17,7 +17,7 @@ Can add and drop a file
   b6d81b360a5672d80c27430f39153e2c
   $ touch --date=1990-01-01 bigfile
   $ ts add sample1 sample2 bigfile
-  $ ts ls -n unit_tests
+  $ ts ls -n unit_tests_a
   When using -n/--name, a database path is required
   [1]
   $ ts ls
@@ -40,7 +40,7 @@ Can add and drop a file
   sample2
   sample1
   bigfile
-  $ ts ls -j -n unit_tests ''
+  $ ts ls -j -n unit_tests_a ''
   bigfile
   sample1
   sample2
@@ -115,15 +115,28 @@ Dropping nonexistent file is a no-op
 
 Can list stashes
 
-  $ ts list-stashes | grep -P '^unit_tests$'
-  unit_tests
+  $ ts list-stashes | grep -P '^unit_tests_a$'
+  unit_tests_a
 
 Can destroy a terastash
 
-  $ ts destroy unit_tests
-  Destroyed keyspace ts_unit_tests.
+  $ ts destroy unit_tests_a
+  Destroyed keyspace and removed config for unit_tests_a.
 
 Stash is not listed after being destroyed
 
-  $ ts list-stashes | grep -P '^unit_tests$'
+  $ ts list-stashes | grep -P '^unit_tests_a$'
   [1]
+
+Can store chunks in gdrive
+
+  $ ts destroy unit_tests_b > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
+  $ ts init unit_tests_b --chunk-store=terastash-tests-gdrive
+  $ ts config-chunk-store terastash-tests-gdrive --chunk-size=1024
+  $ dd bs=1025 count=2 if=/dev/urandom of=smallfile 2> /dev/null
+  $ MD5_BEFORE="$(cat smallfile | md5sum | cut -f 1 -d " ")"
+  $ ts add smallfile
+  $ rm smallfile
+  $ ts get smallfile
+  $ MD5_AFTER="$(cat smallfile | md5sum | cut -f 1 -d " ")"
+  $ [[ "$MD5_BEFORE" == "$MD5_AFTER" ]]

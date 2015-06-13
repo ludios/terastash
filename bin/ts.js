@@ -86,10 +86,10 @@ program
 program
 	.command('destroy <name>')
 	.description(d(`
-		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>`))
+		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
 	.action(a(function(name) {
 		T(name, T.string);
-		utils.catchAndLog(terastash.destroyKeyspace(name));
+		utils.catchAndLog(terastash.destroyStash(name));
 	}));
 
 /* It's 'add' instead of 'put' for left-hand-only typing */
@@ -193,16 +193,35 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
-		let chunkSize;
-		if(options.chunkSize) {
+		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		} else {
 			options.chunkSize = 1024*1024*1024;
 		}
 		if(options.chunkSize % 128/8 !== 0) {
-			throw new Error(`Chunk size must be a multiple of 16; got ${chunkSize}`);
+			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
 		}
 		utils.catchAndLog(terastash.defineChunkStore(storeName, options));
+	}));
+
+program
+	.command('config-chunk-store <store-name>')
+	.description(d(`
+		Change a setting on a chunk store.`))
+	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
+	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisble by 16.  Defaults to 1024*1024*1024.')
+	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
+	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
+	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
+	.action(a(function(storeName, options) {
+		T(storeName, T.string, options, T.object);
+		if(options.chunkSize !== undefined) {
+			options.chunkSize = utils.evalMultiplications(options.chunkSize);
+		}
+		if(options.chunkSize % 128/8 !== 0) {
+			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
+		}
+		utils.catchAndLog(terastash.configChunkStore(storeName, options));
 	}));
 
 program

@@ -311,6 +311,9 @@ class GDriver {
 	/**
 	 * fileId is the file's fileId on Google Drive (not the filename)
 	 * range is an optional [start, end] where start is inclusive and end is exclusive
+	 *
+	 * Returns a Promise that is resolved with a stream.
+	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
 	*getData(fileId, range) {
 		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])));
@@ -412,7 +415,7 @@ const writeChunks = Promise.coroutine(function*(gdriver, parents, cipherStream, 
 			idx,
 			file_id: response.id,
 			crc32c: crc32Hasher.hash.digest(),
-			md5: md5Digest.hash.digest(),
+			md5: md5Digest,
 			size: crc32Hasher.length
 		});
 		totalSize += crc32Hasher.length;
@@ -449,7 +452,7 @@ function readChunks(gdriver, chunks) {
 	Promise.coroutine(function*() {
 		for(const chunk of chunks) {
 			A.eq(chunk.crc32c.length, 32/8);
-			const chunkStream = gdriver.getData(chunk.file_id);
+			const chunkStream = yield gdriver.getData(chunk.file_id);
 			cipherStream.append(chunkStream);
 			yield new Promise(function(resolve) {
 				chunkStream.once('end', resolve);

@@ -42,7 +42,7 @@ function getNewClient() {
 
 const getStashes = utils.makeConfigFileInitializer(
 	"stashes.json", {
-		stashes: [],
+		stashes: {},
 		_comment: utils.ol(`You cannot change the name of a stash because it must match
 			the Cassandra keyspace, and you cannot rename a Cassandra keyspace.`)
 	}
@@ -63,14 +63,16 @@ const getChunkStores = utils.makeConfigFileInitializer(
 const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 	T(pathname, T.string);
 	const config = yield getStashes();
-	if(!config.stashes || !Array.isArray(config.stashes)) {
-		throw new Error(`terastash config has no "stashes" or not an Array`);
+	if(!config.stashes || typeof config.stashes !== "object") {
+		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
 	const resolvedPathname = path.resolve(pathname);
-	for(const stash of config.stashes) {
+	for(const stashName of Object.keys(config.stashes)) {
+		const stash = config.stashes[stashName];
 		//console.log(resolvedPathname, stash.path);
-		if(resolvedPathname.startsWith(stash.path)) {
+		if(resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + '/')) {
+			stash.name = stashName;
 			return stash;
 		}
 	}
@@ -83,16 +85,16 @@ const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 const getStashInfoByName = Promise.coroutine(function*(stashName) {
 	T(stashName, T.string);
 	const config = yield getStashes();
-	if(!config.stashes || !Array.isArray(config.stashes)) {
-		throw new Error(`terastash config has no "stashes" or not an Array`);
+	if(!config.stashes || typeof config.stashes !== "object") {
+		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
-	for(const stash of config.stashes) {
-		if(stash.name === stashName) {
-			return stash;
-		}
+	const stash = config.stashes[stashName];
+	if(!stash) {
+		return null;
 	}
-	return null;
+	stash.name = stashName;
+	return stash;
 });
 
 /**
@@ -336,7 +338,7 @@ function putFile(client, p) {
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(pathname, parent, type, key, chunks_in_${storeName}, size, blake2b224, mtime, executable)
+				(pathname, parent, type, key, "chunks_in_${storeName}", size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 				[dbPath, parentPath, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
 			);
@@ -383,7 +385,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	try {
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, chunks_in_${storeName}, blake2b224, content, mtime, executable
+			`SELECT pathname, size, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
@@ -589,6 +591,35 @@ const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
 	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
 });
 
+const configChunkStore = Promise.coroutine(function*(storeName, opts) {
+	T(storeName, T.string, opts, T.object);
+	const config = yield getChunkStores();
+	if(!utils.hasKey(config.stores, storeName)) {
+		throw new Error(`${storeName} is not defined in chunk-stores.json`);
+	}
+	if(opts.type !== undefined) {
+		T(opts.type, T.string);
+		config.stores[storeName].type = opts.type;
+	}
+	if(opts.chunkSize !== undefined) {
+		T(opts.chunkSize, T.number);
+		config.stores[storeName].chunkSize = opts.chunkSize;
+	}
+	if(opts.directory !== undefined) {
+		T(opts.directory, T.string);
+		config.stores[storeName].directory = opts.directory;
+	}
+	if(opts.clientId !== undefined) {
+		T(opts.clientId, T.string);
+		config.stores[storeName].clientId = opts.clientId;
+	}
+	if(opts.clientSecret !== undefined) {
+		T(opts.clientSecret, T.string);
+		config.stores[storeName].clientSecret = opts.clientSecret;
+	}
+	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
+});
+
 const questionAsync = function(question) {
 	T(question, T.string);
 	if(!readline) { readline = require('readline'); }
@@ -637,17 +668,19 @@ function assertName(name) {
 	A(name, "Name must not be empty");
 }
 
-function destroyKeyspace(stashName) {
+const destroyStash = Promise.coroutine(function*(stashName) {
 	assertName(stashName);
-	return doWithClient(function(client) {
+	yield doWithClient(function(client) {
 		return runQuery(
 			client,
 			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
-		).then(function() {
-			console.log(`Destroyed keyspace ${KEYSPACE_PREFIX + stashName}.`);
-		});
+		);
 	});
-}
+	const config = yield getStashes();
+	utils.deleteKey(config.stashes, stashName);
+	yield utils.writeObjectToConfigFile("stashes.json", config);
+	console.log(`Destroyed keyspace and removed config for ${stashName}.`);
+});
 
 /**
  * Initialize a new stash
@@ -695,17 +728,17 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
 			ON "${KEYSPACE_PREFIX + stashName}".fs (parent);`);
 
 		const config = yield getStashes();
-		config.stashes.push({
-			"name": stashName,
+		config.stashes[stashName] = {
 			"path": path.resolve(stashPath),
 			"chunk-store": storeName
-		});
+		};
 		yield utils.writeObjectToConfigFile("stashes.json", config);
 	}));
 });
 
 module.exports = {
-	initStash, destroyKeyspace, getStashes, getChunkStores, authorizeGDrive, listTerastashKeyspaces,
-	listChunkStores, defineChunkStore, putFile, putFiles, getFile, getFiles, catFile, catFiles,
-	dropFile, dropFiles, lsPath, KEYSPACE_PREFIX
+	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
+	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
+	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
+	lsPath, KEYSPACE_PREFIX
 };

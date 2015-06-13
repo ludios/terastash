@@ -136,6 +136,11 @@ function hasKey(obj, key) {
 	return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
+/* eslint-disable no-new-func */
+// Hack to allow delete in strong mode
+const deleteKey = new Function("obj", "key", "delete obj[key];");
+/* eslint-enable no-new-func */
+
 const EitherPromise = T.union([Promise, NativePromise]);
 
 /**
@@ -335,7 +340,7 @@ function makeChunkFilename() {
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
-	comparator, comparedBy, hasKey, readFileAsync, writeFileAsync,
+	comparator, comparedBy, hasKey, deleteKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
