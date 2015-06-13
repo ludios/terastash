@@ -160,8 +160,8 @@ function doWithClient(f) {
 	);
 }
 
-const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {
-	T(client, CassandraClientType, stashName, T.maybe(T.string), p, T.string, fn, T.function);
+const doWithPath = Promise.coroutine(function*(stashName, p, fn) {
+	T(stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
@@ -183,7 +183,7 @@ const doWithPath = Promise.coroutine(function*(client, stashName, p, fn) {
 	A(!parentPath.startsWith('/'), parentPath);
 
 	// TODO: validate stashInfo.name - it may contain injection
-	return fn(client, stashInfo, dbPath, parentPath);
+	return fn(stashInfo, dbPath, parentPath);
 });
 
 const pathnameSorterAsc = utils.comparedBy(function(row) {
@@ -204,7 +204,7 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 
 function lsPath(stashName, options, p) {
 	return doWithClient(function(client) {
-		return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+		return doWithPath(stashName, p, function(stashInfo, dbPath, parentPath) {
 			return runQuery(
 				client,
 				`SELECT pathname, type, size, mtime, executable
@@ -279,7 +279,7 @@ A.eq(iv0.length, 128/8);
  * Put a file or directory into the Cassandra database.
  */
 function putFile(client, p) {
-	return doWithPath(client, null, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(null, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const type = 'f';
 		const stat = yield utils.statAsync(p);
 		const mtime = stat.mtime;
@@ -441,7 +441,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
  * Get a file or directory from the Cassandra database.
  */
 function getFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
 		const row = _[0];
 		const readStream = _[1];
@@ -487,7 +487,7 @@ function getFiles(stashName, pathnames) {
 }
 
 function catFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, Promise.coroutine(function*(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
 		const row = _[0];
 		const readStream = _[1];
@@ -504,7 +504,7 @@ function catFiles(stashName, pathnames) {
 }
 
 function dropFile(client, stashName, p) {
-	return doWithPath(client, stashName, p, function(client, stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, function(stashInfo, dbPath, parentPath) {
 		//console.log({stashInfo, dbPath, parentPath});
 		return runQuery(
 			client,
