@@ -5,11 +5,11 @@ const A = require('ayy');
 const T = require('notmytype');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
+const inspect = require('util').inspect;
 
 const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSize) {
 	T(directory, T.string, cipherStream, T.object, chunkSize, T.number);
@@ -90,7 +90,7 @@ function readChunks(directory, chunks) {
 						resolve();
 					} else {
 						reject(new BadChunk(
-							`CRC32C of chunk should be\n` +
+							`CRC32C of chunk\n${inspect(chunk)} should be\n` +
 							`${digest.toString('hex')} but read data was \n` +
 							`${readDigest.toString('hex')}`
 						));
