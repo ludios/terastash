@@ -225,13 +225,21 @@ function concealSize(n) {
 	return ret;
 }
 
-function makeHttpsRequest(options) {
-	T(options, T.object);
+function makeHttpsRequest(options, stream) {
+	T(options, T.object, stream, T.optional(T.shape({pipe: T.function})));
 	if(!https) {
 		https = require('https');
 	}
 	return new Promise(function(resolve, reject) {
-		https.get(options, resolve).on('error', function(err) {
+		const req = https.request(options, resolve).on('error', function(err) {
+			reject(err);
+		});
+		if(stream) {
+			stream.pipe(req);
+		} else {
+			req.end();
+		}
+		req.on('error', function(err) {
 			reject(err);
 		});
 	});

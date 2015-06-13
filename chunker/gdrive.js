@@ -319,6 +319,7 @@ class GDriver {
 			reqHeaders["Range"] = `bytes=${range[0]}-${range[1] - 1}`;
 		}
 		const res = yield utils.makeHttpsRequest({
+			method: "GET",
 			host: "www.googleapis.com",
 			path: `/drive/v2/files/${fileId}?alt=media`,
 			headers: reqHeaders
