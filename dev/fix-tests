@@ -1,1 +1,6 @@
-cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=zsh -i
+#!/bin/bash
+
+export REAL_HOME="$HOME"
+export BLUEBIRD_DEBUG=1
+
+cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=bash -i

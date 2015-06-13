@@ -130,8 +130,11 @@ Stash is not listed after being destroyed
 
 Can store chunks in gdrive
 
+  $ mkdir -p "$HOME/.config/terastash"
+  $ cp -a "$REAL_HOME/.config/terastash/chunk-stores.json" "$HOME/.config/terastash/"
+  $ cp -a "$REAL_HOME/.config/terastash/google-tokens.json" "$HOME/.config/terastash/"
   $ ts destroy unit_tests_b > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
-  $ ts init unit_tests_b --chunk-store=terastash-tests-gdrive
+  $ ts init unit_tests_b --chunk-store=terastash-tests-gdrive "--chunk-threshold=10*10"
   $ ts config-chunk-store terastash-tests-gdrive --chunk-size=1024
   $ dd bs=1025 count=2 if=/dev/urandom of=smallfile 2> /dev/null
   $ MD5_BEFORE="$(cat smallfile | md5sum | cut -f 1 -d " ")"

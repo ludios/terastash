@@ -75,12 +75,28 @@ program
 program
 	.command('init <name>')
 	.option('-c, --chunk-store <store-name>', 'Store large files in this chunk store')
+	.option('-t, --chunk-threshold <chunk-threshold>', 'If file size >= this number of bytes, put it in chunk store instead of database')
 	.description(d(`
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
 	.action(a(function(name, options) {
-		T(name, T.string, options, T.shape({chunkStore: T.optional(T.string)}));
-		utils.catchAndLog(terastash.initStash(process.cwd(), name, options.chunkStore));
+		T(
+			name, T.string,
+			options, T.shape({
+				chunkStore: T.optional(T.string),
+				chunkThreshold: T.optional(T.string)
+			})
+		);
+		if(options.chunkThreshold !== undefined) {
+			options.chunkThreshold = utils.evalMultiplications(options.chunkThreshold);
+		} else {
+			options.chunkThreshold = 200 * 1024;
+		}
+		if(options.chunkStore === undefined) {
+			console.error("-c/--chunk-store is required");
+			process.exit(1);
+		}
+		utils.catchAndLog(terastash.initStash(process.cwd(), name, options));
 	}));
 
 program

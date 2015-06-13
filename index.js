@@ -242,10 +242,6 @@ function lsPath(stashName, options, p) {
 	});
 }
 
-function shouldStoreInChunks(p, stat) {
-	return stat.size > 200*1024;
-}
-
 const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 	const type = 'd';
 	const stat = yield utils.statAsync(p);
@@ -288,16 +284,16 @@ function putFile(client, p) {
 		const stat = yield utils.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
-		const storeName = stashInfo['chunk-store'];
+		const storeName = stashInfo.chunkStore;
 		if(!storeName) {
-			throw new Error("stash info doesn't specify chunk-store key");
+			throw new Error("stash info doesn't specify chunkStore key");
 		}
 
 		if(parentPath) {
 			yield makeDirs(client, stashInfo, path.dirname(p), parentPath);
 		}
 
-		if(shouldStoreInChunks(p, stat)) {
+		if(stat.size >= stashInfo.chunkThreshold) {
 			// TODO: validate storeName
 			// TODO: do this query only if we fail to add a file
 			yield tryCreateColumnOnStashTable(
@@ -305,6 +301,9 @@ function putFile(client, p) {
 			const key = crypto.randomBytes(128/8);
 			const config = yield getChunkStores();
 			const chunkStore = config.stores[storeName];
+			if(!chunkStore) {
+				throw new Error(`Chunk store ${storeName} is not defined in chunk-stores.json`);
+			}
 
 			const inputStream = fs.createReadStream(p);
 			const hasher = utils.streamHasher(inputStream, 'blake2b');
@@ -376,9 +375,9 @@ function putFiles(pathnames) {
  */
 const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	// TODO: instead of checking just this one stash, check all stashes
-	const storeName = stashInfo['chunk-store'];
+	const storeName = stashInfo.chunkStore;
 	if(!storeName) {
-		throw new Error("stash info doesn't specify chunk-store key");
+		throw new Error("stash info doesn't specify chunkStore key");
 	}
 
 	let result;
@@ -685,8 +684,15 @@ const destroyStash = Promise.coroutine(function*(stashName) {
 /**
  * Initialize a new stash
  */
-const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
-	T(stashPath, T.string, stashName, T.string, storeName, T.string);
+const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
+	T(
+		stashPath, T.string,
+		stashName, T.string,
+		options, T.shape({
+			chunkStore: T.string,
+			chunkThreshold: T.number
+		})
+	);
 	assertName(stashName);
 
 	if(yield getStashInfoByPath(stashPath)) {
@@ -729,8 +735,9 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, storeName) {
 
 		const config = yield getStashes();
 		config.stashes[stashName] = {
-			"path": path.resolve(stashPath),
-			"chunk-store": storeName
+			path: path.resolve(stashPath),
+			chunkStore: options.chunkStore,
+			chunkThreshold: options.chunkThreshold
 		};
 		yield utils.writeObjectToConfigFile("stashes.json", config);
 	}));

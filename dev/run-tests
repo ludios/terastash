@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export REAL_HOME="$HOME"
 export BLUEBIRD_DEBUG=1
 
 integration_tests_log="$(mktemp)"
