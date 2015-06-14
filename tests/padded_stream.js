@@ -52,7 +52,7 @@ describe('Unpadder', function() {
 		assert.deepStrictEqual(buf, new Buffer("hi\x00\x00"));
 	}));
 
-	it("doesn't touch stream when given length > stream length", Promise.coroutine(function*() {
+	it("doesn't touch stream when given length == stream length", Promise.coroutine(function*() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi\x00\x00'));
 		const unpadder = new padded_stream.Unpadder(4);
 		inputStream.pipe(unpadder);
