@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export REAL_HOME="$HOME"
-export BLUEBIRD_DEBUG=1
-export TERASTASH_DETERMINISTIC_TESTS=1
+. ./dev/setup-test-env
 
 cd tests && python2 -S -B ../../hg-test-runner/run-tests.py --shell=bash --debug

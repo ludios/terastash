@@ -284,7 +284,7 @@ A.eq(iv0.length, 128/8);
 
 let keyCounterForTests = 0;
 function makeKey() {
-	if(Number(process.env.TERASTASH_DETERMINISTIC_TESTS)) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const buf = new Buffer(128/8).fill(0);
 		buf.writeIntBE(keyCounterForTests, 0, 128/8);
 		keyCounterForTests += 1;
