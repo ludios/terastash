@@ -100,6 +100,17 @@ program
 	}));
 
 program
+	.command('dump-db')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.description(d(`
+		Dump a backup of the database to stdout`))
+	.action(a(function(options) {
+		T(options, T.object);
+		const name = stringOrNull(options.name);
+		utils.catchAndLog(terastash.dumpDb(name));
+	}));
+
+program
 	.command('destroy <name>')
 	.description(d(`
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))

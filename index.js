@@ -19,6 +19,8 @@ let blake2;
 let gdrive;
 let readline;
 let padded_stream;
+let transit;
+let objectAssign = Object.assign;
 
 const KEYSPACE_PREFIX = "ts_";
 
@@ -33,10 +35,14 @@ function blake2b224Buffer(buf) {
 
 let CassandraClientType = T.object;
 
+function loadCassandra() {
+	cassandra = require('cassandra-driver');
+	CassandraClientType = cassandra.Client;
+}
+
 function getNewClient() {
 	if(!cassandra) {
-		cassandra = require('cassandra-driver');
-		CassandraClientType = cassandra.Client;
+		loadCassandra();
 	}
 	return new cassandra.Client({contactPoints: ['localhost']});
 }
@@ -783,9 +789,44 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 	}));
 });
 
+function dumpDb(stashName) {
+	T(stashName, T.maybe(T.string));
+	return doWithClient(function(client) {
+		return doWithPath(stashName, ".", Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+			T(stashInfo.name, T.string);
+			if(!transit) {
+				transit = require('transit-js');
+			}
+			if(!cassandra) {
+				loadCassandra();
+			}
+			if(!objectAssign) {
+				objectAssign = require('object-assign');
+			}
+			const writer = transit.writer("json-verbose", {handlers: transit.map([
+				cassandra.types.Row,
+				transit.makeWriteHandler({
+					tag: function(v, h) { return "Row"; },
+					rep: function(v, h) { return objectAssign({}, v); },
+				}),
+				cassandra.types.Long,
+				transit.makeWriteHandler({
+					tag: function(v, h) { return "Long"; },
+					rep: function(v, h) { return String(v); },
+				})
+			])});
+			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
+			for(const row of result.rows) {
+				//console.log(row);
+				console.log(writer.write(row));
+			}
+		}));
+	});
+};
+
 module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	lsPath, KEYSPACE_PREFIX
+	lsPath, KEYSPACE_PREFIX, dumpDb
 };
