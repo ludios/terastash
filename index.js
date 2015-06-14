@@ -403,6 +403,18 @@ function putFiles(pathnames) {
 	}));
 }
 
+class NoSuchPathError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
+class NotAFileError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -418,7 +430,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	try {
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
+			`SELECT pathname, size, type, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
@@ -430,14 +442,20 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		// chunks_in_${storeName} doesn't exist, try the query without it
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, key, blake2b224, content, mtime, executable
+			`SELECT pathname, size, type, key, blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		);
 	}
-	A.eq(result.rows.length, 1);
+	A.lte(result.rows.length, 1);
+	if(result.rows.length === 0) {
+		throw new NoSuchPathError(`Path ${inspect(dbPath)} not in stash ${inspect(stashInfo.name)}`);
+	}
 	const row = result.rows[0];
+	if(row.type !== 'f') {
+		throw new NotAFileError(`Path ${inspect(dbPath)} in stash ${inspect(stashInfo.name)} is not a file`);
+	}
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = row['chunks_in_' + storeName];
@@ -840,5 +858,5 @@ module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	lsPath, KEYSPACE_PREFIX, dumpDb
+	lsPath, KEYSPACE_PREFIX, dumpDb, NoSuchPathError, NotAFileError
 };

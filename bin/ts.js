@@ -39,6 +39,30 @@ const terastash = require('..');
 const utils = require('../utils');
 const T = require('notmytype');
 const program = require('commander');
+const chalk = require('chalk');
+const Promise = require('bluebird');
+const NativePromise = global.Promise;
+
+const EitherPromise = T.union([Promise, NativePromise]);
+
+/**
+ * Attaches a logging .catch to a Promise.  If an error is caught,
+ * print it and exit with exit code 1.  Some known errors are handled
+ * without printing a stack trace.
+ */
+function catchAndLog(p) {
+	T(p, EitherPromise);
+	return p.catch(function(err) {
+		if(
+		err instanceof terastash.NoSuchPathError ||
+		err instanceof terastash.NotAFileError) {
+			console.error(chalk.bold(chalk.red(err.message)));
+		} else {
+			console.error(err.stack);
+		}
+		process.exit(1);
+	});
+}
 
 // Ugly hack to avoid getting Function
 function stringOrNull(o) {
@@ -96,7 +120,7 @@ program
 			console.error("-c/--chunk-store is required");
 			process.exit(1);
 		}
-		utils.catchAndLog(terastash.initStash(process.cwd(), name, options));
+		catchAndLog(terastash.initStash(process.cwd(), name, options));
 	}));
 
 program
@@ -107,7 +131,7 @@ program
 	.action(a(function(options) {
 		T(options, T.object);
 		const name = stringOrNull(options.name);
-		utils.catchAndLog(terastash.dumpDb(name));
+		catchAndLog(terastash.dumpDb(name));
 	}));
 
 program
@@ -116,7 +140,7 @@ program
 		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
 	.action(a(function(name) {
 		T(name, T.string);
-		utils.catchAndLog(terastash.destroyStash(name));
+		catchAndLog(terastash.destroyStash(name));
 	}));
 
 /* It's 'add' instead of 'put' for left-hand-only typing */
@@ -126,7 +150,7 @@ program
 		Put a file or directory (recursively) into the database`))
 	.action(a(function(files) {
 		T(files, T.list(T.string));
-		utils.catchAndLog(terastash.putFiles(files));
+		catchAndLog(terastash.putFiles(files));
 	}));
 
 program
@@ -137,7 +161,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		utils.catchAndLog(terastash.getFiles(name, files));
+		catchAndLog(terastash.getFiles(name, files));
 	}));
 
 program
@@ -148,7 +172,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		utils.catchAndLog(terastash.catFiles(name, files));
+		catchAndLog(terastash.catFiles(name, files));
 	}));
 
 program
@@ -161,7 +185,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		utils.catchAndLog(terastash.dropFiles(name, files));
+		catchAndLog(terastash.dropFiles(name, files));
 	}));
 
 program
@@ -183,7 +207,7 @@ program
 		if(name === null && !paths.length) {
 			paths[0] = '.';
 		}
-		utils.catchAndLog(terastash.lsPath(
+		catchAndLog(terastash.lsPath(
 			name, {
 				justNames: options.justNames,
 				reverse: options.reverse,
@@ -198,7 +222,7 @@ program
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
 	.action(a(function() {
-		utils.catchAndLog(terastash.listTerastashKeyspaces());
+		catchAndLog(terastash.listTerastashKeyspaces());
 	}));
 
 program
@@ -206,7 +230,7 @@ program
 	.description(d(`
 		List chunk stores`))
 	.action(a(function() {
-		utils.catchAndLog(terastash.listChunkStores());
+		catchAndLog(terastash.listChunkStores());
 	}));
 
 program
@@ -228,7 +252,7 @@ program
 		if(options.chunkSize % 128/8 !== 0) {
 			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
 		}
-		utils.catchAndLog(terastash.defineChunkStore(storeName, options));
+		catchAndLog(terastash.defineChunkStore(storeName, options));
 	}));
 
 program
@@ -248,7 +272,7 @@ program
 		if(options.chunkSize % 128/8 !== 0) {
 			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
 		}
-		utils.catchAndLog(terastash.configChunkStore(storeName, options));
+		catchAndLog(terastash.configChunkStore(storeName, options));
 	}));
 
 program
@@ -257,7 +281,7 @@ program
 		For gdrive chunk store <store-name>, start the OAuth2 authorization flow.`))
 	.action(a(function(storeName) {
 		T(storeName, T.string);
-		utils.catchAndLog(terastash.authorizeGDrive(storeName));
+		catchAndLog(terastash.authorizeGDrive(storeName));
 	}));
 
 program

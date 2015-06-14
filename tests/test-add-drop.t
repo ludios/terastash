@@ -7,6 +7,9 @@ Can add and drop a file
   $ ts init unit_tests_a --chunk-store=mychunks
   $ ts list-chunk-stores
   mychunks
+  $ ts get not-here
+  Path 'not-here' not in stash 'unit_tests_a'
+  [1]
   $ echo -e "hello\nworld" > sample1
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2
@@ -46,6 +49,9 @@ Can add and drop a file
   adir
   sample1
   sample2
+  $ ts cat adir
+  Path 'adir' in stash 'unit_tests_a' is not a file
+  [1]
   $ ts cat sample1
   hello
   world

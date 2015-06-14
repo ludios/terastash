@@ -3,7 +3,6 @@
 
 const A = require('ayy');
 const T = require('notmytype');
-const NativePromise = global.Promise;
 const Promise = require('bluebird');
 const mkdirp = require('mkdirp');
 const fs = require('fs');
@@ -140,18 +139,6 @@ function hasKey(obj, key) {
 // Hack to allow delete in strong mode
 const deleteKey = new Function("obj", "key", "delete obj[key];");
 /* eslint-enable no-new-func */
-
-const EitherPromise = T.union([Promise, NativePromise]);
-
-/**
- * Attaches a logging .catch to a Promise
- */
-function catchAndLog(p) {
-	T(p, EitherPromise);
-	return p.catch(function(err) {
-		console.error(err.stack);
-	});
-}
 
 const readFileAsync = Promise.promisify(fs.readFile);
 const writeFileAsync = Promise.promisify(fs.writeFile);
@@ -346,7 +333,7 @@ function makeChunkFilename() {
 
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
-	numberWithCommas, getParentPath, getBaseName, catchAndLog, ol,
+	numberWithCommas, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
