@@ -495,6 +495,9 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		}
 		const unpadder = new padded_stream.Unpadder(Number(row.size));
 		clearStream.pipe(unpadder);
+		clearStream.on('error', function(err) {
+			unpadder.emit('error', err);
+		});
 		hasher = utils.streamHasher(unpadder, 'blake2b');
 	} else {
 		const streamWrapper = streamifier.createReadStream(row.content);

@@ -312,7 +312,8 @@ class GDriver {
 	 * fileId is the file's fileId on Google Drive (not the filename)
 	 * range is an optional [start, end] where start is inclusive and end is exclusive
 	 *
-	 * Returns a Promise that is resolved with a stream.
+	 * Returns a Promise that is resolved with [stream, http response].
+	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
 	*getData(fileId, range) {
@@ -353,8 +354,8 @@ class GDriver {
 				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
 			if(googHash) {
-				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 				A(googHash.startsWith("crc32c="), googHash);
+				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 			}
 			hasher.stream.once('end', function() {
 				const computedCRC = hasher.hash.digest();
@@ -366,10 +367,7 @@ class GDriver {
 					));
 				}
 			});
-			// We might be able to return req instead, but we would have to .pause()
-			// because hasher above attaches a 'data' event and puts it into flowing
-			// mode.
-			return hasher.stream;
+			return [hasher.stream, res];
 		} else {
 			const body = yield utils.streamToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
@@ -441,8 +439,22 @@ function readChunks(gdriver, chunks) {
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
 		for(const chunk of chunks) {
-			A.eq(chunk.crc32c.length, 32/8);
-			const chunkStream = yield gdriver.getData(chunk.file_id);
+			const _ = yield gdriver.getData(chunk.file_id);
+			const chunkStream = _[0];
+			const res = _[1];
+
+			const googHash = res.headers['x-goog-hash'];
+			T(googHash, T.string);
+			A(googHash.startsWith("crc32c="), googHash);
+			const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+			if(!chunk.crc32c.equals(googCRC)) {
+				throw new Error(
+					`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
+					`expected Google to send crc32c\n` +
+					`${chunk.crc32c.toString('hex')} but got\n` +
+					`${googHash.toString('hex')}`);
+			}
+
 			cipherStream.append(chunkStream);
 			yield new Promise(function(resolve) {
 				chunkStream.once('end', resolve);
