@@ -154,3 +154,7 @@ Can store chunks in gdrive
   $ ts get smallfile
   $ MD5_AFTER="$(cat smallfile | md5sum | cut -f 1 -d " ")"
   $ [[ "$MD5_BEFORE" == "$MD5_AFTER" ]]
+
+Can run build-natives
+
+  $ ts build-natives

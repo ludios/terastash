@@ -285,6 +285,17 @@ program
 	}));
 
 program
+	.command('build-natives')
+	.description(d(`
+		Build native modules required by terastash.
+		Requires a C++ compiler.`))
+	.action(a(function() {
+		const compile_require = require('../compile_require');
+		compile_require('blake2');
+		compile_require('sse4_crc32');
+	}));
+
+program
 	.command('help')
 	.description(d(`
 		Output usage information`))

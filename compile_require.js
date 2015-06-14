@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const T = require('notmytype');
+const A = require('ayy');
 let child_process;
 
 /**
@@ -11,6 +12,7 @@ let child_process;
  */
 function maybeCompileAndRequire(name, verbose) {
 	T(name, T.string, verbose, T.optional(T.boolean));
+	A(!name.startsWith('.'), name);
 	try {
 		return require(name);
 	} catch(requireErr) {
