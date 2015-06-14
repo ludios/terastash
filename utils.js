@@ -330,11 +330,18 @@ function evalMultiplications(s) {
 	}
 }
 
+let filenameCounter = 0;
 function makeChunkFilename() {
-	const seconds_s = String(Date.now()/1000).split('.')[0];
-	const nanos_s = String(process.hrtime()[1]);
-	const random_s = crypto.randomBytes(128/8).toString('hex');
-	return `${seconds_s}-${nanos_s}-${random_s}`;
+	if(Number(process.env.TERASTASH_DETERMINISTIC_TESTS)) {
+		const s = `deterministic-filename-${filenameCounter}`;
+		filenameCounter += 1;
+		return s;
+	} else {
+		const seconds_s = String(Date.now()/1000).split('.')[0];
+		const nanos_s = String(process.hrtime()[1]);
+		const random_s = crypto.randomBytes(128/8).toString('hex');
+		return `${seconds_s}-${nanos_s}-${random_s}`;
+	}
 }
 
 module.exports = {

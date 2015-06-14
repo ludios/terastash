@@ -282,6 +282,18 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashNam
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 A.eq(iv0.length, 128/8);
 
+let keyCounterForTests = 0;
+function makeKey() {
+	if(Number(process.env.TERASTASH_DETERMINISTIC_TESTS)) {
+		const buf = new Buffer(128/8).fill(0);
+		buf.writeIntBE(keyCounterForTests, 0, 128/8);
+		keyCounterForTests += 1;
+		return buf;
+	} else {
+		return crypto.randomBytes(128/8);
+	}
+}
+
 /**
  * Put a file or directory into the Cassandra database.
  */
@@ -305,7 +317,7 @@ function putFile(client, p) {
 			// TODO: do this query only if we fail to add a file
 			yield tryCreateColumnOnStashTable(
 				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
-			const key = crypto.randomBytes(128/8);
+			const key = makeKey();
 			const config = yield getChunkStores();
 			const chunkStore = config.stores[storeName];
 			if(!chunkStore) {
@@ -807,12 +819,12 @@ function dumpDb(stashName) {
 				cassandra.types.Row,
 				transit.makeWriteHandler({
 					tag: function(v, h) { return "Row"; },
-					rep: function(v, h) { return objectAssign({}, v); },
+					rep: function(v, h) { return objectAssign({}, v); }
 				}),
 				cassandra.types.Long,
 				transit.makeWriteHandler({
 					tag: function(v, h) { return "Long"; },
-					rep: function(v, h) { return String(v); },
+					rep: function(v, h) { return String(v); }
 				})
 			])});
 			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
@@ -822,7 +834,7 @@ function dumpDb(stashName) {
 			}
 		}));
 	});
-};
+}
 
 module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,

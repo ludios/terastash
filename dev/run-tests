@@ -2,6 +2,7 @@
 
 export REAL_HOME="$HOME"
 export BLUEBIRD_DEBUG=1
+export TERASTASH_DETERMINISTIC_TESTS=1
 
 integration_tests_log="$(mktemp)"
 integration_ret_file="$(mktemp)"

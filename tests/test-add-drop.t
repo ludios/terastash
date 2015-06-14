@@ -12,36 +12,38 @@ Can add and drop a file
   $ echo -e "second\nsample" > sample2
   $ touch --date=1980-01-01 sample2
   $ chmod +x sample2
-  $ dd bs=1024 count=1024 if=/dev/zero of=bigfile 2> /dev/null
-  $ cat bigfile | md5sum | cut -f 1 -d " "
+  $ mkdir adir
+  $ dd bs=1024 count=1024 if=/dev/zero of=adir/bigfile 2> /dev/null
+  $ touch --date=1995-01-01 adir
+  $ cat adir/bigfile | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
-  $ touch --date=1990-01-01 bigfile
-  $ ts add sample1 sample2 bigfile
+  $ touch --date=1990-01-01 adir/bigfile
+  $ ts add sample1 sample2 adir/bigfile
   $ ts ls -n unit_tests_a
   When using -n/--name, a database path is required
   [1]
   $ ts ls
-           1,048,576 1990-01-01 00:00 bigfile
+                   0 1995-01-01 00:00 adir/
                   12 1970-01-01 00:00 sample1
                   14 1980-01-01 00:00 sample2*
   $ ts ls -t
-           1,048,576 1990-01-01 00:00 bigfile
+                   0 1995-01-01 00:00 adir/
                   14 1980-01-01 00:00 sample2*
                   12 1970-01-01 00:00 sample1
   $ ts ls -rt
                   12 1970-01-01 00:00 sample1
                   14 1980-01-01 00:00 sample2*
-           1,048,576 1990-01-01 00:00 bigfile
+                   0 1995-01-01 00:00 adir/
   $ ts ls -j
-  bigfile
+  adir
   sample1
   sample2
   $ ts ls -rj
   sample2
   sample1
-  bigfile
+  adir
   $ ts ls -j -n unit_tests_a ''
-  bigfile
+  adir
   sample1
   sample2
   $ ts cat sample1
@@ -67,18 +69,21 @@ Can add and drop a file
   $ cat sample1
   hello
   world
-  $ rm sample1 bigfile
-  $ ts cat bigfile > bigfile.copy
-  $ cat bigfile.copy | md5sum | cut -f 1 -d " "
+  $ rm sample1 adir/bigfile
+  $ ts cat adir/bigfile > adir/bigfile.copy
+  $ cat adir/bigfile.copy | md5sum | cut -f 1 -d " "
   b6d81b360a5672d80c27430f39153e2c
-  $ ts get sample1 bigfile # Make sure 'ts get' works with > 1 file
+  $ ts get sample1 adir/bigfile # Make sure 'ts get' works with > 1 file
   $ stat -c %y sample1
   1970-01-01 00:00:00.000000000 +0000
-  $ stat -c %y bigfile
+  $ stat -c %y adir/bigfile
   1990-01-01 00:00:00.000000000 +0000
-  $ cat bigfile | md5sum | cut -f 1 -d " "
-  b6d81b360a5672d80c27430f39153e2c
-  $ ts drop sample1 bigfile
+  $ ts dump-db
+  {"~#Row":{"pathname":"sample2","blake2b224":"~b91UqIiWOC4GSfm1sthj+37PkP8fFJuzmd9Ffkg==","chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crtime":null,"executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","parent":"","size":{"~#Long":"14"},"type":"f"}}
+  {"~#Row":{"pathname":"adir","blake2b224":null,"chunks_in_mychunks":null,"content":null,"crtime":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","parent":"","size":null,"type":"d"}}
+  {"~#Row":{"pathname":"sample1","blake2b224":"~b8fTjgJNl8/J4zGdDxIzJ9raMZ/C3DCok5tCw4Q==","chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crtime":null,"executable":false,"key":null,"mtime":"~t1970-01-01T00:00:00.000Z","parent":"","size":{"~#Long":"12"},"type":"f"}}
+  {"~#Row":{"pathname":"adir/bigfile","blake2b224":"~bqDSxkpHlSAi6g2fKYOar2cdEE4VBKEsSu2yqUw==","chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0-e3c2ee15","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":1,"file_id":"deterministic-filename-1-0ab47b4a","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":2,"file_id":"deterministic-filename-2-556fff12","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":3,"file_id":"deterministic-filename-3-16e83749","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":4,"file_id":"deterministic-filename-4-a0730203","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":5,"file_id":"deterministic-filename-5-4e03ee20","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":6,"file_id":"deterministic-filename-6-d248a511","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":7,"file_id":"deterministic-filename-7-df9740a4","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":8,"file_id":"deterministic-filename-8-beb78df9","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":9,"file_id":"deterministic-filename-9-078ba627","md5":null,"crc32c":null,"size":{"~#Long":"102400"}},{"idx":10,"file_id":"deterministic-filename-10-1669bda3","md5":null,"crc32c":null,"size":{"~#Long":"24576"}}],"content":null,"crtime":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAA==","mtime":"~t1990-01-01T00:00:00.000Z","parent":"adir","size":{"~#Long":"1048576"},"type":"f"}}
+  $ ts drop sample1 adir/bigfile adir
   $ ts ls
                   14 1980-01-01 00:00 sample2*
   $ ls -1F sample2
