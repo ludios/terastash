@@ -27,7 +27,7 @@ const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSi
 		const writeStream = fs.createWriteStream(tempFname);
 
 		const hasher = utils.streamHasher(chunkStream, 'crc32c');
-		hasher.stream.pipe(writeStream);
+		utils.pipeWithErrors(hasher.stream, writeStream);
 
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {

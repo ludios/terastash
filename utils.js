@@ -217,21 +217,28 @@ function concealSize(n) {
 	return ret;
 }
 
+function pipeWithErrors(src, dest) {
+	src.pipe(dest);
+	src.once('error', function(err) {
+		dest.emit('error', err);
+	});
+}
+
 function makeHttpsRequest(options, stream) {
 	T(options, T.object, stream, T.optional(T.shape({pipe: T.function})));
 	if(!https) {
 		https = require('https');
 	}
 	return new Promise(function(resolve, reject) {
-		const req = https.request(options, resolve).on('error', function(err) {
+		const req = https.request(options, resolve).once('error', function(err) {
 			reject(err);
 		});
 		if(stream) {
-			stream.pipe(req);
+			pipeWithErrors(stream, req);
 		} else {
 			req.end();
 		}
-		req.on('error', function(err) {
+		req.once('error', function(err) {
 			reject(err);
 		});
 	});
@@ -290,14 +297,11 @@ function streamHasher(inputStream, algo) {
 	}
 
 	const stream = new PassThrough();
-	inputStream.pipe(stream);
+	pipeWithErrors(inputStream, stream);
 	const out = {stream, hash, length: 0};
 	stream.on('data', function(data) {
 		out.length += data.length;
 		hash.update(data);
-	});
-	inputStream.on('error', function(err) {
-		stream.emit('error', err);
 	});
 	// We attached a 'data' handler, but don't let that put us into
 	// flowing mode yet, because the user hasn't attached their own
@@ -346,6 +350,7 @@ module.exports = {
 	comparator, comparedBy, hasKey, deleteKey, readFileAsync, writeFileAsync,
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
-	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	streamHasher, evalMultiplications, makeChunkFilename, ChunksType
+	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
+	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,
+	ChunksType
 };

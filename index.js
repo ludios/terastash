@@ -338,9 +338,9 @@ function putFile(client, p) {
 			const hasher = utils.streamHasher(inputStream, 'blake2b');
 			const concealedSize = utils.concealSize(stat.size);
 			const padder = new padded_stream.Padder(concealedSize);
-			hasher.stream.pipe(padder);
+			utils.pipeWithErrors(hasher.stream, padder);
 			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-			padder.pipe(cipherStream);
+			utils.pipeWithErrors(padder, cipherStream);
 
 			let _;
 			if(chunkStore.type === "localfs") {
@@ -486,18 +486,12 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 			cipherStream = gdrive.readChunks(gdriver, chunks);
 		}
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
-		cipherStream.pipe(clearStream);
-		cipherStream.on('error', function(err) {
-			clearStream.emit('error', err);
-		});
+		utils.pipeWithErrors(cipherStream, clearStream);
 		if(!padded_stream) {
 			padded_stream = require('./padded_stream');
 		}
 		const unpadder = new padded_stream.Unpadder(Number(row.size));
-		clearStream.pipe(unpadder);
-		clearStream.on('error', function(err) {
-			unpadder.emit('error', err);
-		});
+		utils.pipeWithErrors(clearStream, unpadder);
 		hasher = utils.streamHasher(unpadder, 'blake2b');
 	} else {
 		const streamWrapper = streamifier.createReadStream(row.content);
@@ -543,7 +537,7 @@ function getFile(client, stashName, p) {
 		yield utils.mkdirpAsync(path.dirname(outputFilename));
 
 		const writeStream = fs.createWriteStream(outputFilename);
-		readStream.pipe(writeStream);
+		utils.pipeWithErrors(readStream, writeStream);
 		yield new Promise(function(resolve, reject) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				resolve();
@@ -576,7 +570,7 @@ function catFile(client, stashName, p) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
 		//const row = _[0];
 		const readStream = _[1];
-		readStream.pipe(process.stdout);
+		utils.pipeWithErrors(readStream, process.stdout);
 	}));
 }
 
