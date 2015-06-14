@@ -448,9 +448,31 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		}
 		const unpadder = new padded_stream.Unpadder(Number(row.size));
 		clearStream.pipe(unpadder);
-		return [row, unpadder];
+		const hasher = utils.streamHasher(unpadder, 'blake2b');
+		hasher.stream.once('end', function() {
+			const digest = hasher.hash.digest().slice(0, 224/8);
+			if(!digest.equals(row.blake2b224)) {
+				hasher.stream.emit('error', new Error(
+					`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
+					`${row.blake2b224.toString('hex')} but was\n` +
+					`${digest.toString('hex')}`
+				));
+			}
+		});
+		return [row, hasher.stream];
 	} else {
-		return [row, streamifier.createReadStream(row.content)];
+		const digest = blake2b224Buffer(row.content);
+		const stream = streamifier.createReadStream(row.content);
+		stream.once('end', function() {
+			if(!digest.equals(row.blake2b224)) {
+				stream.emit('error', new Error(
+					`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
+					`${row.blake2b224.toString('hex')} but was\n` +
+					`${digest.toString('hex')}`
+				));
+			}
+		});
+		return [row, stream];
 	}
 });
 
