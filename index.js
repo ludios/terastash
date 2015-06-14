@@ -534,7 +534,6 @@ function getFile(client, stashName, p) {
 
 		const writeStream = fs.createWriteStream(outputFilename);
 		readStream.pipe(writeStream);
-		// TODO: check file length
 		yield new Promise(function(resolve, reject) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				resolve();
