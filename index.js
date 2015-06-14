@@ -357,6 +357,10 @@ function putFile(client, p) {
 			const content = yield utils.readFileAsync(p);
 			const blake2b224 = blake2b224Buffer(content);
 			const size = content.length;
+			A.eq(size, stat.size,
+				`For ${dbPath}, read\n` +
+				`${utils.numberWithCommas(size)} bytes instead of the expected\n` +
+				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
 
 			// TODO: make sure file does not already exist? require additional flag to update?
 			yield runQuery(
