@@ -419,7 +419,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = row['chunks_in_' + storeName];
-	// TODO: check blake2b224 in both cases
+	let hasher;
 	if(chunks) {
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
@@ -448,32 +448,29 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		}
 		const unpadder = new padded_stream.Unpadder(Number(row.size));
 		clearStream.pipe(unpadder);
-		const hasher = utils.streamHasher(unpadder, 'blake2b');
-		hasher.stream.once('end', function() {
-			const digest = hasher.hash.digest().slice(0, 224/8);
-			if(!digest.equals(row.blake2b224)) {
-				hasher.stream.emit('error', new Error(
-					`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
-					`${row.blake2b224.toString('hex')} but was\n` +
-					`${digest.toString('hex')}`
-				));
-			}
-		});
-		return [row, hasher.stream];
+		hasher = utils.streamHasher(unpadder, 'blake2b');
 	} else {
-		const digest = blake2b224Buffer(row.content);
-		const stream = streamifier.createReadStream(row.content);
-		stream.once('end', function() {
-			if(!digest.equals(row.blake2b224)) {
-				stream.emit('error', new Error(
-					`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
-					`${row.blake2b224.toString('hex')} but was\n` +
-					`${digest.toString('hex')}`
-				));
-			}
-		});
-		return [row, stream];
+		const streamWrapper = streamifier.createReadStream(row.content);
+		hasher = utils.streamHasher(streamWrapper, 'blake2b');
 	}
+	hasher.stream.once('end', function() {
+		if(hasher.length !== Number(row.size)) {
+			hasher.stream.emit('error', new Error(
+				`For dbPath=${dbPath}, expected length of content to be\n` +
+				`${utils.numberWithCommas(row.size)} but was\n` +
+				`${utils.numberWithCommas(hasher.length)}`
+			));
+		}
+		const digest = hasher.hash.digest().slice(0, 224/8);
+		if(!digest.equals(row.blake2b224)) {
+			hasher.stream.emit('error', new Error(
+				`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
+				`${row.blake2b224.toString('hex')} but was\n` +
+				`${digest.toString('hex')}`
+			));
+		}
+	});
+	return [row, hasher.stream];
 });
 
 /**
