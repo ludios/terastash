@@ -3,7 +3,6 @@
 
 require('better-buffer-inspect');
 
-const A = require('ayy');
 const assert = require('assert');
 const utils = require('../utils');
 const padded_stream = require('../padded_stream');

@@ -18,6 +18,7 @@ let localfs;
 let blake2;
 let gdrive;
 let readline;
+let padded_stream;
 
 const KEYSPACE_PREFIX = "ts_";
 
@@ -306,9 +307,15 @@ function putFile(client, p) {
 			}
 
 			const inputStream = fs.createReadStream(p);
+			if(!padded_stream) {
+				padded_stream = require('./padded_stream');
+			}
 			const hasher = utils.streamHasher(inputStream, 'blake2b');
+			const concealedSize = utils.concealSize(stat.size);
+			const padder = new padded_stream.Padder(concealedSize);
+			hasher.stream.pipe(padder);
 			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-			hasher.stream.pipe(cipherStream);
+			padder.pipe(cipherStream);
 
 			let _;
 			if(chunkStore.type === "localfs") {
@@ -327,9 +334,14 @@ function putFile(client, p) {
 
 			const totalSize = _[0];
 			const chunkInfo = _[1];
-			A.eq(totalSize, stat.size,
-				`Wrote \n${utils.numberWithCommas(totalSize)} bytes to chunks instead of the expected\n` +
+			A.eq(padder.bytesRead, stat.size,
+				`For ${dbPath}, read\n` +
+				`${utils.numberWithCommas(padder.bytesRead)} bytes instead of the expected\n` +
 				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
+			A.eq(totalSize, concealedSize,
+				`For ${dbPath}, wrote to chunks\n` +
+				`${utils.numberWithCommas(totalSize)} bytes instead of the expected\n` +
+				`${utils.numberWithCommas(concealedSize)} (concealed) bytes`);
 			T(chunkInfo, Array);
 
 			const blake2b224 = hasher.hash.digest().slice(0, 224/8);
@@ -431,7 +443,12 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		cipherStream.on('error', function(err) {
 			clearStream.emit('error', err);
 		});
-		return [row, clearStream];
+		if(!padded_stream) {
+			padded_stream = require('./padded_stream');
+		}
+		const unpadder = new padded_stream.Unpadder(Number(row.size));
+		clearStream.pipe(unpadder);
+		return [row, unpadder];
 	} else {
 		return [row, streamifier.createReadStream(row.content)];
 	}
