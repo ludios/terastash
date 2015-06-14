@@ -20,11 +20,10 @@ class Padder extends Transform {
 	}
 
 	_flush(callback) {
-		if(this._padToLength <= this._bytesRead) {
-			callback();
-		} else {
-			callback(null, new Buffer(this._padToLength - this._bytesRead).fill(0));
+		if(this._padToLength > this._bytesRead) {
+			this.push(new Buffer(this._padToLength - this._bytesRead).fill(0));
 		}
+		callback();
 	}
 }
 
@@ -50,3 +49,5 @@ class Unpadder extends Transform {
 		}
 	}
 }
+
+module.exports = {Padder, Unpadder};
