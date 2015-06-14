@@ -5,6 +5,7 @@ const A = require('ayy');
 const T = require('notmytype');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const Promise = require('bluebird');
 const chopshop = require('chopshop');
 const Combine = require('combine-streams');
@@ -22,7 +23,7 @@ const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSi
 
 	let idx = 0;
 	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
-		const tempFname = path.join(directory, 'temp-' + Math.random());
+		const tempFname = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
 		const writeStream = fs.createWriteStream(tempFname);
 
 		const hasher = utils.streamHasher(chunkStream, 'crc32c');
@@ -33,12 +34,12 @@ const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSi
 				const size = (yield utils.statAsync(tempFname)).size;
 				A.lte(size, chunkSize);
 				totalSize += size;
-				const digest = hasher.hash.digest('hex');
-				const fname = utils.makeChunkFilename() + '-' + digest;
-				chunkInfo.push({idx, file_id: fname, size});
+				const crc32c = hasher.hash.digest();
+				const file_id = utils.makeChunkFilename();
+				chunkInfo.push({idx, file_id, size, crc32c});
 				yield utils.renameAsync(
 					tempFname,
-					path.join(directory, fname)
+					path.join(directory, file_id)
 				);
 				resolve();
 			}));
@@ -58,28 +59,17 @@ class BadChunk extends Error {
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
 function readChunks(directory, chunks) {
-	T(
-		directory, T.string,
-		chunks, T.list(
-			T.shape({
-				"idx": T.number,
-				"file_id": T.string,
-				"size": T.object /* bigint */
-			})
-		)
-	);
+	T(directory, T.string, chunks, utils.ChunksType);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function*() {
 		for(const chunk of chunks) {
-			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
-
-			// For localfs, the last part of the filename is the digest
-			const digest = Buffer(chunk.file_id.split('-').pop(), "hex");
+			const digest = chunk.crc32c;
 			A.eq(digest.length, 32/8);
 
+			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
 			const hasher = utils.streamHasher(chunkStream, 'crc32c');
 			cipherStream.append(hasher.stream);
 

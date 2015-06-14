@@ -331,6 +331,15 @@ function makeChunkFilename() {
 	}
 }
 
+const ChunksType = T.list(
+	T.shape({
+		"idx": T.number,
+		"file_id": T.string,
+		"crc32c": Buffer,
+		"size": T.object /* Long */
+	})
+);
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -338,5 +347,5 @@ module.exports = {
 	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, makeHttpsRequest, streamToBuffer,
-	streamHasher, evalMultiplications, makeChunkFilename
+	streamHasher, evalMultiplications, makeChunkFilename, ChunksType
 };

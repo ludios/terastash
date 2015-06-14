@@ -434,17 +434,7 @@ class BadChunk extends Error {
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
 function readChunks(gdriver, chunks) {
-	T(
-		gdriver, GDriver,
-		chunks, T.list(
-			T.shape({
-				"idx": T.number,
-				"file_id": T.string,
-				"crc32c": Buffer,
-				"size": T.object /* Long */
-			})
-		)
-	);
+	T(gdriver, GDriver, chunks, utils.ChunksType);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
