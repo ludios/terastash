@@ -58,8 +58,15 @@ const getStashes = utils.makeConfigFileInitializer(
 const getChunkStores = utils.makeConfigFileInitializer(
 	"chunk-stores.json", {
 		stores: {},
-		_comment: utils.ol(`You cannot change the name of a store because existing
-			chunks reference it by name in the Cassandra database.`)
+		_comments: [
+			utils.ol(`You cannot change the name of a store because existing
+				chunks reference it by name in the Cassandra database.`),
+			utils.ol(`Folders specified in 'parents' for type 'gdrive', and
+				'directories' for type 'localfs' *must not* be used by anything but one chunk store.
+				('ts fsck' will delete unreferenced chunks in the chunk store's folder.)`),
+			utils.ol(`A chunk store *must not* be used by more than one stash.
+				('ts fsck' will delete unreferenced chunks in the chunk store's folder.)`)
+		]
 	}
 );
 
