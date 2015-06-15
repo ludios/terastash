@@ -317,7 +317,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 		);
 	} else if(typeInDb === FILE) {
 		throw new MakeDirError(
-			`Cannot make directory:` +
+			`Cannot mkdir in database:` +
 			` ${inspect(dbPath)} in stash ${inspect(stashName)}` +
 			` already exists as a file`);
 	} else if(typeInDb === DIRECTORY) {
@@ -734,6 +734,17 @@ function makeDirectories(stashName, paths) {
 		for(let i=0; i < dbPaths.length; i++) {
 			const p = paths[i];
 			const dbPath = dbPaths[i];
+			try {
+				yield utils.mkdirpAsync(p);
+			} catch(err) {
+				if(err.code !== 'EEXIST') {
+					throw err;
+				}
+				throw new MakeDirError(
+					`Cannot mkdir in working directory:` +
+					` ${inspect(p)} already exists and is not a directory`
+				);
+			}
 			yield makeDirsInDb(client, stashInfo.name, p, dbPath);
 		}
 	}));

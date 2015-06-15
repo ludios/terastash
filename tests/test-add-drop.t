@@ -172,12 +172,15 @@ Can create directories
   dir_already_exists_in_stash_dir
   $ touch a
   $ ts add a
-  $ ts mkdir a
-  Cannot make directory: 'a' in stash 'unit_tests_b' already exists as a file
-  [1]
   $ rm a
-  $ mkdir a
+  $ ts mkdir a # despite failing, this leaves behind an 'a' dir in working directory
+  Cannot mkdir in database: 'a' in stash 'unit_tests_b' already exists as a file
+  [1]
   $ touch a/b
   $ ts add a/b
-  Cannot make directory: 'a' in stash 'unit_tests_b' already exists as a file
+  Cannot mkdir in database: 'a' in stash 'unit_tests_b' already exists as a file
+  [1]
+  $ touch c
+  $ ts mkdir c
+  Cannot mkdir in working directory: 'c' already exists and is not a directory
   [1]
