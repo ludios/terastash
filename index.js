@@ -288,6 +288,23 @@ const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 	return typeInDb;
 });
 
+const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
+	T(p, T.string);
+	try {
+		const stat = yield utils.statAsync(p);
+		if(stat.isDirectory()) {
+			return DIRECTORY;
+		} else {
+			return FILE;
+		}
+	} catch(err) {
+		if(err.code !== 'ENOENT') {
+			throw err;
+		}
+		return MISSING;
+	}
+});
+
 class MakeDirError extends Error {
 	get name() {
 		return this.constructor.name;
@@ -771,7 +788,51 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 
 	return doWithClient(Promise.coroutine(function*(client) {
 		// This is inherently racy; type may be different by the time we mv
-		const destTypeInDb = yield getTypeInDb(client, stashInfo.name, dbPathDest);
+		let destTypeInDb = yield getTypeInDb(client, stashInfo.name, dbPathDest);
+		const destTypeInWorkDir = yield getTypeInWorkingDirectory(dest);
+
+		if(destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
+			yield makeDirsInDb(client, stashInfo.name, dest, dbPathDest);
+			destTypeInDb = DIRECTORY;
+		}
+
+		if(destTypeInDb === FILE) {
+			throw new Error(`Cannot mv: destination ${inspect(dbPathDest)}` +
+				` already exists in stash ${inspect(stashInfo.name)}`
+			);
+		}
+		if(destTypeInWorkDir === FILE) {
+			throw new Error(`Cannot mv: refusing to overwrite ${inspect(dest)}` +
+				` in working directory`
+			);
+		}
+		if(destTypeInDb === DIRECTORY) {
+			for(const dbPathSource of dbPathSources) {
+				const result = yield runQuery(
+					client,
+					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+					WHERE pathname = ?;`, [dbPathSource]
+				);
+				A.lte(result.rows.length, 1);
+				if(!result.rows.length) {
+					throw new Error(
+						`Cannot mv: source ${inspect(dbPathSource)} in stash ` +
+						`${inspect(stashInfo.name)} disappeared during move operation`
+					);
+				}
+				const row = result.rows[0];
+				row.pathname = `${dbPathDest}/${dbPathSource.split('/').pop()}`;
+				console.log(Object.keys(row));
+			}
+		} else {
+			throw new Error("Haven't implemented mv to a non-dir dest yet")
+		}
+
+		/*else if(destTypeInDb === MISSING) {
+			if(dbPathSources.length > 1) {
+
+			}
+		}*/
 		console.log({dbPathSources, dbPathDest, destTypeInDb});
 	}));
 });
