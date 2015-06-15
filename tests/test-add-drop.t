@@ -4,6 +4,9 @@ Can add and drop a file
   $ ts list-chunk-stores
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
   $ ts destroy unit_tests_a > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
+  $ ts ls
+  File '([^\']+)' is not in a terastash working directory (re)
+  [1]
   $ ts init unit_tests_a --chunk-store=mychunks
   $ ts list-chunk-stores
   mychunks
@@ -163,17 +166,17 @@ Can run build-natives
 Can create directories
 
   $ ts mkdir dir
-  $ ls -1d dir # 'ts mkdir' should also create dir in stash dir
+  $ ls -1d dir # 'ts mkdir' should also create dir in working dir
   dir
-  $ mkdir dir_already_exists_in_stash_dir
-  $ ts mkdir dir_already_exists_in_stash_dir # 'ts mkdir' should work if dir already in stash dir
+  $ mkdir dir_already_exists_in_working_dir
+  $ ts mkdir dir_already_exists_in_working_dir # 'ts mkdir' should work if dir already in working dir
   $ ts ls -j
   dir
-  dir_already_exists_in_stash_dir
+  dir_already_exists_in_working_dir
   $ touch a
   $ ts add a
   $ rm a
-  $ ts mkdir a # despite failing, this leaves behind an 'a' dir in working directory
+  $ ts mkdir a # despite failing, this leaves behind an 'a' dir in working dir
   Cannot mkdir in database: 'a' in stash 'unit_tests_b' already exists as a file
   [1]
   $ touch a/b

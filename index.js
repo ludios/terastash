@@ -70,7 +70,7 @@ const getChunkStores = utils.makeConfigFileInitializer(
 	}
 );
 
-class PathNotInStashError extends Error {
+class NotInWorkingDirectoryError extends Error {
 	get name() {
 		return this.constructor.name;
 	}
@@ -96,7 +96,8 @@ const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 			return stash;
 		}
 	}
-	throw new PathNotInStashError(`File ${pathname} is not in a stash directory`);
+	throw new NotInWorkingDirectoryError(
+		`File ${inspect(pathname)} is not in a terastash working directory`);
 });
 
 /**
@@ -948,7 +949,7 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 	try {
 		yield getStashInfoByPath(stashPath);
 	} catch(err) {
-		if(!(err instanceof PathNotInStashError)) {
+		if(!(err instanceof NotInWorkingDirectoryError)) {
 			throw err;
 		}
 		caught = true;
@@ -1041,5 +1042,5 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
-	NoSuchPathError, NotAFileError, MakeDirError
+	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, MakeDirError
 };

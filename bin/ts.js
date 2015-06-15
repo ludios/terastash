@@ -56,7 +56,8 @@ function catchAndLog(p) {
 		if(
 		err instanceof terastash.NoSuchPathError ||
 		err instanceof terastash.NotAFileError ||
-		err instanceof terastash.MakeDirError) {
+		err instanceof terastash.MakeDirError ||
+		err instanceof terastash.NotInWorkingDirectoryError) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);
@@ -186,7 +187,7 @@ program
 
 		Does not emit error or warning if specified files are not in the database.
 
-		Does not remove the corresponding file in the stash directory, if it is there.`))
+		Does not remove the corresponding file in the working directory, if it is there.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
@@ -197,7 +198,7 @@ program
 	.command('mkdir <path...>')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
-		Creates directories in the database and in the stash directory.
+		Creates directories in the database and in the working directory.
 		Parent directories are automatically created as needed.`))
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
@@ -214,7 +215,7 @@ program
 
 		Move a file from src to dest.  dest may be a new filename or a directory.
 		If more than one src is given, dest must be a directory.
-		If the corresponding file for src is in the stash directory, it will be moved as well.`))
+		If the corresponding file for src is in the working directory, it will be moved as well.`))
 	.action(a(function(args, options) {
 		T(args, T.list(T.string), options, T.object);
 		const srces = args;
