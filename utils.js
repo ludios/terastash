@@ -355,6 +355,12 @@ function allIdentical(arr) {
 	return true;
 }
 
+function filledArray(n, obj) {
+	T(n, T.number, obj, T.any);
+	A(Number.isInteger(n), n);
+	return Array.apply(null, new Array(n)).map(function(_) { return obj; });
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -363,5 +369,5 @@ module.exports = {
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
 	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,
-	ChunksType, allIdentical
+	ChunksType, allIdentical, filledArray
 };

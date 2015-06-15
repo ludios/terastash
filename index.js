@@ -822,7 +822,36 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				}
 				const row = result.rows[0];
 				row.pathname = `${dbPathDest}/${dbPathSource.split('/').pop()}`;
-				console.log(Object.keys(row));
+				row.parent = utils.getParentPath(row.pathname);
+				const cols = Object.keys(row);
+				const quotedCols = cols.map(function(k) { return JSON.stringify(k); });
+				const qMarks = utils.filledArray(cols.length, "?");
+
+				// This one checks the actual dir/basename instead of the dir/
+				let actualDestTypeInDb = yield getTypeInDb(client, stashInfo.name, row.pathname);
+				if(actualDestTypeInDb !== MISSING) {
+					throw new Error(`Cannot mv: destination ${inspect(row.pathname)}` +
+						` already exists in stash ${inspect(stashInfo.name)}`
+					);
+				}
+				// Do dest-in-working directory check here?
+
+				yield runQuery(
+					client,
+					`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+					(${quotedCols.join(", ")})
+					VALUES (${qMarks.join(", ")});`,
+					cols.map(function(col) { return row[col]; })
+				);
+
+				yield runQuery(
+					client,
+					`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+					WHERE pathname = ?;`,
+					[dbPathSource]
+				);
+
+				// TODO: move file in working directory
 			}
 		} else {
 			throw new Error("Haven't implemented mv to a non-dir dest yet")
@@ -833,7 +862,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 
 			}
 		}*/
-		console.log({dbPathSources, dbPathDest, destTypeInDb});
+		//console.log({dbPathSources, dbPathDest, destTypeInDb});
 	}));
 });
 
