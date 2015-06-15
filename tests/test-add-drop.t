@@ -159,3 +159,25 @@ Can store chunks in gdrive
 Can run build-natives
 
   $ ts build-natives
+
+Can create directories
+
+  $ ts mkdir dir
+  $ ls -1d dir # 'ts mkdir' should also create dir in stash dir
+  dir
+  $ mkdir dir_already_exists_in_stash_dir
+  $ ts mkdir dir_already_exists_in_stash_dir # 'ts mkdir' should work if dir already in stash dir
+  $ ts ls -j
+  dir
+  dir_already_exists_in_stash_dir
+  $ touch a
+  $ ts add a
+  $ ts mkdir a
+  Cannot make directory: 'a' in stash 'unit_tests_b' already exists as a file
+  [1]
+  $ rm a
+  $ mkdir a
+  $ touch a/b
+  $ ts add a/b
+  Cannot make directory: 'a' in stash 'unit_tests_b' already exists as a file
+  [1]

@@ -256,20 +256,73 @@ function lsPath(stashName, options, p) {
 	});
 }
 
-const makeDirs = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
-	const type = 'd';
-	const stat = yield utils.statAsync(p);
-	const mtime = stat.mtime;
+const MISSING = Symbol('MISSING');
+const DIRECTORY = Symbol('DIRECTORY');
+const FILE = Symbol('FILE');
+
+const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
+	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
+	let typeInDb;
+	const result = yield runQuery(
+		client,
+		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
+		WHERE pathname = ?;`,
+		[dbPath]
+	);
+	A.lte(result.rows.length, 1);
+	if(result.rows.length) {
+		const row = result.rows[0];
+		if(row.type === "f") {
+			typeInDb = FILE;
+		} else if(row.type === "d") {
+			typeInDb = DIRECTORY;
+		} else {
+			throw new Error(
+				`Unexpected type in db for ${inspect(dbPath)}:` +
+				` ${inspect(row.type)}`);
+		}
+	} else {
+		typeInDb = MISSING;
+	}
+	return typeInDb;
+});
+
+class MakeDirError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
+const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
+	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
+	let mtime = new Date();
+	try {
+		mtime = (yield utils.statAsync(p)).mtime;
+	} catch(err) {
+		if(err.code !== 'ENOENT') {
+			throw err;
+		}
+	}
 	const parentPath = utils.getParentPath(dbPath);
 	if(parentPath) {
-		yield makeDirs(client, stashInfo, p, parentPath);
+		yield makeDirsInDb(client, stashName, p, parentPath);
 	}
-	yield runQuery(
-		client,
-		`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-		(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
-		[dbPath, parentPath, type, mtime]
-	);
+	const typeInDb = yield getTypeInDb(client, stashName, dbPath);
+	if(typeInDb === MISSING) {
+		yield runQuery(
+			client,
+			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
+			(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
+			[dbPath, parentPath, 'd', mtime]
+		);
+	} else if(typeInDb === FILE) {
+		throw new MakeDirError(
+			`Cannot make directory:` +
+			` ${inspect(dbPath)} in stash ${inspect(stashName)}` +
+			` already exists as a file`);
+	} else if(typeInDb === DIRECTORY) {
+		// do nothing
+	}
 });
 
 const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashName, columnName, type) {
@@ -327,7 +380,7 @@ function putFile(client, p) {
 		const chunkStore = yield getChunkStore(stashInfo);
 
 		if(parentPath) {
-			yield makeDirs(client, stashInfo, path.dirname(p), parentPath);
+			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
 
 		if(stat.size >= stashInfo.chunkThreshold) {
@@ -650,7 +703,43 @@ function dropFiles(stashName, pathnames) {
 	}));
 }
 
-const moveFile = Promise.coroutine(function*(stashName, sources, dest) {
+const getStashInfoForPaths = Promise.coroutine(function*(paths) {
+	// Make sure all paths are in the same stash
+	const stashInfos = yield Promise.all(paths.map(function(p) {
+		return getStashInfoByPath(path.resolve(p));
+	}));
+	const stashNames = stashInfos.map(utils.prop('name'));
+	if(!utils.allIdentical(stashNames)) {
+		throw new Error(
+			`All paths used in mv command must be in the same stash;` +
+			` stashes were ${inspect(stashNames)}`);
+	}
+	return stashInfos[0];
+});
+
+function makeDirectories(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+	return doWithClient(Promise.coroutine(function*(client) {
+		let dbPaths;
+		let stashInfo;
+		if(stashName) { // Explicit stash name provided
+			stashInfo = yield getStashInfoByName(stashName);
+			dbPaths = paths;
+		} else {
+			stashInfo = yield getStashInfoForPaths(paths);
+			dbPaths = paths.map(function(p) {
+				return userPathToDatabasePath(stashInfo.path, p);
+			});
+		}
+		for(let i=0; i < dbPaths.length; i++) {
+			const p = paths[i];
+			const dbPath = dbPaths[i];
+			yield makeDirsInDb(client, stashInfo.name, p, dbPath);
+		}
+	}));
+}
+
+const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 	T(stashName, T.maybe(T.string), sources, T.list(T.string), dest, T.string);
 
 	let stashInfo;
@@ -661,26 +750,18 @@ const moveFile = Promise.coroutine(function*(stashName, sources, dest) {
 		dbPathSources = sources;
 		dbPathDest = dest;
 	} else {
-		// Make sure all paths are in the same stash
-		const stashInfos = yield Promise.all(sources.concat(dest).map(function(p) {
-			return getStashInfoByPath(path.resolve(p));
-		}));
-		const stashNames = stashInfos.map(utils.prop('name'));
-		if(!utils.allIdentical(stashNames)) {
-			throw new Error(
-				`All paths used in mv command must be in the same stash;` +
-				` stashes were ${inspect(stashNames)}`);
-		}
-		stashInfo = stashInfos[0];
-		console.log(stashInfos);
-
+		stashInfo = yield getStashInfoForPaths(sources.concat(dest));
 		dbPathSources = sources.map(function(p) {
 			return userPathToDatabasePath(stashInfo.path, p);
 		});
 		dbPathDest = userPathToDatabasePath(stashInfo.path, dest);
 	}
 
-	console.log({dbPathSources, dbPathDest});
+	return doWithClient(Promise.coroutine(function*(client) {
+		// This is inherently racy; type may be different by the time we mv
+		const destTypeInDb = yield getTypeInDb(client, stashInfo.name, dbPathDest);
+		console.log({dbPathSources, dbPathDest, destTypeInDb});
+	}));
 });
 
 /**
@@ -948,5 +1029,6 @@ module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	moveFile, lsPath, KEYSPACE_PREFIX, dumpDb, NoSuchPathError, NotAFileError
+	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
+	NoSuchPathError, NotAFileError, MakeDirError
 };

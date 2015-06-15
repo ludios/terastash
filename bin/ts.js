@@ -55,7 +55,8 @@ function catchAndLog(p) {
 	return p.catch(function(err) {
 		if(
 		err instanceof terastash.NoSuchPathError ||
-		err instanceof terastash.NotAFileError) {
+		err instanceof terastash.NotAFileError ||
+		err instanceof terastash.MakeDirError) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);
@@ -193,6 +194,18 @@ program
 	}));
 
 program
+	.command('mkdir <path...>')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.description(d(`
+		Creates directories in the database and in the stash directory.
+		Parent directories are automatically created as needed.`))
+	.action(a(function(paths, options) {
+		T(paths, T.list(T.string), options, T.object);
+		const name = stringOrNull(options.name);
+		catchAndLog(terastash.makeDirectories(name, paths));
+	}));
+
+program
 	.command('mv <args...>')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
@@ -207,7 +220,7 @@ program
 		const srces = args;
 		const dest = srces.pop();
 		const name = stringOrNull(options.name);
-		catchAndLog(terastash.moveFile(name, srces, dest));
+		catchAndLog(terastash.moveFiles(name, srces, dest));
 	}));
 
 program
