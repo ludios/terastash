@@ -263,7 +263,10 @@ const FILE = Symbol('FILE');
 
 const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
-	let typeInDb;
+	if(dbPath === "") {
+		// pathname="" is the root directory
+		return DIRECTORY;
+	}
 	const result = yield runQuery(
 		client,
 		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
@@ -274,18 +277,17 @@ const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 	if(result.rows.length) {
 		const row = result.rows[0];
 		if(row.type === "f") {
-			typeInDb = FILE;
+			return FILE;
 		} else if(row.type === "d") {
-			typeInDb = DIRECTORY;
+			return DIRECTORY;
 		} else {
 			throw new Error(
 				`Unexpected type in db for ${inspect(dbPath)}:` +
 				` ${inspect(row.type)}`);
 		}
 	} else {
-		typeInDb = MISSING;
+		return MISSING;
 	}
-	return typeInDb;
 });
 
 const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
@@ -821,7 +823,12 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 					);
 				}
 				const row = result.rows[0];
-				row.pathname = `${dbPathDest}/${dbPathSource.split('/').pop()}`;
+				if(dbPathDest !== "") {
+					row.pathname = `${dbPathDest}/${dbPathSource.split('/').pop()}`;
+				} else {
+					row.pathname = `${dbPathSource.split('/').pop()}`;
+				}
+				A(!row.pathname.startsWith('/'), row.pathname);
 				row.parent = utils.getParentPath(row.pathname);
 				const cols = Object.keys(row);
 				const quotedCols = cols.map(function(k) { return JSON.stringify(k); });
