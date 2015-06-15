@@ -10,6 +10,7 @@ const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
 const inspect = require('util').inspect;
+const chalk = require('chalk');
 
 const getAllCredentials = utils.makeConfigFileInitializer(
 	"google-tokens.json", {
@@ -467,4 +468,21 @@ function readChunks(gdriver, chunks) {
 	return cipherStream;
 }
 
-module.exports = {GDriver, writeChunks, readChunks};
+/**
+ * Deletes chunks
+ */
+const deleteChunks = Promise.coroutine(function*(gdriver, chunks) {
+	T(gdriver, GDriver, chunks, utils.ChunksType);
+	for(const chunk of chunks) {
+		try {
+			yield gdriver.deleteFile(chunk.file_id);
+		} catch(err) {
+			console.error(chalk.red(
+				`Failed to delete chunk with file_id=${inspect(chunk.file_id)}` +
+				` (chunk #${chunk.idx} for file)`));
+			console.error(chalk.red(err.stack));
+		}
+	}
+});
+
+module.exports = {GDriver, writeChunks, readChunks, deleteChunks};

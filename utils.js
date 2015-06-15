@@ -145,6 +145,7 @@ const writeFileAsync = Promise.promisify(fs.writeFile);
 const mkdirpAsync = Promise.promisify(mkdirp);
 const statAsync = Promise.promisify(fs.stat);
 const renameAsync = Promise.promisify(fs.rename);
+const unlinkAsync = Promise.promisify(fs.unlink);
 const chmodAsync = Promise.promisify(fs.chmod);
 const utimesAsync = Promise.promisify(fs.utimes);
 
@@ -348,7 +349,7 @@ module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey, readFileAsync, writeFileAsync,
-	mkdirpAsync, statAsync, renameAsync, chmodAsync, utimesAsync,
+	mkdirpAsync, statAsync, renameAsync, unlinkAsync, chmodAsync, utimesAsync,
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
 	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,

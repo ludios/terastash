@@ -71,5 +71,14 @@ describe('GDriver', function() {
 			gdriver.deleteFile(createFileResponse.id),
 			gdriver.deleteFile(createFolderResponse.id)
 		]);
+
+		// Deleting a file that doesn't exist throws an error
+		let caught;
+		try {
+			yield gdriver.deleteFile(createFileResponse.id);
+		} catch(err) {
+			caught = err;
+		}
+		A(caught instanceof Error, `deleteFile on nonexistent file did not throw Error; caught=${caught}`);
 	}));
 });

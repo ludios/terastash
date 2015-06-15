@@ -301,6 +301,20 @@ function makeKey() {
 	}
 }
 
+const getChunkStore = Promise.coroutine(function*(stashInfo) {
+	const storeName = stashInfo.chunkStore;
+	if(!storeName) {
+		throw new Error("stash info doesn't specify chunkStore key");
+	}
+	const config = yield getChunkStores();
+	const chunkStore = config.stores[storeName];
+	if(!chunkStore) {
+		throw new Error(`Chunk store ${storeName} is not defined in chunk-stores.json`);
+	}
+	chunkStore.name = storeName;
+	return chunkStore;
+});
+
 /**
  * Put a file or directory into the Cassandra database.
  */
@@ -310,10 +324,7 @@ function putFile(client, p) {
 		const stat = yield utils.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
-		const storeName = stashInfo.chunkStore;
-		if(!storeName) {
-			throw new Error("stash info doesn't specify chunkStore key");
-		}
+		const chunkStore = yield getChunkStore(stashInfo);
 
 		if(parentPath) {
 			yield makeDirs(client, stashInfo, path.dirname(p), parentPath);
@@ -323,13 +334,8 @@ function putFile(client, p) {
 			// TODO: validate storeName
 			// TODO: do this query only if we fail to add a file
 			yield tryCreateColumnOnStashTable(
-				client, stashInfo.name, `chunks_in_${storeName}`, 'list<frozen<chunk>>');
+				client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
 			const key = makeKey();
-			const config = yield getChunkStores();
-			const chunkStore = config.stores[storeName];
-			if(!chunkStore) {
-				throw new Error(`Chunk store ${storeName} is not defined in chunk-stores.json`);
-			}
 
 			const inputStream = fs.createReadStream(p);
 			if(!padded_stream) {
@@ -374,7 +380,7 @@ function putFile(client, p) {
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(pathname, parent, type, key, "chunks_in_${storeName}", size, blake2b224, mtime, executable)
+				(pathname, parent, type, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 				[dbPath, parentPath, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
 			);
@@ -422,6 +428,10 @@ class NotAFileError extends Error {
 	}
 }
 
+function isColumnMissingError(err) {
+	return /^ResponseError: Undefined name .* in selection clause/.test(String(err));
+}
+
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -443,7 +453,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 			[dbPath]
 		);
 	} catch(err) {
-		if(!(/^ResponseError: Undefined name .* in selection clause/.test(String(err)))) {
+		if(!isColumnMissingError(err)) {
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
@@ -583,15 +593,50 @@ function catFiles(stashName, pathnames) {
 }
 
 function dropFile(client, stashName, p) {
-	return doWithPath(stashName, p, function(stashInfo, dbPath, parentPath) {
-		//console.log({stashInfo, dbPath, parentPath});
-		return runQuery(
+	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+		const chunkStore = yield getChunkStore(stashInfo);
+		let chunks = null;
+		try {
+			const result = yield runQuery(
+				client,
+				`SELECT "chunks_in_${chunkStore.name}"
+				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+				WHERE pathname = ?;`,
+				[dbPath]
+			);
+			A.lte(result.rows.length, 1);
+			if(result.rows.length) {
+				chunks = result.rows[0][`chunks_in_${chunkStore.name}`];
+			}
+		} catch(err) {
+			if(!isColumnMissingError(err)) {
+				throw err;
+			}
+		}
+		// TODO: Instead of DELETE, mark file with 'deleting' or something in case
+		// the chunk-deletion process needs to be resumed later.
+		yield runQuery(
 			client,
 			`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			WHERE pathname = ?;`,
 			[dbPath]
 		);
-	});
+		if(chunks !== null) {
+			if(chunkStore.type === "localfs") {
+				if(!localfs) {
+					localfs = require('./chunker/localfs');
+				}
+				yield localfs.deleteChunks(chunkStore.directory, chunks);
+			} else {
+				if(!gdrive) {
+					gdrive = require('./chunker/gdrive');
+				}
+				const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+				yield gdriver.loadCredentials();
+				yield gdrive.deleteChunks(gdriver, chunks);
+			}
+		}
+	}));
 }
 
 /**

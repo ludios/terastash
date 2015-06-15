@@ -11,6 +11,7 @@ const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
 const inspect = require('util').inspect;
+const chalk = require('chalk');
 
 const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSize) {
 	T(directory, T.string, cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
@@ -95,4 +96,21 @@ function readChunks(directory, chunks) {
 	return cipherStream;
 }
 
-module.exports = {writeChunks, readChunks};
+/**
+ * Deletes chunks
+ */
+const deleteChunks = Promise.coroutine(function*(directory, chunks) {
+	T(directory, T.string, chunks, utils.ChunksType);
+	for(const chunk of chunks) {
+		try {
+			yield utils.unlinkAsync(path.join(directory, chunk.file_id));
+		} catch(err) {
+			console.error(chalk.red(
+				`Failed to delete chunk with file_id=${inspect(chunk.file_id)}` +
+				` (chunk #${chunk.idx} for file)`));
+			console.error(chalk.red(err.stack));
+		}
+	}
+});
+
+module.exports = {writeChunks, readChunks, deleteChunks};
