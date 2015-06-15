@@ -179,13 +179,35 @@ program
 	.command('drop <file...>')
 	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
 	.description(d(`
-		Removes file(s) from the database and their corresponding chunks, if any.
+		Removes files from the database and their corresponding chunks, if any.
+		Chunks in both localfs and gdrive are permanently deleted, not moved to the trash.
+		This cannot be undone!
+
 		Does not emit error or warning if specified files are not in the database.
+
 		Does not remove the corresponding file in the stash directory, if it is there.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		catchAndLog(terastash.dropFiles(name, files));
+	}));
+
+program
+	.command('mv <args...>')
+	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.description(d(`
+		mv src dest
+		mv src1 src2 dest/
+
+		Move a file from src to dest.  dest may be a new filename or a directory.
+		If more than one src is given, dest must be a directory.
+		If the corresponding file for src is in the stash directory, it will be moved as well.`))
+	.action(a(function(args, options) {
+		T(args, T.list(T.string), options, T.object);
+		const srces = args;
+		const dest = srces.pop();
+		const name = stringOrNull(options.name);
+		catchAndLog(terastash.moveFile(name, srces, dest));
 	}));
 
 program

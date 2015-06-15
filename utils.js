@@ -345,6 +345,16 @@ const ChunksType = T.list(
 	})
 );
 
+function allIdentical(arr) {
+	T(arr, Array);
+	for(let n=0; n < arr.length; n++) {
+		if(arr[n] !== arr[0]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -353,5 +363,5 @@ module.exports = {
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
 	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,
-	ChunksType
+	ChunksType, allIdentical
 };

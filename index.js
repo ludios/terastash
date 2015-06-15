@@ -70,6 +70,12 @@ const getChunkStores = utils.makeConfigFileInitializer(
 	}
 );
 
+class PathNotInStashError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 /**
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
@@ -90,7 +96,7 @@ const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 			return stash;
 		}
 	}
-	return null;
+	throw new PathNotInStashError(`File ${pathname} is not in a stash directory`);
 });
 
 /**
@@ -105,7 +111,7 @@ const getStashInfoByName = Promise.coroutine(function*(stashName) {
 
 	const stash = config.stashes[stashName];
 	if(!stash) {
-		return null;
+		throw new Error(`No stash with name ${stashName}`);
 	}
 	stash.name = stashName;
 	return stash;
@@ -181,15 +187,9 @@ const doWithPath = Promise.coroutine(function*(stashName, p, fn) {
 	let stashInfo;
 	if(stashName) { // Explicit stash name provided
 		stashInfo = yield getStashInfoByName(stashName);
-		if(!stashInfo) {
-			throw new Error(`No stash with name ${stashName}; consult terastash.json and ts help`);
-		}
 		dbPath = p;
 	} else {
 		stashInfo = yield getStashInfoByPath(resolvedPathname);
-		if(!stashInfo) {
-			throw new Error(`File ${p} is not in a stash directory; consult terastash.json and ts help`);
-		}
 		dbPath = userPathToDatabasePath(stashInfo.path, p);
 	}
 
@@ -650,6 +650,39 @@ function dropFiles(stashName, pathnames) {
 	}));
 }
 
+const moveFile = Promise.coroutine(function*(stashName, sources, dest) {
+	T(stashName, T.maybe(T.string), sources, T.list(T.string), dest, T.string);
+
+	let stashInfo;
+	let dbPathSources;
+	let dbPathDest;
+	if(stashName) { // Explicit stash name provided
+		stashInfo = yield getStashInfoByName(stashName);
+		dbPathSources = sources;
+		dbPathDest = dest;
+	} else {
+		// Make sure all paths are in the same stash
+		const stashInfos = yield Promise.all(sources.concat(dest).map(function(p) {
+			return getStashInfoByPath(path.resolve(p));
+		}));
+		const stashNames = stashInfos.map(utils.prop('name'));
+		if(!utils.allIdentical(stashNames)) {
+			throw new Error(
+				`All paths used in mv command must be in the same stash;` +
+				` stashes were ${inspect(stashNames)}`);
+		}
+		stashInfo = stashInfos[0];
+		console.log(stashInfos);
+
+		dbPathSources = sources.map(function(p) {
+			return userPathToDatabasePath(stashInfo.path, p);
+		});
+		dbPathDest = userPathToDatabasePath(stashInfo.path, dest);
+	}
+
+	console.log({dbPathSources, dbPathDest});
+});
+
 /**
  * List all terastash keyspaces in Cassandra
  */
@@ -819,7 +852,16 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 	);
 	assertName(stashName);
 
-	if(yield getStashInfoByPath(stashPath)) {
+	let caught;
+	try {
+		yield getStashInfoByPath(stashPath);
+	} catch(err) {
+		if(!(err instanceof PathNotInStashError)) {
+			throw err;
+		}
+		caught = true;
+	}
+	if(!caught) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
@@ -906,5 +948,5 @@ module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	lsPath, KEYSPACE_PREFIX, dumpDb, NoSuchPathError, NotAFileError
+	moveFile, lsPath, KEYSPACE_PREFIX, dumpDb, NoSuchPathError, NotAFileError
 };
