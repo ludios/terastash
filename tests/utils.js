@@ -88,3 +88,17 @@ describe('concealSize', function() {
 		A.eq(utils.concealSize(1024*1024*1024 + 1024*1024), 1024*1024*1024 + 1024*1024*1024/64);
 	});
 });
+
+describe('allIdentical', function() {
+	it('works', function() {
+		A.eq(utils.allIdentical([]), true);
+		A.eq(utils.allIdentical([1]), true);
+		A.eq(utils.allIdentical([1, 1]), true);
+		A.eq(utils.allIdentical([1, 1, 1]), true);
+		A.eq(utils.allIdentical([1, "1"]), false);
+		A.eq(utils.allIdentical(["1", 1]), false);
+		A.eq(utils.allIdentical([1, "1", 1]), false);
+		A.eq(utils.allIdentical([1, "1", 1, "1", 1, "1"]), false);
+		A.eq(utils.allIdentical([1, "1", 1, "1", 1, "1", 1]), false);
+	});
+});
