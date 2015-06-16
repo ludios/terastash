@@ -354,7 +354,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	const typeInDb = yield getTypeInDb(client, stashName, dbPath);
 	if(typeInDb === MISSING) {
 		const parentUuid = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
-		const uuid = crypto.randomBytes(128/8);
+		const uuid = makeUuid();
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
@@ -388,16 +388,34 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashNam
 const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
 A.eq(iv0.length, 128/8);
 
-let keyCounterForTests = 0;
 function makeKey() {
 	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+		const keyCounter = new utils.PersistentCounter(
+			path.join(process.env.TERASTASH_COUNTERS_DIR, 'key-counter'));
 		const buf = new Buffer(128/8).fill(0);
-		buf.writeIntBE(keyCounterForTests, 0, 128/8);
-		keyCounterForTests += 1;
+		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
 		return buf;
 	} else {
 		return crypto.randomBytes(128/8);
 	}
+}
+
+function makeUuid() {
+	let uuid;
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+		const uuidCounter = new utils.PersistentCounter(
+			path.join(process.env.TERASTASH_COUNTERS_DIR, 'uuid-counter'), 1);
+		const buf = new Buffer(128/8).fill(0);
+		buf.writeIntBE(uuidCounter.getNext(), 0, 128/8);
+		uuid = buf;
+	} else {
+		uuid = crypto.randomBytes(128/8);
+	}
+	A(
+		!uuid.equals(new Buffer(128/8).fill(0)),
+		"uuid must not be 0 because root directory is 0"
+	);
+	return uuid;
 }
 
 const getChunkStore = Promise.coroutine(function*(stashInfo) {
