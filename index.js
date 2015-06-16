@@ -217,9 +217,6 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 	return row.mtime;
 }, true);
 
-// p = ""
-// p = "a"
-// p = "a/b/c"
 const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
