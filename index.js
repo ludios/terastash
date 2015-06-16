@@ -202,11 +202,11 @@ const doWithPath = Promise.coroutine(function*(stashName, p, fn) {
 });
 
 const pathnameSorterAsc = utils.comparedBy(function(row) {
-	return utils.getBaseName(row.pathname);
+	return row.basename;
 });
 
 const pathnameSorterDesc = utils.comparedBy(function(row) {
-	return utils.getBaseName(row.pathname);
+	return row.basename;
 }, true);
 
 const mtimeSorterAsc = utils.comparedBy(function(row) {
@@ -217,43 +217,68 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 	return row.mtime;
 }, true);
 
+// p = ""
+// p = "a"
+// p = "a/b/c"
+const getUuidForPath = Promise.coroutine(function*(client, p) {
+	T(client, CassandraClientType, p, T.string);
+	if(p === "") {
+		return new Buffer(128/8).fill(0);
+	}
+
+	const parentPath = utils.getParentPath(p);
+	const parent = yield getUuidForPath(client, parentPath);
+	const basename = p.split("/").pop();
+
+	const result = yield runQuery(
+		client,
+		`SELECT uuid
+		from "${KEYSPACE_PREFIX + stashInfo.name}".fs
+		WHERE parent = ? AND basename = ?`,
+		[parent, basename]
+	)
+	A.lte(result.rows, 1);
+	if(!result.rows.length) {
+		throw new Error(`No entry with parent=${parent.toString('hex')} and basename=${inspect(basename)}`);
+	}
+	return result.rows[0].uuid;
+});
+
 function lsPath(stashName, options, p) {
 	return doWithClient(function(client) {
-		return doWithPath(stashName, p, function(stashInfo, dbPath, parentPath) {
-			return runQuery(
+		return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+			const result = yield runQuery(
 				client,
-				`SELECT pathname, type, size, mtime, executable
+				`SELECT basename, type, size, mtime, executable
 				from "${KEYSPACE_PREFIX + stashInfo.name}".fs
 				WHERE parent = ?`,
-				[dbPath]
-			).then(function(result) {
-				if(options.sortByMtime) {
-					result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+				[yield getUuidForPath(client, dbPath)]
+			)
+			if(options.sortByMtime) {
+				result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+			} else {
+				result.rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
+			}
+			for(const row of result.rows) {
+				if(options.justNames) {
+					console.log(baseName);
 				} else {
-					result.rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
-				}
-				for(const row of result.rows) {
-					const baseName = utils.getBaseName(row.pathname);
-					if(options.justNames) {
-						console.log(baseName);
-					} else {
-						let decoratedName = baseName;
-						if(row.type === 'd') {
-							decoratedName = chalk.bold.blue(decoratedName);
-							decoratedName += '/';
-						} else if(row.executable) {
-							decoratedName = chalk.bold.green(decoratedName);
-							decoratedName += '*';
-						}
-						console.log(
-							utils.pad(utils.numberWithCommas((row.size || 0).toString()), 18) + " " +
-							utils.shortISO(row.mtime) + " " +
-							decoratedName
-						);
+					let decoratedName = row.basename;
+					if(row.type === 'd') {
+						decoratedName = chalk.bold.blue(decoratedName);
+						decoratedName += '/';
+					} else if(row.executable) {
+						decoratedName = chalk.bold.green(decoratedName);
+						decoratedName += '*';
 					}
+					console.log(
+						utils.pad(utils.numberWithCommas((row.size || 0).toString()), 18) + " " +
+						utils.shortISO(row.mtime) + " " +
+						decoratedName
+					);
 				}
-			});
-		});
+			}
+		}));
 	});
 }
 
@@ -267,11 +292,12 @@ const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 		// pathname="" is the root directory
 		return DIRECTORY;
 	}
+	const parent = yield getUuidForPath(client, utils.getParentPath(dbPath));
 	const result = yield runQuery(
 		client,
 		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
-		WHERE pathname = ?;`,
-		[dbPath]
+		WHERE parent = ? AND basename = ?;`,
+		[parent, utils.getBaseName(dbPath)]
 	);
 	A.lte(result.rows.length, 1);
 	if(result.rows.length) {
@@ -329,11 +355,12 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	}
 	const typeInDb = yield getTypeInDb(client, stashName, dbPath);
 	if(typeInDb === MISSING) {
+		const parentUuid = yield getUuidForPath(client, utils.getParentPath(dbPath));
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
-			(pathname, parent, type, mtime) VALUES (?, ?, ?, ?);`,
-			[dbPath, parentPath, 'd', mtime]
+			(basename, parent, type, mtime) VALUES (?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, 'd', mtime]
 		);
 	} else if(typeInDb === FILE) {
 		throw new MakeDirError(
@@ -1069,25 +1096,25 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 		)`);
 
 		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
-			pathname text PRIMARY KEY,
+			basename text,
 			type ascii,
-			parent text,
+			parent blob,
+			uuid blob,
 			size bigint,
 			content blob,
 			blake2b224 blob,
 			key blob,
 			mtime timestamp,
 			crtime timestamp,
-			executable boolean
+			executable boolean,
+			PRIMARY KEY (parent, basename)
 		);`);
+		// The above PRIMARY KEY lets us select on both parent and (parent, basename)
 
 		// Note: chunks_in_* columns are added by defineChunkStore.
 		// We use column-per-chunk-store instead of having a map of
 		// <chunkStore, chunkInfo> because non-frozen, nested collections
 		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
-
-		yield runQuery(client, `CREATE INDEX IF NOT EXISTS fs_parent
-			ON "${KEYSPACE_PREFIX + stashName}".fs (parent);`);
 
 		const config = yield getStashes();
 		config.stashes[stashName] = {
