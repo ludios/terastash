@@ -698,14 +698,15 @@ function catFiles(stashName, pathnames) {
 function dropFile(client, stashName, p) {
 	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const chunkStore = yield getChunkStore(stashInfo);
+		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 		let chunks = null;
 		try {
 			const result = yield runQuery(
 				client,
 				`SELECT "chunks_in_${chunkStore.name}"
 				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				WHERE pathname = ?;`,
-				[dbPath]
+				WHERE parent = ? AND basename = ?;`,
+				[parentUuid, utils.getBaseName(dbPath)]
 			);
 			A.lte(result.rows.length, 1);
 			if(result.rows.length) {
@@ -721,8 +722,8 @@ function dropFile(client, stashName, p) {
 		yield runQuery(
 			client,
 			`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath]
+			WHERE parent = ? AND basename = ?;`,
+			[parentUuid, utils.getBaseName(dbPath)]
 		);
 		if(chunks !== null) {
 			if(chunkStore.type === "localfs") {
