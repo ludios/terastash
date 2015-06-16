@@ -220,6 +220,7 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
+		// root directory is 0
 		return new Buffer(128/8).fill(0);
 	}
 
@@ -474,17 +475,19 @@ function putFile(client, p) {
 			T(chunkInfo, Array);
 
 			const blake2b224 = hasher.hash.digest().slice(0, 224/8);
+			const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 			// TODO: make sure file does not already exist? require additional flag to update?
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(pathname, parent, type, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
+				(basename, parent, type, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-				[dbPath, parentPath, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
+				[utils.getBaseName(dbPath), parentUuid, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
 			);
 		} else {
 			const content = yield utils.readFileAsync(p);
 			const blake2b224 = blake2b224Buffer(content);
+			const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 			const size = content.length;
 			A.eq(size, stat.size,
 				`For ${dbPath}, read\n` +
@@ -495,9 +498,9 @@ function putFile(client, p) {
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(pathname, parent, type, content, size, blake2b224, mtime, executable)
+				(basename, parent, type, content, size, blake2b224, mtime, executable)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-				[dbPath, parentPath, type, content, size, blake2b224, mtime, executable]
+				[utils.getBaseName(dbPath), parentUuid, type, content, size, blake2b224, mtime, executable]
 			);
 		}
 	}));
