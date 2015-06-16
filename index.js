@@ -545,13 +545,14 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	}
 
 	let result;
+	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	try {
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, type, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
+			`SELECT size, type, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath]
+			WHERE parent = ? AND basename = ?;`,
+			[parentUuid, utils.getBaseName(dbPath)]
 		);
 	} catch(err) {
 		if(!isColumnMissingError(err)) {
@@ -560,10 +561,10 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		// chunks_in_${storeName} doesn't exist, try the query without it
 		result = yield runQuery(
 			client,
-			`SELECT pathname, size, type, key, blake2b224, content, mtime, executable
+			`SELECT size, type, key, blake2b224, content, mtime, executable
 			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE pathname = ?;`,
-			[dbPath]
+			WHERE parent = ? AND basename = ?;`,
+			[parentUuid, utils.getBaseName(dbPath)]
 		);
 	}
 	A.lte(result.rows.length, 1);
@@ -640,9 +641,10 @@ function getFile(client, stashName, p) {
 		let outputFilename;
 		// If stashName was given, write file to current directory
 		if(stashName) {
-			outputFilename = row.pathname;
+			outputFilename = utils.getBaseName(dbPath);
 		} else {
-			outputFilename = stashInfo.path + '/' + row.pathname;
+			T(stashInfo.path, T.string);
+			outputFilename = stashInfo.path + '/' + dbPath;
 		}
 
 		yield utils.mkdirpAsync(path.dirname(outputFilename));
