@@ -10,6 +10,7 @@ const path = require('path');
 const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
+const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
 let https;
 let blake2;
@@ -361,6 +362,38 @@ function filledArray(n, obj) {
 	return Array.apply(null, new Array(n)).map(function(_) { return obj; });
 }
 
+class PersistentCounter {
+	constructor(fname, start) {
+		T(fname, T.string, start, T.optional(T.number));
+		this.fname = fname;
+		this.start = start !== undefined ? start : 0;
+	}
+
+	getNext() {
+		let n;
+		try {
+			n = Number(fs.readFileSync(this.fname));
+		} catch(err) {
+			if(err.code !== 'ENOENT') {
+				throw err;
+			}
+			n = this.start;
+		}
+		this.setNumber(n + 1);
+		return n;
+	}
+
+	setNumber(num) {
+		T(num, T.number);
+		A(Number.isInteger(num), num);
+		return Number(fs.writeFileSync(this.fname, String(num)));
+	}
+
+	inspect() {
+		return `<PersistentCounter fname=${inspect(this.fname)}>`;
+	}
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -369,5 +402,5 @@ module.exports = {
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
 	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
 	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,
-	ChunksType, allIdentical, filledArray
+	ChunksType, allIdentical, filledArray, PersistentCounter
 };

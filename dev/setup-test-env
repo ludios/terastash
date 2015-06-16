@@ -1,3 +1,4 @@
 export REAL_HOME="$HOME"
 export BLUEBIRD_DEBUG=1
+export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-state.XXXXXXXXXX)"
 export TERASTASH_INSECURE_AND_DETERMINISTIC=1
