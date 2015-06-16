@@ -13,6 +13,9 @@ Can add and drop a file
   $ ts get not-here
   Path 'not-here' not in stash 'unit_tests_a'
   [1]
+  $ ts get dir/not-here
+  No entry with parent=00000000000000000000000000000000 and basename='dir'
+  [1]
   $ echo -e "hello\nworld" > sample1
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2

@@ -217,6 +217,18 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 	return row.mtime;
 }, true);
 
+class NoSuchPathError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
+class NotAFileError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
@@ -237,7 +249,9 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	);
 	A.lte(result.rows.length, 1);
 	if(!result.rows.length) {
-		throw new Error(`No entry with parent=${parent.toString('hex')} and basename=${inspect(basename)}`);
+		throw new NoSuchPathError(
+			`No entry with parent=${parent.toString('hex')}` +
+			` and basename=${inspect(basename)}`);
 	}
 	return result.rows[0].uuid;
 });
@@ -533,18 +547,6 @@ function putFiles(pathnames) {
 			yield putFile(client, p);
 		}
 	}));
-}
-
-class NoSuchPathError extends Error {
-	get name() {
-		return this.constructor.name;
-	}
-}
-
-class NotAFileError extends Error {
-	get name() {
-		return this.constructor.name;
-	}
 }
 
 function isColumnMissingError(err) {
