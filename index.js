@@ -234,7 +234,7 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 		from "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ? AND basename = ?`,
 		[parent, basename]
-	)
+	);
 	A.lte(result.rows.length, 1);
 	if(!result.rows.length) {
 		throw new Error(`No entry with parent=${parent.toString('hex')} and basename=${inspect(basename)}`);
@@ -251,7 +251,7 @@ function lsPath(stashName, options, p) {
 				from "${KEYSPACE_PREFIX + stashInfo.name}".fs
 				WHERE parent = ?`,
 				[yield getUuidForPath(client, stashInfo.name, dbPath)]
-			)
+			);
 			if(options.sortByMtime) {
 				result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
 			} else {
@@ -259,7 +259,7 @@ function lsPath(stashName, options, p) {
 			}
 			for(const row of result.rows) {
 				if(options.justNames) {
-					console.log(baseName);
+					console.log(row.basename);
 				} else {
 					let decoratedName = row.basename;
 					if(row.type === 'd') {
