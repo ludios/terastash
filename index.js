@@ -861,7 +861,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				// TODO: move file in working directory
 			}
 		} else {
-			throw new Error("Haven't implemented mv to a non-dir dest yet")
+			throw new Error("Haven't implemented mv to a non-dir dest yet");
 		}
 
 		/*else if(destTypeInDb === MISSING) {
