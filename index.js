@@ -287,7 +287,7 @@ const FILE = Symbol('FILE');
 const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
 	if(dbPath === "") {
-		// pathname="" is the root directory
+		// The root directory
 		return DIRECTORY;
 	}
 	const parent = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
