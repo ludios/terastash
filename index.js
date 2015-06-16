@@ -220,24 +220,24 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 // p = ""
 // p = "a"
 // p = "a/b/c"
-const getUuidForPath = Promise.coroutine(function*(client, p) {
-	T(client, CassandraClientType, p, T.string);
+const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
+	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		return new Buffer(128/8).fill(0);
 	}
 
 	const parentPath = utils.getParentPath(p);
-	const parent = yield getUuidForPath(client, parentPath);
+	const parent = yield getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
 
 	const result = yield runQuery(
 		client,
 		`SELECT uuid
-		from "${KEYSPACE_PREFIX + stashInfo.name}".fs
+		from "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ? AND basename = ?`,
 		[parent, basename]
 	)
-	A.lte(result.rows, 1);
+	A.lte(result.rows.length, 1);
 	if(!result.rows.length) {
 		throw new Error(`No entry with parent=${parent.toString('hex')} and basename=${inspect(basename)}`);
 	}
@@ -252,7 +252,7 @@ function lsPath(stashName, options, p) {
 				`SELECT basename, type, size, mtime, executable
 				from "${KEYSPACE_PREFIX + stashInfo.name}".fs
 				WHERE parent = ?`,
-				[yield getUuidForPath(client, dbPath)]
+				[yield getUuidForPath(client, stashInfo.name, dbPath)]
 			)
 			if(options.sortByMtime) {
 				result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
@@ -292,7 +292,7 @@ const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 		// pathname="" is the root directory
 		return DIRECTORY;
 	}
-	const parent = yield getUuidForPath(client, utils.getParentPath(dbPath));
+	const parent = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 	const result = yield runQuery(
 		client,
 		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
@@ -355,12 +355,13 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	}
 	const typeInDb = yield getTypeInDb(client, stashName, dbPath);
 	if(typeInDb === MISSING) {
-		const parentUuid = yield getUuidForPath(client, utils.getParentPath(dbPath));
+		const parentUuid = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
+		const uuid = crypto.randomBytes(128/8);
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
-			(basename, parent, type, mtime) VALUES (?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, 'd', mtime]
+			(basename, parent, uuid, type, mtime) VALUES (?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime]
 		);
 	} else if(typeInDb === FILE) {
 		throw new MakeDirError(
