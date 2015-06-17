@@ -28,6 +28,16 @@ Can add and drop a file
   b6d81b360a5672d80c27430f39153e2c
   $ touch --date=1990-01-01 adir/bigfile
   $ ts add sample1 sample2 adir/bigfile
+  $ ts add sample1 # can't add again
+  Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
+  [1]
+  $ mv adir adir.1
+  $ touch adir
+  $ ts add adir # can't add again
+  Cannot add to database: 'adir' in stash 'unit_tests_a' already exists as a directory
+  [1]
+  $ rm adir
+  $ mv adir.1 adir
   $ ts ls -n unit_tests_a
   When using -n/--name, a database path is required
   [1]
