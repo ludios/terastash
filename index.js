@@ -553,6 +553,15 @@ function isColumnMissingError(err) {
 	return /^ResponseError: Undefined name .* in selection clause/.test(String(err));
 }
 
+function validateChunks(chunks) {
+	T(chunks, utils.ChunksType);
+	let expectIdx = 0;
+	for(const chunk of chunks) {
+		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
+		expectIdx += 1;
+	}
+}
+
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -597,9 +606,10 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	}
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
-	const chunks = row['chunks_in_' + storeName];
+	const chunks = row[`chunks_in_${storeName}`];
 	let hasher;
-	if(chunks) {
+	if(chunks !== null) {
+		validateChunks(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
 		let cipherStream;
@@ -746,6 +756,7 @@ function dropFile(client, stashName, p) {
 			[parentUuid, utils.getBaseName(dbPath)]
 		);
 		if(chunks !== null) {
+			validateChunks(chunks);
 			if(chunkStore.type === "localfs") {
 				if(!localfs) {
 					localfs = require('./chunker/localfs');
