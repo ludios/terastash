@@ -456,6 +456,11 @@ function putFile(client, p) {
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 		const chunkStore = yield getChunkStore(stashInfo);
+		let blake2b224;
+		let content = null;
+		let chunkInfo;
+		let size;
+		let key = null;
 
 		if(parentPath) {
 			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
@@ -463,10 +468,7 @@ function putFile(client, p) {
 
 		if(stat.size >= stashInfo.chunkThreshold) {
 			// TODO: validate storeName
-			// TODO: do this query only if we fail to add a file
-			yield tryCreateColumnOnStashTable(
-				client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
-			const key = makeKey();
+			key = makeKey();
 
 			const inputStream = fs.createReadStream(p);
 			if(!padded_stream) {
@@ -485,17 +487,19 @@ function putFile(client, p) {
 					localfs = require('./chunker/localfs');
 				}
 				_ = yield localfs.writeChunks(chunkStore.directory, cipherStream, chunkStore.chunkSize);
-			} else {
+			} else if(chunkStore.type === "gdrive") {
 				if(!gdrive) {
 					gdrive = require('./chunker/gdrive');
 				}
 				const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 				yield gdriver.loadCredentials();
 				_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, cipherStream, chunkStore.chunkSize);
+			} else {
+				throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 			}
 
 			const totalSize = _[0];
-			const chunkInfo = _[1];
+			chunkInfo = _[1];
 			A.eq(padder.bytesRead, stat.size,
 				`For ${dbPath}, read\n` +
 				`${utils.numberWithCommas(padder.bytesRead)} bytes instead of the expected\n` +
@@ -506,49 +510,46 @@ function putFile(client, p) {
 				`${utils.numberWithCommas(concealedSize)} (concealed) bytes`);
 			T(chunkInfo, Array);
 
-			const blake2b224 = hasher.hash.digest().slice(0, 224/8);
-			const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-
-			const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
-			if(typeInDb !== MISSING) {
-				throw new PathAlreadyExistsError(
-					`Cannot add to database:` +
-					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
-					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
-			}
-
-			yield runQuery(
-				client,
-				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(basename, parent, type, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-				[utils.getBaseName(dbPath), parentUuid, type, key, chunkInfo, stat.size, blake2b224, mtime, executable]
-			);
+			blake2b224 = hasher.hash.digest().slice(0, 224/8);
+			size = stat.size;
 		} else {
-			const content = yield utils.readFileAsync(p);
-			const blake2b224 = blake2b224Buffer(content);
-			const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-			const size = content.length;
+			content = yield utils.readFileAsync(p);
+			blake2b224 = blake2b224Buffer(content);
+			size = content.length;
 			A.eq(size, stat.size,
 				`For ${dbPath}, read\n` +
 				`${utils.numberWithCommas(size)} bytes instead of the expected\n` +
 				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
+		}
 
-			const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
-			if(typeInDb !== MISSING) {
-				throw new PathAlreadyExistsError(
-					`Cannot add to database:` +
-					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
-					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
-			}
+		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
+		if(typeInDb !== MISSING) {
+			throw new PathAlreadyExistsError(
+				`Cannot add to database:` +
+				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
+				` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+		}
 
-			yield runQuery(
+		function insert() {
+			return runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(basename, parent, type, content, size, blake2b224, mtime, executable)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-				[utils.getBaseName(dbPath), parentUuid, type, content, size, blake2b224, mtime, executable]
+				(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+				[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, blake2b224, mtime, executable]
 			);
+		}
+
+		try {
+			yield insert();
+		} catch(err) {
+			if(!isColumnMissingError(err)) {
+				throw err;
+			}
+			yield tryCreateColumnOnStashTable(
+				client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
+			yield insert();
 		}
 	}));
 }
@@ -565,7 +566,7 @@ function putFiles(pathnames) {
 }
 
 function isColumnMissingError(err) {
-	return /^ResponseError: Undefined name .* in selection clause/.test(String(err));
+	return /^ResponseError: (Undefined name .* in selection clause|Unknown identifier )/.test(String(err));
 }
 
 function validateChunks(chunks) {
@@ -634,13 +635,15 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 			}
 			const chunksDir = chunkStore.directory;
 			cipherStream = localfs.readChunks(chunksDir, chunks);
-		} else {
+		} else if(chunkStore.type === "gdrive") {
 			if(!gdrive) {
 				gdrive = require('./chunker/gdrive');
 			}
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
 			cipherStream = gdrive.readChunks(gdriver, chunks);
+		} else {
+			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
 		utils.pipeWithErrors(cipherStream, clearStream);
@@ -1216,5 +1219,5 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
-	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError,
+	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError
 };
