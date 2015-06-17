@@ -345,7 +345,7 @@ const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
 	}
 });
 
-class MakeDirError extends Error {
+class PathAlreadyExistsError extends Error {
 	get name() {
 		return this.constructor.name;
 	}
@@ -376,7 +376,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime]
 		);
 	} else if(typeInDb === FILE) {
-		throw new MakeDirError(
+		throw new PathAlreadyExistsError(
 			`Cannot mkdir in database:` +
 			` ${inspect(dbPath)} in stash ${inspect(stashName)}` +
 			` already exists as a file`);
@@ -508,7 +508,15 @@ function putFile(client, p) {
 
 			const blake2b224 = hasher.hash.digest().slice(0, 224/8);
 			const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-			// TODO: make sure file does not already exist? require additional flag to update?
+
+			const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
+			if(typeInDb !== MISSING) {
+				throw new PathAlreadyExistsError(
+					`Cannot add to database:` +
+					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
+					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+			}
+
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
@@ -526,7 +534,14 @@ function putFile(client, p) {
 				`${utils.numberWithCommas(size)} bytes instead of the expected\n` +
 				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
 
-			// TODO: make sure file does not already exist? require additional flag to update?
+			const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
+			if(typeInDb !== MISSING) {
+				throw new PathAlreadyExistsError(
+					`Cannot add to database:` +
+					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
+					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+			}
+
 			yield runQuery(
 				client,
 				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
@@ -822,7 +837,7 @@ function makeDirectories(stashName, paths) {
 				if(err.code !== 'EEXIST') {
 					throw err;
 				}
-				throw new MakeDirError(
+				throw new PathAlreadyExistsError(
 					`Cannot mkdir in working directory:` +
 					` ${inspect(p)} already exists and is not a directory`
 				);
@@ -1201,5 +1216,5 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
-	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, MakeDirError
+	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError,
 };
