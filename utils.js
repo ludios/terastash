@@ -394,10 +394,19 @@ class PersistentCounter {
 	}
 }
 
+const WILDCARD = Symbol('WILDCARD');
+const ColsType = T.list(T.union([T.string, T.symbol]));
+
 function colsAsString(cols) {
-	T(cols, T.list(T.string));
-	// TODO: validate cols for lack of injection
-	return cols.map(function(k) { return JSON.stringify(k); }).join(", ");
+	T(cols, ColsType);
+	// TODO: validate cols for lack of injection?
+	return cols.map(function(k) {
+		if(k === WILDCARD) {
+			return "*";
+		} else {
+			return JSON.stringify(k);
+		}
+	}).join(", ");
 }
 
 module.exports = {
@@ -412,5 +421,5 @@ module.exports = {
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	colsAsString
+	WILDCARD, colsAsString, ColsType
 };

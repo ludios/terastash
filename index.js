@@ -255,7 +255,7 @@ class NotAFileError extends Error {
 }
 
 const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
-	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, T.list(T.string));
+	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
 		client,
 		`SELECT ${utils.colsAsString(cols)}
@@ -288,7 +288,7 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 });
 
 const getChildrenForParent = Promise.coroutine(function*(client, stashName, parent, cols, limit) {
-	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, T.list(T.string), limit, T.optional(T.number));
+	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 	const result = yield runQuery(
 		client,
 		`SELECT ${utils.colsAsString(cols)}
@@ -933,7 +933,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				const parent = yield getUuidForPath(
 					client, stashInfo.name, utils.getParentPath(dbPathSource));
 				const row = yield getRowByParentBasename(
-					client, stashInfo.name, parent, utils.getBaseName(dbPathSource), ['*']);
+					client, stashInfo.name, parent, utils.getBaseName(dbPathSource), [utils.WILDCARD]);
 				row.parent = yield getUuidForPath(client, stashInfo.name, dbPathDest);
 				// row.basename is unchanged
 				const cols = Object.keys(row);
@@ -974,8 +974,8 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 					[parent, utils.getBaseName(dbPathSource)]
 				);
 
-				// mkdirp destination directory
 				// Now move the file in the working directory
+				yield utils.mkdirpAsync(path.dirname(actualDestInWorkDir));
 				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
 				try {
 					yield utils.renameAsync(srcInWorkDir, actualDestInWorkDir);
