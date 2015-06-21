@@ -141,6 +141,14 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
+function isColumnMissingError(err) {
+	return /^ResponseError: (Undefined name .* in selection clause|Unknown identifier )/.test(String(err));
+}
+
+function isKeyspaceMissingError(err) {
+	return /^ResponseError: Keyspace .* does not exist/.test(String(err));
+}
+
 /**
  * Run a Cassandra query and return a Promise that is fulfilled
  * with the query results.
@@ -240,6 +248,25 @@ class NotAFileError extends Error {
 	}
 }
 
+const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
+	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, T.list(T.string));
+	// TODO: validate cols for lack of injection
+	const result = yield runQuery(
+		client,
+		`SELECT ${cols.join(", ")}
+		from "${KEYSPACE_PREFIX + stashName}".fs
+		WHERE parent = ? AND basename = ?`,
+		[parent, basename]
+	);
+	A.lte(result.rows.length, 1);
+	if(!result.rows.length) {
+		throw new NoSuchPathError(
+			`No entry with parent=${parent.toString('hex')}` +
+			` and basename=${inspect(basename)}`);
+	}
+	return result.rows[0];
+});
+
 const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
@@ -251,20 +278,8 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	const parent = yield getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
 
-	const result = yield runQuery(
-		client,
-		`SELECT uuid
-		from "${KEYSPACE_PREFIX + stashName}".fs
-		WHERE parent = ? AND basename = ?`,
-		[parent, basename]
-	);
-	A.lte(result.rows.length, 1);
-	if(!result.rows.length) {
-		throw new NoSuchPathError(
-			`No entry with parent=${parent.toString('hex')}` +
-			` and basename=${inspect(basename)}`);
-	}
-	return result.rows[0].uuid;
+	const row = yield getRowByParentBasename(client, stashName, parent, basename, ['uuid']);
+	return row.uuid;
 });
 
 function lsPath(stashName, options, p) {
@@ -311,26 +326,24 @@ const FILE = Symbol('FILE');
 
 const getTypeInDbByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
-	const result = yield runQuery(
-		client,
-		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
-		WHERE parent = ? AND basename = ?;`,
-		[parent, basename]
-	);
-	A.lte(result.rows.length, 1);
-	if(result.rows.length) {
-		const row = result.rows[0];
-		if(row.type === "f") {
-			return FILE;
-		} else if(row.type === "d") {
-			return DIRECTORY;
-		} else {
-			throw new Error(
-				`Unexpected type in db for ${inspect(dbPath)}:` +
-				` ${inspect(row.type)}`);
+	let row;
+	try {
+		row = yield getRowByParentBasename(client, stashName, parent, basename, ['type']);
+	} catch(err) {
+		if(!(err instanceof NoSuchPathError)) {
+			throw err;
 		}
-	} else {
 		return MISSING;
+	}
+	if(row.type === "f") {
+		return FILE;
+	} else if(row.type === "d") {
+		return DIRECTORY;
+	} else {
+		throw new Error(
+			`Unexpected type in db for parent=${parent.toString('hex')}` +
+			` basename=${inspect(basename)}: ${inspect(row.type)}`
+		);
 	}
 });
 
@@ -579,14 +592,6 @@ function putFiles(pathnames) {
 			yield putFile(client, p);
 		}
 	}));
-}
-
-function isColumnMissingError(err) {
-	return /^ResponseError: (Undefined name .* in selection clause|Unknown identifier )/.test(String(err));
-}
-
-function isKeyspaceMissingError(err) {
-	return /^ResponseError: Keyspace .* does not exist/.test(String(err));
 }
 
 function validateChunks(chunks) {
@@ -916,20 +921,8 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 			for(const dbPathSource of dbPathSources) {
 				const parent = yield getUuidForPath(
 					client, stashInfo.name, utils.getParentPath(dbPathSource));
-				const result = yield runQuery(
-					client,
-					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-					WHERE basename = ? AND parent = ?;`,
-					[utils.getBaseName(dbPathSource), parent]
-				);
-				A.lte(result.rows.length, 1);
-				if(!result.rows.length) {
-					throw new PathAlreadyExistsError(
-						`Cannot mv in database: source ${inspect(dbPathSource)} in stash ` +
-						`${inspect(stashInfo.name)} disappeared during move operation`
-					);
-				}
-				const row = result.rows[0];
+				const row = yield getRowByParentBasename(
+					client, stashInfo.name, parent, utils.getBaseName(dbPathSource), ['*']);
 				row.parent = yield getUuidForPath(client, stashInfo.name, dbPathDest);
 				// row.basename is unchanged
 				const cols = Object.keys(row);
@@ -971,6 +964,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 					[parent, utils.getBaseName(dbPathSource)]
 				);
 
+				// mkdirp destination directory
 				// Now move the file in the working directory
 				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
 				try {
