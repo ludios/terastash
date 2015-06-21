@@ -75,7 +75,7 @@ function readChunks(directory, chunks) {
 			cipherStream.append(hasher.stream);
 
 			yield new Promise(function(resolve, reject) {
-				chunkStream.once('end', function() {
+				hasher.stream.once('end', function() {
 					const readDigest = hasher.hash.digest();
 					if(readDigest.equals(digest)) {
 						resolve();
