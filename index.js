@@ -76,6 +76,12 @@ class NotInWorkingDirectoryError extends Error {
 	}
 }
 
+class KeyspaceMissingError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 /**
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
@@ -150,6 +156,11 @@ function runQuery(client, statement, args) {
 				resolve(result);
 			}
 		});
+	}).catch(function(err) {
+		if(isKeyspaceMissingError(err)) {
+			throw new KeyspaceMissingError(err.message);
+		}
+		throw err;
 	});
 }
 
@@ -567,6 +578,10 @@ function putFiles(pathnames) {
 
 function isColumnMissingError(err) {
 	return /^ResponseError: (Undefined name .* in selection clause|Unknown identifier )/.test(String(err));
+}
+
+function isKeyspaceMissingError(err) {
+	return /^ResponseError: Keyspace .* does not exist/.test(String(err));
 }
 
 function validateChunks(chunks) {
@@ -1219,5 +1234,6 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
-	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError
+	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError,
+	KeyspaceMissingError
 };
