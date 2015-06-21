@@ -22,6 +22,7 @@
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
     "googleapis": "^2.0.5",
+    "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
     "notmytype": "^1.0.0",
     "object-assign": "^3.0.0",

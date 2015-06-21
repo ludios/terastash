@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const chalk = require('chalk');
 const inspect = require('util').inspect;
 const streamifier = require('streamifier');
+const noop = require('lodash.noop');
 
 const utils = require('./utils');
 const compile_require = require('./compile_require');
@@ -491,6 +492,11 @@ const getChunkStore = Promise.coroutine(function*(stashInfo) {
 	return chunkStore;
 });
 
+const selfTests = {aes: function() {
+	require('./aes').selfTest();
+	selfTests.aes = noop;
+}};
+
 /**
  * Put a file or directory into the Cassandra database.
  */
@@ -523,6 +529,7 @@ function putFile(client, p) {
 			const concealedSize = utils.concealSize(stat.size);
 			const padder = new padded_stream.Padder(concealedSize);
 			utils.pipeWithErrors(hasher.stream, padder);
+			selfTests.aes();
 			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
 			utils.pipeWithErrors(padder, cipherStream);
 
@@ -675,6 +682,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
+		selfTests.aes();
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
 		utils.pipeWithErrors(cipherStream, clearStream);
 		if(!padded_stream) {
