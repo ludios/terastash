@@ -79,20 +79,42 @@ index 83453a3..9a255df 100644
    if (!validate.request(har)) {
      return options
    }
+diff --git a/node_modules/request/lib/tunnel.js b/node_modules/request/lib/tunnel.js
+index cf28016..cc0cd10 100644
+--- a/node_modules/request/lib/tunnel.js
++++ b/node_modules/request/lib/tunnel.js
+@@ -1,7 +1,7 @@
+ 'use strict'
+ 
+ var url = require('url')
+-  , tunnel = require('tunnel-agent')
++  , tunnel
+ 
+ var defaultProxyHeaderWhiteList = [
+   'accept',
+@@ -101,6 +101,9 @@ function getTunnelFn(request) {
+   var uri = request.uri
+   var proxy = request.proxy
+   var tunnelFnName = constructTunnelFnName(uri, proxy)
++  if(!tunnel) {
++    tunnel = require('tunnel-agent');
++  }
+   return tunnel[tunnelFnName]
+ }
+ 
 diff --git a/node_modules/request/request.js b/node_modules/request/request.js
-index 21b4f52..2da7889 100644
+index c032ea8..b55c7aa 100644
 --- a/node_modules/request/request.js
 +++ b/node_modules/request/request.js
-@@ -7,21 +7,20 @@ var http = require('http')
+@@ -6,20 +6,20 @@ var http = require('http')
+   , util = require('util')
    , stream = require('stream')
    , zlib = require('zlib')
-   , helpers = require('./lib/helpers')
 -  , bl = require('bl')
 -  , hawk = require('hawk')
 -  , aws = require('aws-sign2')
 -  , httpSignature = require('http-signature')
 -  , mime = require('mime-types')
--  , tunnel = require('tunnel-agent')
 +  , bl
 +  , hawk
 +  , aws
@@ -103,8 +125,8 @@ index 21b4f52..2da7889 100644
    , ForeverAgent = require('forever-agent')
 -  , FormData = require('form-data')
 +  , FormData
+   , helpers = require('./lib/helpers')
    , cookies = require('./lib/cookies')
-   , copy = require('./lib/copy')
    , getProxyFromURI = require('./lib/getProxyFromURI')
    , Querystring = require('./lib/querystring').Querystring
 -  , Har = require('./lib/har').Har
@@ -112,7 +134,7 @@ index 21b4f52..2da7889 100644
    , Auth = require('./lib/auth').Auth
    , OAuth = require('./lib/oauth').OAuth
    , Multipart = require('./lib/multipart').Multipart
-@@ -240,6 +239,9 @@ function Request (options) {
+@@ -113,6 +113,9 @@ function Request (options) {
  
    // start with HAR, then override with additional options
    if (options.har) {
@@ -122,7 +144,7 @@ index 21b4f52..2da7889 100644
      self._har = new Har(self)
      options = self._har.options(options)
    }
-@@ -657,6 +659,9 @@ Request.prototype.init = function (options) {
+@@ -500,6 +503,9 @@ Request.prototype.init = function (options) {
      self.src = src
      if (isReadStream(src)) {
        if (!self.hasHeader('content-type')) {
@@ -132,7 +154,7 @@ index 21b4f52..2da7889 100644
          self.setHeader('content-type', mime.lookup(src.path))
        }
      } else {
-@@ -1158,6 +1163,9 @@ Request.prototype.onRequestResponse = function (response) {
+@@ -1001,6 +1007,9 @@ Request.prototype.onRequestResponse = function (response) {
      responseContent.on('close', function () {self.emit('close')})
  
      if (self.callback) {
@@ -142,7 +164,7 @@ index 21b4f52..2da7889 100644
        var buffer = bl()
          , strings = []
  
-@@ -1309,6 +1317,9 @@ Request.prototype.form = function (form) {
+@@ -1152,6 +1161,9 @@ Request.prototype.form = function (form) {
      return self
    }
    // create form-data object
@@ -152,19 +174,17 @@ index 21b4f52..2da7889 100644
    self._form = new FormData()
    self._form.on('error', function(err) {
      err.message = 'form-data: ' + err.message
-@@ -1395,6 +1406,11 @@ Request.prototype.aws = function (opts, now) {
+@@ -1238,6 +1250,9 @@ Request.prototype.aws = function (opts, now) {
    }
    var date = new Date()
    self.setHeader('date', date.toUTCString())
-+
 +  if(!aws) {
 +    aws = require('aws-sign2');
 +  }
-+
    var auth =
      { key: opts.key
      , secret: opts.secret
-@@ -1421,6 +1437,9 @@ Request.prototype.aws = function (opts, now) {
+@@ -1264,6 +1279,9 @@ Request.prototype.aws = function (opts, now) {
  }
  Request.prototype.httpSignature = function (opts) {
    var self = this
@@ -174,7 +194,7 @@ index 21b4f52..2da7889 100644
    httpSignature.signRequest({
      getHeader: function(header) {
        return self.getHeader(header, self.headers)
-@@ -1437,6 +1456,9 @@ Request.prototype.httpSignature = function (opts) {
+@@ -1280,6 +1298,9 @@ Request.prototype.httpSignature = function (opts) {
  }
  Request.prototype.hawk = function (opts) {
    var self = this
