@@ -449,7 +449,7 @@ function readChunks(gdriver, chunks) {
 			A(googHash.startsWith("crc32c="), googHash);
 			const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 			if(!chunk.crc32c.equals(googCRC)) {
-				throw new Error(
+				throw new BadChunk(
 					`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
 					`expected Google to send crc32c\n` +
 					`${chunk.crc32c.toString('hex')} but got\n` +
