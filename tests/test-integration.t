@@ -207,3 +207,28 @@ Can create directories
   $ ts mkdir c
   Cannot mkdir in working directory: 'c' already exists and is not a directory
   [1]
+
+Can move files to directories
+
+  $ touch f
+  $ ts add f
+  $ ts mv f dir
+  $ ls -1 | grep '^f$'
+  [1]
+  $ ts ls -j | grep '^f$' # file is no longer in src
+  [1]
+  $ ts ls -j dir # file is now in dest
+  f
+  $ ls -1 dir # file is moved in working directory as well
+  f
+  $ touch f
+  $ ts add f
+  $ ts mv f dir
+  Cannot mv in database: destination parent=00000000000000000000000000000005 basename='f' already exists in stash 'unit_tests_b'
+  [1]
+  $ touch dir/b
+  $ touch b
+  $ ts add b
+  $ ts mv b dir
+  Cannot mv in working directory: refusing to overwrite .* (re)
+  [1]
