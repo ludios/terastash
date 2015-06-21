@@ -226,9 +226,28 @@ Can move files to directories
   $ ts mv f dir
   Cannot mv in database: destination parent=00000000000000000000000000000005 basename='f' already exists in stash 'unit_tests_b'
   [1]
+  $ ts drop dir/f
   $ touch dir/b
   $ touch b
   $ ts add b
   $ ts mv b dir
   Cannot mv in working directory: refusing to overwrite .* (re)
   [1]
+  $ mkdir sub1 sub2
+  $ touch sub1/x sub2/y
+  $ ts add sub1/x sub2/y
+  $ ts mv sub1 sub2 dir/ # moving a directory into a directory works
+  $ ts ls -j dir
+  sub1
+  sub2
+  $ ts ls -j dir/sub1
+  x
+  $ ts mv dir/sub1/x ./
+  $ ts ls -j dir/sub1
+  $ ts ls -j | grep '^x$'
+  x
+  $ cd dir/sub2
+  $ ts mv y ..
+  $ ts ls -j .. | grep '^y$'
+  y
+  $ cd ../../
