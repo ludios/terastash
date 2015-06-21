@@ -309,18 +309,13 @@ const MISSING = Symbol('MISSING');
 const DIRECTORY = Symbol('DIRECTORY');
 const FILE = Symbol('FILE');
 
-const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
-	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
-	if(dbPath === "") {
-		// The root directory
-		return DIRECTORY;
-	}
-	const parent = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
+const getTypeInDbByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename) {
+	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
 	const result = yield runQuery(
 		client,
 		`SELECT "type" FROM "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ? AND basename = ?;`,
-		[parent, utils.getBaseName(dbPath)]
+		[parent, basename]
 	);
 	A.lte(result.rows.length, 1);
 	if(result.rows.length) {
@@ -337,6 +332,16 @@ const getTypeInDb = Promise.coroutine(function*(client, stashName, dbPath) {
 	} else {
 		return MISSING;
 	}
+});
+
+const getTypeInDbByPath = Promise.coroutine(function*(client, stashName, dbPath) {
+	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
+	if(dbPath === "") {
+		// The root directory
+		return DIRECTORY;
+	}
+	const parent = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
+	return getTypeInDbByParentBasename(client, stashName, parent, utils.getBaseName(dbPath));
 });
 
 const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
@@ -376,7 +381,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	if(parentPath) {
 		yield makeDirsInDb(client, stashName, p, parentPath);
 	}
-	const typeInDb = yield getTypeInDb(client, stashName, dbPath);
+	const typeInDb = yield getTypeInDbByPath(client, stashName, dbPath);
 	if(typeInDb === MISSING) {
 		const parentUuid = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 		const uuid = makeUuid();
@@ -534,7 +539,7 @@ function putFile(client, p) {
 		}
 
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		const typeInDb = yield getTypeInDb(client, stashInfo.name, dbPath);
+		const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
 		if(typeInDb !== MISSING) {
 			throw new PathAlreadyExistsError(
 				`Cannot add to database:` +
@@ -885,7 +890,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 
 	return doWithClient(Promise.coroutine(function*(client) {
 		// This is inherently racy; type may be different by the time we mv
-		let destTypeInDb = yield getTypeInDb(client, stashInfo.name, dbPathDest);
+		let destTypeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPathDest);
 		const destTypeInWorkDir = yield getTypeInWorkingDirectory(dest);
 
 		if(destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
@@ -905,10 +910,13 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 		}
 		if(destTypeInDb === DIRECTORY) {
 			for(const dbPathSource of dbPathSources) {
+				const parent = yield getUuidForPath(
+					client, stashInfo.name, utils.getParentPath(dbPathSource));
 				const result = yield runQuery(
 					client,
 					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-					WHERE pathname = ?;`, [dbPathSource]
+					WHERE basename = ? AND parent = ?;`,
+					[utils.getBaseName(dbPathSource), parent]
 				);
 				A.lte(result.rows.length, 1);
 				if(!result.rows.length) {
@@ -918,22 +926,18 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 					);
 				}
 				const row = result.rows[0];
-				if(dbPathDest !== "") {
-					row.pathname = `${dbPathDest}/${dbPathSource.split('/').pop()}`;
-				} else {
-					row.pathname = `${dbPathSource.split('/').pop()}`;
-				}
-				A(!row.pathname.startsWith('/'), row.pathname);
-				row.parent = utils.getParentPath(row.pathname);
+				row.parent = yield getUuidForPath(client, stashInfo.name, dbPathDest);
+				// row.basename is unchanged
 				const cols = Object.keys(row);
 				const quotedCols = cols.map(function(k) { return JSON.stringify(k); });
 				const qMarks = utils.filledArray(cols.length, "?");
 
 				// This one checks the actual dir/basename instead of the dir/
-				let actualDestTypeInDb = yield getTypeInDb(client, stashInfo.name, row.pathname);
+				let actualDestTypeInDb = yield getTypeInDbByParentBasename(
+					client, stashInfo.name, row.parent, row.basename);
 				if(actualDestTypeInDb !== MISSING) {
-					throw new Error(`Cannot mv: destination ${inspect(row.pathname)}` +
-						` already exists in stash ${inspect(stashInfo.name)}`
+					throw new Error(`Cannot mv: destination parent=${row.parent.toString('hex')}` +
+						` basename=${inspect(row.basename)} already exists in stash ${inspect(stashInfo.name)}`
 					);
 				}
 				// Do dest-in-working directory check here?
@@ -949,8 +953,8 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				yield runQuery(
 					client,
 					`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-					WHERE pathname = ?;`,
-					[dbPathSource]
+					WHERE parent = ? AND basename = ?;`,
+					[parent, utils.getBaseName(dbPathSource)]
 				);
 
 				// TODO: move file in working directory
