@@ -397,10 +397,13 @@ class PersistentCounter {
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
-	comparator, comparedBy, hasKey, deleteKey, readFileAsync, writeFileAsync,
-	mkdirpAsync, statAsync, renameAsync, unlinkAsync, chmodAsync, utimesAsync,
-	writeObjectToConfigFile, readObjectFromConfigFile, clone, makeConfigFileInitializer,
-	getConcealmentSize, concealSize, pipeWithErrors, makeHttpsRequest,
-	streamToBuffer, streamHasher, evalMultiplications, makeChunkFilename,
-	ChunksType, allIdentical, filledArray, PersistentCounter
+	comparator, comparedBy, hasKey, deleteKey,
+
+	readFileAsync, writeFileAsync, mkdirpAsync, statAsync, renameAsync, unlinkAsync,
+	chmodAsync, utimesAsync,
+
+	writeObjectToConfigFile, readObjectFromConfigFile, clone,
+	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
+	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
+	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter
 };

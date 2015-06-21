@@ -891,7 +891,9 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 	return doWithClient(Promise.coroutine(function*(client) {
 		// This is inherently racy; type may be different by the time we mv
 		let destTypeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPathDest);
-		const destTypeInWorkDir = yield getTypeInWorkingDirectory(dest);
+		// TODO XXX: is this right? what about when -n is specified?
+		const destInWorkDir = path.join(stashInfo.path, dbPathDest);
+		const destTypeInWorkDir = yield getTypeInWorkingDirectory(destInWorkDir);
 
 		if(destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
 			yield makeDirsInDb(client, stashInfo.name, dest, dbPathDest);
@@ -899,12 +901,14 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 		}
 
 		if(destTypeInDb === FILE) {
-			throw new Error(`Cannot mv: destination ${inspect(dbPathDest)}` +
+			throw new PathAlreadyExistsError(
+				`Cannot mv in database: destination ${inspect(dbPathDest)}` +
 				` already exists in stash ${inspect(stashInfo.name)}`
 			);
 		}
 		if(destTypeInWorkDir === FILE) {
-			throw new Error(`Cannot mv: refusing to overwrite ${inspect(dest)}` +
+			throw new PathAlreadyExistsError(
+				`Cannot mv in working directory: refusing to overwrite ${inspect(dest)}` +
 				` in working directory`
 			);
 		}
@@ -920,8 +924,8 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				);
 				A.lte(result.rows.length, 1);
 				if(!result.rows.length) {
-					throw new Error(
-						`Cannot mv: source ${inspect(dbPathSource)} in stash ` +
+					throw new PathAlreadyExistsError(
+						`Cannot mv in database: source ${inspect(dbPathSource)} in stash ` +
 						`${inspect(stashInfo.name)} disappeared during move operation`
 					);
 				}
@@ -936,11 +940,21 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				let actualDestTypeInDb = yield getTypeInDbByParentBasename(
 					client, stashInfo.name, row.parent, row.basename);
 				if(actualDestTypeInDb !== MISSING) {
-					throw new Error(`Cannot mv: destination parent=${row.parent.toString('hex')}` +
+					throw new PathAlreadyExistsError(
+						`Cannot mv in database: destination parent=${row.parent.toString('hex')}` +
 						` basename=${inspect(row.basename)} already exists in stash ${inspect(stashInfo.name)}`
 					);
 				}
-				// Do dest-in-working directory check here?
+
+				const actualDestInWorkDir = path.join(
+					stashInfo.path, dbPathDest, utils.getBaseName(dbPathSource));
+				const actualDestTypeInWorkDir = yield getTypeInWorkingDirectory(actualDestInWorkDir);
+				if(actualDestTypeInWorkDir !== MISSING) {
+					throw new PathAlreadyExistsError(
+						`Cannot mv in working directory: refusing to overwrite` +
+						` ${inspect(actualDestInWorkDir)}`
+					);
+				}
 
 				yield runQuery(
 					client,
@@ -957,7 +971,16 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 					[parent, utils.getBaseName(dbPathSource)]
 				);
 
-				// TODO: move file in working directory
+				// Now move the file in the working directory
+				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
+				try {
+					yield utils.renameAsync(srcInWorkDir, actualDestInWorkDir);
+				} catch(err) {
+					if(err.code !== "ENOENT") {
+						throw err;
+					}
+					// It's okay if the file was missing in work dir
+				}
 			}
 		} else {
 			throw new Error("Haven't implemented mv to a non-dir dest yet");
