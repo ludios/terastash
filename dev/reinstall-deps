@@ -9,5 +9,5 @@ rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js.gz
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.map
 # Re-patch node_modules/
-#git diff 356ffa39c636e031976418cfa57ec4df8c390f30^\! | patch -p1
-#git diff 97dcb37f01977dbd590718f7038369d69a6ab62c^\! | patch -p1
+patch -p1 < ./dev/patches/000-cache-require-paths-env-var.patch
+patch -p1 < ./dev/patches/001-lazy-requires.patch
