@@ -343,6 +343,6 @@ program
 program.parse(process.argv);
 
 if(!ranCommand) {
-	console.log(`Unknown command: ${program.args[0]}; see ts help`);
+	console.log(chalk.bold(chalk.red(`Unknown command: ${program.args[0]}; see ts help`)));
 	process.exit(1);
 }
