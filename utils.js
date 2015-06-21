@@ -394,6 +394,12 @@ class PersistentCounter {
 	}
 }
 
+function colsAsString(cols) {
+	T(cols, T.list(T.string));
+	// TODO: validate cols for lack of injection
+	return cols.map(function(k) { return JSON.stringify(k); }).join(", ");
+}
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -405,5 +411,6 @@ module.exports = {
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
-	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter
+	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
+	colsAsString
 };

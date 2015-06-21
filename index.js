@@ -250,10 +250,9 @@ class NotAFileError extends Error {
 
 const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, T.list(T.string));
-	// TODO: validate cols for lack of injection
 	const result = yield runQuery(
 		client,
-		`SELECT ${cols.join(", ")}
+		`SELECT ${utils.colsAsString(cols)}
 		from "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ? AND basename = ?`,
 		[parent, basename]
@@ -614,34 +613,23 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		throw new Error("stash info doesn't specify chunkStore key");
 	}
 
-	let result;
+	let row;
 	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	try {
-		result = yield runQuery(
-			client,
-			`SELECT size, type, key, "chunks_in_${storeName}", blake2b224, content, mtime, executable
-			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE parent = ? AND basename = ?;`,
-			[parentUuid, utils.getBaseName(dbPath)]
+		row = yield getRowByParentBasename(
+			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+			["size", "type", "key", `chunks_in_${storeName}`, "blake2b224", "content", "mtime", "executable"]
 		);
 	} catch(err) {
 		if(!isColumnMissingError(err)) {
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
-		result = yield runQuery(
-			client,
-			`SELECT size, type, key, blake2b224, content, mtime, executable
-			FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE parent = ? AND basename = ?;`,
-			[parentUuid, utils.getBaseName(dbPath)]
+		row = yield getRowByParentBasename(
+			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+			["size", "type", "key", "blake2b224", "content", "mtime", "executable"]
 		);
 	}
-	A.lte(result.rows.length, 1);
-	if(result.rows.length === 0) {
-		throw new NoSuchPathError(`Path ${inspect(dbPath)} not in stash ${inspect(stashInfo.name)}`);
-	}
-	const row = result.rows[0];
 	if(row.type !== 'f') {
 		throw new NotAFileError(`Path ${inspect(dbPath)} in stash ${inspect(stashInfo.name)} is not a file`);
 	}
@@ -926,7 +914,6 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				row.parent = yield getUuidForPath(client, stashInfo.name, dbPathDest);
 				// row.basename is unchanged
 				const cols = Object.keys(row);
-				const quotedCols = cols.map(function(k) { return JSON.stringify(k); });
 				const qMarks = utils.filledArray(cols.length, "?");
 
 				// This one checks the actual dir/basename instead of the dir/
@@ -952,7 +939,7 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				yield runQuery(
 					client,
 					`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-					(${quotedCols.join(", ")})
+					(${utils.colsAsString(cols)})
 					VALUES (${qMarks.join(", ")});`,
 					cols.map(function(col) { return row[col]; })
 				);

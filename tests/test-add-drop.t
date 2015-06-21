@@ -11,7 +11,7 @@ Can add and drop a file
   $ ts list-chunk-stores
   mychunks
   $ ts get not-here
-  Path 'not-here' not in stash 'unit_tests_a'
+  No entry with parent=00000000000000000000000000000000 and basename='not-here'
   [1]
   $ ts get dir/not-here
   No entry with parent=00000000000000000000000000000000 and basename='dir'
