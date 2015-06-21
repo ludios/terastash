@@ -7,7 +7,7 @@ integration_ret_file="$(mktemp)"
 # Run integration tests in a subshell so that unit tests and integration tests run in parallel
 (
 	cd tests
-	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py --shell=bash
+	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py -j8 --shell=bash
 	echo -E -n "$?" >> "$integration_ret_file"
 ) > "$integration_tests_log" 2>&1 &
 integration_pid=$!

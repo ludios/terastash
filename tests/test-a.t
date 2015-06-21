@@ -1,9 +1,13 @@
-Can add and drop a file
+Setup
 
+  $ export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-a-state.XXXXXXXXXX)"
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
   $ ts destroy unit_tests_a > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
+
+Can add and drop a file
+
   $ ts ls
   File '([^\']+)' is not in a terastash working directory (re)
   [1]
@@ -161,93 +165,3 @@ Stash is not listed after being destroyed
 
   $ ts list-stashes | grep -P '^unit_tests_a$'
   [1]
-
-Can store chunks in gdrive
-
-  $ mkdir -p "$HOME/.config/terastash"
-  $ cp -a "$REAL_HOME/.config/terastash/chunk-stores.json" "$HOME/.config/terastash/"
-  $ cp -a "$REAL_HOME/.config/terastash/google-tokens.json" "$HOME/.config/terastash/"
-  $ ts destroy unit_tests_b > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
-  $ ts init unit_tests_b --chunk-store=terastash-tests-gdrive "--chunk-threshold=10*10"
-  $ ts config-chunk-store terastash-tests-gdrive --chunk-size=1024
-  $ dd bs=1025 count=2 if=/dev/urandom of=smallfile 2> /dev/null
-  $ MD5_BEFORE="$(cat smallfile | md5sum | cut -f 1 -d " ")"
-  $ ts add smallfile
-  $ rm smallfile
-  $ ts get smallfile
-  $ MD5_AFTER="$(cat smallfile | md5sum | cut -f 1 -d " ")"
-  $ [[ "$MD5_BEFORE" == "$MD5_AFTER" ]]
-  $ ts drop smallfile
-
-Can run build-natives
-
-  $ ts build-natives
-
-Can create directories
-
-  $ ts mkdir dir
-  $ ls -1d dir # 'ts mkdir' should also create dir in working dir
-  dir
-  $ mkdir dir_already_exists_in_working_dir
-  $ ts mkdir dir_already_exists_in_working_dir # 'ts mkdir' should work if dir already in working dir
-  $ ts ls -j
-  dir
-  dir_already_exists_in_working_dir
-  $ touch a
-  $ ts add a
-  $ rm a
-  $ ts mkdir a # despite failing, this leaves behind an 'a' dir in working dir
-  Cannot mkdir in database: 'a' in stash 'unit_tests_b' already exists as a file
-  [1]
-  $ touch a/b
-  $ ts add a/b
-  Cannot mkdir in database: 'a' in stash 'unit_tests_b' already exists as a file
-  [1]
-  $ touch c
-  $ ts mkdir c
-  Cannot mkdir in working directory: 'c' already exists and is not a directory
-  [1]
-
-Can move files to directories
-
-  $ touch f
-  $ ts add f
-  $ ts mv f dir
-  $ ls -1 | grep '^f$'
-  [1]
-  $ ts ls -j | grep '^f$' # file is no longer in src
-  [1]
-  $ ts ls -j dir # file is now in dest
-  f
-  $ ls -1 dir # file is moved in working directory as well
-  f
-  $ touch f
-  $ ts add f
-  $ ts mv f dir
-  Cannot mv in database: destination parent=00000000000000000000000000000005 basename='f' already exists in stash 'unit_tests_b'
-  [1]
-  $ ts drop dir/f
-  $ touch dir/b
-  $ touch b
-  $ ts add b
-  $ ts mv b dir
-  Cannot mv in working directory: refusing to overwrite .* (re)
-  [1]
-  $ mkdir sub1 sub2
-  $ touch sub1/x sub2/y
-  $ ts add sub1/x sub2/y
-  $ ts mv sub1 sub2 dir/ # moving a directory into a directory works
-  $ ts ls -j dir
-  sub1
-  sub2
-  $ ts ls -j dir/sub1
-  x
-  $ ts mv dir/sub1/x ./
-  $ ts ls -j dir/sub1
-  $ ts ls -j | grep '^x$'
-  x
-  $ cd dir/sub2
-  $ ts mv y ..
-  $ ts ls -j .. | grep '^y$'
-  y
-  $ cd ../../
