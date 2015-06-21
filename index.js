@@ -70,6 +70,12 @@ const getChunkStores = utils.makeConfigFileInitializer(
 	}
 );
 
+class DirectoryNotEmptyError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 class NotInWorkingDirectoryError extends Error {
 	get name() {
 		return this.constructor.name;
@@ -281,22 +287,33 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	return row.uuid;
 });
 
+const getChildrenForParent = Promise.coroutine(function*(client, stashName, parent, cols, limit) {
+	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, T.list(T.string), limit, T.optional(T.number));
+	const result = yield runQuery(
+		client,
+		`SELECT ${utils.colsAsString(cols)}
+		from "${KEYSPACE_PREFIX + stashName}".fs
+		WHERE parent = ?
+		${limit === undefined ? "" : "LIMIT " + limit}`,
+		[parent]
+	);
+	return result.rows;
+});
+
 function lsPath(stashName, options, p) {
 	return doWithClient(function(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
-			const result = yield runQuery(
-				client,
-				`SELECT basename, type, size, mtime, executable
-				from "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				WHERE parent = ?`,
-				[yield getUuidForPath(client, stashInfo.name, dbPath)]
+			const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
+			const rows = yield getChildrenForParent(
+				client, stashInfo.name, parent,
+				["basename", "type", "size", "mtime", "executable"]
 			);
 			if(options.sortByMtime) {
-				result.rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+				rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
 			} else {
-				result.rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
+				rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
 			}
-			for(const row of result.rows) {
+			for(const row of rows) {
 				if(options.justNames) {
 					console.log(row.basename);
 				} else {
@@ -762,20 +779,26 @@ function dropFile(client, stashName, p) {
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 		let chunks = null;
 		try {
-			const result = yield runQuery(
-				client,
-				`SELECT "chunks_in_${chunkStore.name}"
-				FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				WHERE parent = ? AND basename = ?;`,
-				[parentUuid, utils.getBaseName(dbPath)]
+			const row = yield getRowByParentBasename(
+				client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+				[`chunks_in_${chunkStore.name}`]
 			);
-			A.lte(result.rows.length, 1);
-			if(result.rows.length) {
-				chunks = result.rows[0][`chunks_in_${chunkStore.name}`];
-			}
+			chunks = row[`chunks_in_${chunkStore.name}`];
 		} catch(err) {
 			if(!isColumnMissingError(err)) {
 				throw err;
+			}
+		}
+		const row = yield getRowByParentBasename(
+			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+			["type", "uuid"]
+		);
+		if(row.type === 'd') {
+			const childRows = yield getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
+			if(childRows.length) {
+				throw new DirectoryNotEmptyError(
+					`Refusing to drop ${inspect(dbPath)} because it is a non-empty directory`
+				);
 			}
 		}
 		// TODO: Instead of DELETE, mark file with 'deleting' or something in case
@@ -1242,6 +1265,6 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
-	NotInWorkingDirectoryError, NoSuchPathError, NotAFileError, PathAlreadyExistsError,
-	KeyspaceMissingError
+	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
+	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError
 };

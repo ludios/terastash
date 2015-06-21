@@ -105,6 +105,9 @@ Can add and drop a file
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","blake2b224":null,"chunks_in_mychunks":null,"content":null,"crtime":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAAAQ=="}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","blake2b224":"~b8fTjgJNl8/J4zGdDxIzJ9raMZ/C3DCok5tCw4Q==","chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crtime":null,"executable":false,"key":null,"mtime":"~t1970-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":null}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","blake2b224":"~b91UqIiWOC4GSfm1sthj+37PkP8fFJuzmd9Ffkg==","chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crtime":null,"executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":null}}
+  $ ts drop adir # Can't drop a non-empty directory
+  Refusing to drop 'adir' because it is a non-empty directory
+  [1]
   $ ts drop sample1 adir/bigfile adir
   $ ts ls
                   14 1980-01-01 00:00 sample2*
@@ -128,16 +131,20 @@ Parent directories are automatically created as needed
   d3
   $ ts ls -j d1/d2/d3
   empty
-  $ ts drop d1
+  $ ts drop d1/d2/d3/empty d1/d2/d3 d1/d2 d1
 
-Dropping file again is a no-op
+Dropping file again throws an error
 
   $ ts drop sample1
+  No entry with parent=00000000000000000000000000000000 and basename='sample1'
+  [1]
   $ ts ls
 
-Dropping nonexistent file is a no-op
+Dropping nonexistent file throws an error
 
   $ ts drop doesntexist
+  No entry with parent=00000000000000000000000000000000 and basename='doesntexist'
+  [1]
   $ ts ls
 
 Can list stashes

@@ -54,6 +54,7 @@ function catchAndLog(p) {
 	T(p, EitherPromise);
 	return p.catch(function(err) {
 		if(
+		err instanceof terastash.DirectoryNotEmptyError ||
 		err instanceof terastash.NoSuchPathError ||
 		err instanceof terastash.NotAFileError ||
 		err instanceof terastash.PathAlreadyExistsError ||
