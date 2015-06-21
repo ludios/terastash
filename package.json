@@ -16,7 +16,7 @@
     "blake2": "^1.0.2",
     "bluebird": "^2.9.30",
     "cache-require-paths": "^0.1.2",
-    "cassandra-driver": "^2.1.0",
+    "cassandra-driver": "^2.1.1",
     "chalk": "^1.0.0",
     "chopshop": "^0.2.3",
     "combine-streams": "^1.0.0",
