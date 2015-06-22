@@ -294,6 +294,14 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	return row.uuid;
 });
 
+const getRowByPath = Promise.coroutine(function*(client, stashName, p, cols) {
+	T(client, CassandraClientType, stashName, T.string, p, T.string, cols, utils.ColsType);
+	const parentPath = utils.getParentPath(p);
+	const parent = yield getUuidForPath(client, stashName, parentPath);
+	const basename = p.split("/").pop();
+	return getRowByParentBasename(client, stashName, parent, basename, cols);
+});
+
 const getChildrenForParent = Promise.coroutine(function*(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 	const result = yield runQuery(
@@ -651,16 +659,14 @@ const StashInfoType = T.shape({path: T.string});
 const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
-	const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
-	if(typeInDb === DIRECTORY) {
-		throw new NotAFileError("Can't put away a directory");
-	} else if(typeInDb === MISSING) {
-		throw new NoSuchPathError(`File ${inspect(p)} does not have a corresponding entry ` +
-			`in the database (checked for ${inspect(dbPath)})`);
-	} else if(typeInDb === FILE) {
+	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
+	if(row.type === 'd') {
+		throw new NotAFileError(`Can't put away dbPath=${inspect(dbPath)}; it is a directory`);
+	} else if(row.type === 'f') {
+		// TODO: check that mtime and size matches
 		console.log("TODO");
 	} else {
-		throw new Error(`Unexpected type ${inspect(typeInDb)} for path ${inspect(p)}`);
+		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
 });
 
@@ -687,10 +693,8 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 	}
 
 	let row;
-	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	try {
-		row = yield getRowByParentBasename(
-			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+		row = yield getRowByPath(client, stashInfo.name, dbPath,
 			["size", "type", "key", `chunks_in_${storeName}`, "blake2b224", "content", "mtime", "executable"]
 		);
 	} catch(err) {
@@ -698,8 +702,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
-		row = yield getRowByParentBasename(
-			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+		row = yield getRowByPath(client, stashInfo.name, dbPath,
 			["size", "type", "key", "blake2b224", "content", "mtime", "executable"]
 		);
 	}
