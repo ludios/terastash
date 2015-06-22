@@ -59,7 +59,8 @@ function catchAndLog(p) {
 		err instanceof terastash.NotAFileError ||
 		err instanceof terastash.PathAlreadyExistsError ||
 		err instanceof terastash.NotInWorkingDirectoryError ||
-		err instanceof terastash.KeyspaceMissingError) {
+		err instanceof terastash.KeyspaceMissingError ||
+		err instanceof terastash.DifferentStashesError) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);

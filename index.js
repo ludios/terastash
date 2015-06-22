@@ -255,6 +255,12 @@ class NotAFileError extends Error {
 	}
 }
 
+class DifferentStashesError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
@@ -626,11 +632,54 @@ function validateChunks(chunks) {
 	}
 }
 
+const getStashInfoForPaths = Promise.coroutine(function*(paths) {
+	// Make sure all paths are in the same stash
+	const stashInfos = yield Promise.all(paths.map(function(p) {
+		return getStashInfoByPath(path.resolve(p));
+	}));
+	const stashNames = stashInfos.map(utils.prop('name'));
+	if(!utils.allIdentical(stashNames)) {
+		throw new DifferentStashesError(
+			`All paths used in command must be in the same stash;` +
+			` stashes were ${inspect(stashNames)}`);
+	}
+	return stashInfos[0];
+});
+
+const StashInfoType = T.shape({path: T.string});
+
+const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+	const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
+	if(typeInDb === DIRECTORY) {
+		throw new NotAFileError("Can't put away a directory");
+	} else if(typeInDb === MISSING) {
+		throw new NoSuchPathError(`File ${inspect(p)} does not have a corresponding entry ` +
+			`in the database (checked for ${inspect(dbPath)})`);
+	} else if(typeInDb === FILE) {
+		console.log("TODO");
+	} else {
+		throw new Error(`Unexpected type ${inspect(typeInDb)} for path ${inspect(p)}`);
+	}
+});
+
+function shooFiles(pathnames) {
+	T(pathnames, T.list(T.string));
+	return doWithClient(Promise.coroutine(function*(client) {
+		const stashInfo = yield getStashInfoForPaths(pathnames);
+		for(const p of pathnames) {
+			yield shooFile(client, stashInfo, p);
+		}
+	}));
+}
+
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
 const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
 	// TODO: instead of checking just this one stash, check all stashes
 	const storeName = stashInfo.chunkStore;
 	if(!storeName) {
@@ -846,20 +895,6 @@ function dropFiles(stashName, pathnames) {
 		}
 	}));
 }
-
-const getStashInfoForPaths = Promise.coroutine(function*(paths) {
-	// Make sure all paths are in the same stash
-	const stashInfos = yield Promise.all(paths.map(function(p) {
-		return getStashInfoByPath(path.resolve(p));
-	}));
-	const stashNames = stashInfos.map(utils.prop('name'));
-	if(!utils.allIdentical(stashNames)) {
-		throw new Error(
-			`All paths used in mv command must be in the same stash;` +
-			` stashes were ${inspect(stashNames)}`);
-	}
-	return stashInfos[0];
-});
 
 function makeDirectories(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
@@ -1272,7 +1307,8 @@ module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
+	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
-	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError
+	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
+	DifferentStashesError
 };
