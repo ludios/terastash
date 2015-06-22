@@ -141,7 +141,7 @@ program
 program
 	.command('destroy <name>')
 	.description(d(`
-		Destroys Cassandra keyspace ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
+		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
 	.action(a(function(name) {
 		T(name, T.string);
 		catchAndLog(terastash.destroyStash(name));
@@ -151,11 +151,25 @@ program
 program
 	.command('add <path...>')
 	.description(d(`
-		Put a file or directory (recursively) into the database`))
+		Add a file to the database`))
 	.action(a(function(files) {
 		T(files, T.list(T.string));
 		catchAndLog(terastash.putFiles(files));
 	}));
+
+program
+	.command('aw <path...>')
+	.description(d(`
+		'Put away' a file in the working directory that already has a corresponding
+		entry in the database.  For each path, replaces file with a zero'ed sparse
+		file of the same length.  Sets the sticky bit to make obvious which files
+		are zero'ed.  Not dangerous, assuming your chunk store is reliable and
+		the database is accurate.`))
+	.action(a(function(files) {
+		T(files, T.list(T.string));
+		catchAndLog(terastash.shooFiles(files));
+	}));
+
 
 program
 	.command('get <path...>')
