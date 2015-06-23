@@ -263,7 +263,7 @@ class DifferentStashesError extends Error {
 	}
 }
 
-class ShooError extends Error {
+class UnexpectedFileError extends Error {
 	get name() {
 		return this.constructor.name;
 	}
@@ -528,6 +528,13 @@ function putFile(client, p) {
 		const stat = yield fs.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
+		const sticky = Boolean(stat.mode & 0o1000);
+		if(sticky) {
+			throw new UnexpectedFileError(
+				`Refusing to add file ${inspect(p)} because it has sticky bit set,` +
+				` which may have been set by 'ts shoo'`
+			);
+		}
 		const chunkStore = yield getChunkStore(stashInfo);
 		let blake2b224;
 		let content = null;
@@ -684,7 +691,7 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 		const stat = yield fs.statAsync(p);
 		T(stat.mtime, Date);
 		if(stat.mtime.getTime() !== Number(row.mtime)) {
-			throw new ShooError(
+			throw new UnexpectedFileError(
 				`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
 				` but mtime for dbPath=${inspect(dbPath)} is` +
 				`\n${new Date(Number(row.mtime)).toISOString()}`
@@ -692,7 +699,7 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 		}
 		T(stat.size, T.number);
 		if(stat.size !== Number(row.size)) {
-			throw new ShooError(
+			throw new UnexpectedFileError(
 				`size for working directory file ${inspect(p)} is \n${commaify(stat.size)}` +
 				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
 			);
@@ -1348,5 +1355,5 @@ module.exports = {
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
-	DifferentStashesError, ShooError
+	DifferentStashesError, UnexpectedFileError
 };

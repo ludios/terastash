@@ -61,7 +61,7 @@ function catchAndLog(p) {
 		err instanceof terastash.NotInWorkingDirectoryError ||
 		err instanceof terastash.KeyspaceMissingError ||
 		err instanceof terastash.DifferentStashesError ||
-		err instanceof terastash.ShooError) {
+		err instanceof terastash.UnexpectedFileError) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);
