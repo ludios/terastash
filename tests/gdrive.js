@@ -6,7 +6,7 @@ require('better-buffer-inspect');
 const assert = require('assert');
 const A = require('ayy');
 const terastash = require('..');
-const fs = require('fs');
+const fs = require('../fs-promisified');
 const os = require('os');
 const crypto = require('crypto');
 const path = require('path');
@@ -31,7 +31,7 @@ describe('GDriver', function() {
 		const fileLength = utils.randInt(1*1024, 5*1024);
 		const buf = crypto.pseudoRandomBytes(fileLength);
 		A.eq(buf.length, fileLength);
-		yield utils.writeFileAsync(tempFname, buf, 0, buf.length);
+		yield fs.writeFileAsync(tempFname, buf, 0, buf.length);
 
 		let _ = yield Promise.all([
 			gdriver.createFile(

@@ -3,7 +3,7 @@
 
 const A = require('ayy');
 const T = require('notmytype');
-const fs = require('fs');
+const fs = require('../fs-promisified');
 const path = require('path');
 const crypto = require('crypto');
 const Promise = require('bluebird');
@@ -32,13 +32,13 @@ const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSi
 
 		yield new Promise(function(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
-				const size = (yield utils.statAsync(tempFname)).size;
+				const size = (yield fs.statAsync(tempFname)).size;
 				A.lte(size, chunkSize);
 				totalSize += size;
 				const crc32c = hasher.hash.digest();
 				const file_id = utils.makeChunkFilename();
 				chunkInfo.push({idx, file_id, size, crc32c});
-				yield utils.renameAsync(
+				yield fs.renameAsync(
 					tempFname,
 					path.join(directory, file_id)
 				);
@@ -103,7 +103,7 @@ const deleteChunks = Promise.coroutine(function*(directory, chunks) {
 	T(directory, T.string, chunks, utils.ChunksType);
 	for(const chunk of chunks) {
 		try {
-			yield utils.unlinkAsync(path.join(directory, chunk.file_id));
+			yield fs.unlinkAsync(path.join(directory, chunk.file_id));
 		} catch(err) {
 			console.error(chalk.red(
 				`Failed to delete chunk with file_id=${inspect(chunk.file_id)}` +

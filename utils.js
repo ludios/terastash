@@ -4,7 +4,7 @@
 const A = require('ayy');
 const T = require('notmytype');
 const Promise = require('bluebird');
-const mkdirp = require('mkdirp');
+const mkdirpAsync = Promise.promisify(require('mkdirp'));
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -141,26 +141,17 @@ function hasKey(obj, key) {
 const deleteKey = new Function("obj", "key", "delete obj[key];");
 /* eslint-enable no-new-func */
 
-const readFileAsync = Promise.promisify(fs.readFile);
-const writeFileAsync = Promise.promisify(fs.writeFile);
-const mkdirpAsync = Promise.promisify(mkdirp);
-const statAsync = Promise.promisify(fs.stat);
-const renameAsync = Promise.promisify(fs.rename);
-const unlinkAsync = Promise.promisify(fs.unlink);
-const chmodAsync = Promise.promisify(fs.chmod);
-const utimesAsync = Promise.promisify(fs.utimes);
-
 const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
 	T(fname, T.string, object, T.object);
 	const configPath = basedir.configPath(path.join("terastash", fname));
 	yield mkdirpAsync(path.dirname(configPath));
-	yield writeFileAsync(configPath, JSON.stringify(object, null, 2));
+	yield fs.writeFileAsync(configPath, JSON.stringify(object, null, 2));
 });
 
 const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
 	T(fname, T.string);
 	const configPath = basedir.configPath(path.join("terastash", fname));
-	const buf = yield readFileAsync(configPath);
+	const buf = yield fs.readFileAsync(configPath);
 	return JSON.parse(buf);
 });
 
@@ -413,9 +404,6 @@ module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey,
-
-	readFileAsync, writeFileAsync, mkdirpAsync, statAsync, renameAsync, unlinkAsync,
-	chmodAsync, utimesAsync,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,

@@ -4,7 +4,8 @@
 const A = require('ayy');
 const T = require('notmytype');
 const Promise = require('bluebird');
-const fs = require('fs');
+const fs = require('./fs-promisified');
+const mkdirpAsync = Promise.promisify(require('mkdirp'));
 const path = require('path');
 const crypto = require('crypto');
 const chalk = require('chalk');
@@ -398,7 +399,7 @@ const getTypeInDbByPath = Promise.coroutine(function*(client, stashName, dbPath)
 const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
 	T(p, T.string);
 	try {
-		const stat = yield utils.statAsync(p);
+		const stat = yield fs.statAsync(p);
 		if(stat.isDirectory()) {
 			return DIRECTORY;
 		} else {
@@ -422,7 +423,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	let mtime = new Date();
 	try {
-		mtime = (yield utils.statAsync(p)).mtime;
+		mtime = (yield fs.statAsync(p)).mtime;
 	} catch(err) {
 		if(err.code !== 'ENOENT') {
 			throw err;
@@ -524,7 +525,7 @@ const selfTests = {aes: function() {
 function putFile(client, p) {
 	return doWithPath(null, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
 		const type = 'f';
-		const stat = yield utils.statAsync(p);
+		const stat = yield fs.statAsync(p);
 		const mtime = stat.mtime;
 		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 		const chunkStore = yield getChunkStore(stashInfo);
@@ -586,7 +587,7 @@ function putFile(client, p) {
 			blake2b224 = hasher.hash.digest().slice(0, 224/8);
 			size = stat.size;
 		} else {
-			content = yield utils.readFileAsync(p);
+			content = yield fs.readFileAsync(p);
 			blake2b224 = blake2b224Buffer(content);
 			size = content.length;
 			A.eq(size, stat.size,
@@ -663,6 +664,12 @@ const getStashInfoForPaths = Promise.coroutine(function*(paths) {
 
 const StashInfoType = T.shape({path: T.string});
 
+const makeEmptySparseFile = Promise.coroutine(function*(p) {
+	T(p, T.string);
+	const handle = yield fs.openAsync(p);
+
+});
+
 const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
@@ -670,7 +677,7 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 	if(row.type === 'd') {
 		throw new NotAFileError(`Can't put away dbPath=${inspect(dbPath)}; it is a directory`);
 	} else if(row.type === 'f') {
-		const stat = yield utils.statAsync(p);
+		const stat = yield fs.statAsync(p);
 		T(stat.mtime, Date);
 		if(stat.mtime.getTime() !== Number(row.mtime)) {
 			throw new ShooError(
@@ -807,7 +814,7 @@ function getFile(client, stashName, p) {
 			outputFilename = stashInfo.path + '/' + dbPath;
 		}
 
-		yield utils.mkdirpAsync(path.dirname(outputFilename));
+		yield mkdirpAsync(path.dirname(outputFilename));
 
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
@@ -822,10 +829,10 @@ function getFile(client, stashName, p) {
 				reject(err);
 			});
 		});
-		yield utils.utimesAsync(outputFilename, row.mtime, row.mtime);
+		yield fs.utimesAsync(outputFilename, row.mtime, row.mtime);
 		if(row.executable) {
 			// TODO: setting for 0o700 instead?
-			yield utils.chmodAsync(outputFilename, 0o770);
+			yield fs.chmodAsync(outputFilename, 0o770);
 		}
 	}));
 }
@@ -939,7 +946,7 @@ function makeDirectories(stashName, paths) {
 			const p = paths[i];
 			const dbPath = dbPaths[i];
 			try {
-				yield utils.mkdirpAsync(p);
+				yield mkdirpAsync(p);
 			} catch(err) {
 				if(err.code !== 'EEXIST') {
 					throw err;
@@ -1043,10 +1050,10 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 				);
 
 				// Now move the file in the working directory
-				yield utils.mkdirpAsync(path.dirname(actualDestInWorkDir));
+				yield mkdirpAsync(path.dirname(actualDestInWorkDir));
 				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
 				try {
-					yield utils.renameAsync(srcInWorkDir, actualDestInWorkDir);
+					yield fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
 				} catch(err) {
 					if(err.code !== "ENOENT") {
 						throw err;
