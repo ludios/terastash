@@ -664,10 +664,14 @@ const getStashInfoForPaths = Promise.coroutine(function*(paths) {
 
 const StashInfoType = T.shape({path: T.string});
 
-const makeEmptySparseFile = Promise.coroutine(function*(p) {
-	T(p, T.string);
-	const handle = yield fs.openAsync(p);
-
+const makeEmptySparseFile = Promise.coroutine(function*(p, size) {
+	T(p, T.string, size, T.number);
+	const handle = yield fs.openAsync(p, "w");
+	try {
+		yield fs.truncateAsync(handle, size);
+	} finally {
+		yield fs.closeAsync(handle);
+	}
 });
 
 const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
@@ -693,7 +697,9 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
 			);
 		}
-		console.log("TODO");
+		yield makeEmptySparseFile(p, stat.size);
+		const withSticky = stat.mode ^ 0o1000;
+		yield fs.chmodAsync(p, withSticky);
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
