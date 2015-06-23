@@ -60,7 +60,8 @@ function catchAndLog(p) {
 		err instanceof terastash.PathAlreadyExistsError ||
 		err instanceof terastash.NotInWorkingDirectoryError ||
 		err instanceof terastash.KeyspaceMissingError ||
-		err instanceof terastash.DifferentStashesError) {
+		err instanceof terastash.DifferentStashesError ||
+		err instanceof terastash.ShooError) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);
@@ -159,13 +160,18 @@ program
 	}));
 
 program
-	.command('aw <path...>')
+	.command('shoo <path...>')
 	.description(d(`
-		'Put away' a file in the working directory that already has a corresponding
-		entry in the database.  For each path, replaces file with a zero'ed sparse
-		file of the same length.  Sets the sticky bit to make obvious which files
-		are zero'ed.  Not dangerous, assuming your chunk store is reliable and
-		the database is accurate.`))
+		Removes a file in the working directory and replaces it with a 'fake'
+		(a zero'ed sparse file of the same length).  File must already be in the
+		database.
+
+		If mtime and size does not match between the file in the working directory
+		and database, you will see an error and the working directory file will not
+		be deleted.
+
+		The 'fake' will have the sticky bit set to make it obvious that it does not
+		contain real content.`))
 	.action(a(function(files) {
 		T(files, T.list(T.string));
 		catchAndLog(terastash.shooFiles(files));

@@ -13,6 +13,7 @@ const streamifier = require('streamifier');
 const noop = require('lodash.noop');
 
 const utils = require('./utils');
+const commaify = utils.numberWithCommas;
 const compile_require = require('./compile_require');
 let cassandra;
 let localfs;
@@ -261,6 +262,12 @@ class DifferentStashesError extends Error {
 	}
 }
 
+class ShooError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
@@ -341,7 +348,7 @@ function lsPath(stashName, options, p) {
 						decoratedName += '*';
 					}
 					console.log(
-						utils.pad(utils.numberWithCommas((row.size || 0).toString()), 18) + " " +
+						utils.pad(commaify((row.size || 0).toString()), 18) + " " +
 						utils.shortISO(row.mtime) + " " +
 						decoratedName
 					);
@@ -568,12 +575,12 @@ function putFile(client, p) {
 			chunkInfo = _[1];
 			A.eq(padder.bytesRead, stat.size,
 				`For ${dbPath}, read\n` +
-				`${utils.numberWithCommas(padder.bytesRead)} bytes instead of the expected\n` +
-				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
+				`${commaify(padder.bytesRead)} bytes instead of the expected\n` +
+				`${commaify(stat.size)} bytes; did file change during reading?`);
 			A.eq(totalSize, concealedSize,
 				`For ${dbPath}, wrote to chunks\n` +
-				`${utils.numberWithCommas(totalSize)} bytes instead of the expected\n` +
-				`${utils.numberWithCommas(concealedSize)} (concealed) bytes`);
+				`${commaify(totalSize)} bytes instead of the expected\n` +
+				`${commaify(concealedSize)} (concealed) bytes`);
 			T(chunkInfo, Array);
 
 			blake2b224 = hasher.hash.digest().slice(0, 224/8);
@@ -584,8 +591,8 @@ function putFile(client, p) {
 			size = content.length;
 			A.eq(size, stat.size,
 				`For ${dbPath}, read\n` +
-				`${utils.numberWithCommas(size)} bytes instead of the expected\n` +
-				`${utils.numberWithCommas(stat.size)} bytes; did file change during reading?`);
+				`${commaify(size)} bytes instead of the expected\n` +
+				`${commaify(stat.size)} bytes; did file change during reading?`);
 		}
 
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
@@ -663,7 +670,22 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 	if(row.type === 'd') {
 		throw new NotAFileError(`Can't put away dbPath=${inspect(dbPath)}; it is a directory`);
 	} else if(row.type === 'f') {
-		// TODO: check that mtime and size matches
+		const stat = yield utils.statAsync(p);
+		T(stat.mtime, Date);
+		if(stat.mtime.getTime() !== Number(row.mtime)) {
+			throw new ShooError(
+				`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
+				` but mtime for dbPath=${inspect(dbPath)} is` +
+				`\n${new Date(Number(row.mtime)).toISOString()}`
+			);
+		}
+		T(stat.size, T.number);
+		if(stat.size !== Number(row.size)) {
+			throw new ShooError(
+				`size for working directory file ${inspect(p)} is \n${commaify(stat.size)}` +
+				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
+			);
+		}
 		console.log("TODO");
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
@@ -751,8 +773,8 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
 		if(hasher.length !== Number(row.size)) {
 			hasher.stream.emit('error', new Error(
 				`For dbPath=${dbPath}, expected length of content to be\n` +
-				`${utils.numberWithCommas(row.size)} but was\n` +
-				`${utils.numberWithCommas(hasher.length)}`
+				`${commaify(row.size)} but was\n` +
+				`${commaify(hasher.length)}`
 			));
 		}
 		const digest = hasher.hash.digest().slice(0, 224/8);
@@ -1313,5 +1335,5 @@ module.exports = {
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
-	DifferentStashesError
+	DifferentStashesError, ShooError
 };
