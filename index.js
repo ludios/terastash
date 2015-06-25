@@ -641,6 +641,20 @@ function putFile(client, p) {
 function putFiles(pathnames, skipExisting, progress) {
 	T(pathnames, T.list(T.string), skipExisting, T.optional(T.boolean), progress, T.optional(T.boolean));
 	return doWithClient(Promise.coroutine(function*(client) {
+		// Capture ctrl-c and don't exit until the entire upload is done because
+		// we want to avoid leaving around unreferenced chunks in our chunk stores.
+		// Not that we can always prevent that from happening, but it's nice to
+		// avoid it.
+		let stopNow = false;
+		function stopSoon() {
+			console.log('Got SIGINT.  Stopping after I add the current file.');
+			stopNow = true;
+		}
+		process.on('SIGINT', stopSoon);
+		function cleanup() {
+			process.removeListener('SIGINT', stopSoon);
+		}
+
 		let count = 1;
 		for(const p of pathnames) {
 			if(progress) {
@@ -650,15 +664,20 @@ function putFiles(pathnames, skipExisting, progress) {
 			}
 			try {
 				yield putFile(client, p);
+				if(stopNow) {
+					break;
+				}
 			} catch(err) {
 				if(skipExisting) {
 					console.error(chalk.red(err.message));
 				} else {
+					cleanup();
 					throw err;
 				}
 			}
 			count++;
 		}
+		cleanup();
 	}));
 }
 
