@@ -1,6 +1,8 @@
 Setup
 
+  $ function nanos-now() { date -u +%s%N; } # Use nanos instead of seconds.nanos because bash can't do math on decimals
   $ export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-a-state.XXXXXXXXXX)"
+  $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
@@ -165,3 +167,7 @@ Stash is not listed after being destroyed
 
   $ ts list-stashes | grep -P '^unit_tests_a$'
   [1]
+
+End
+
+  $ echo "$(($(nanos-now) - $(cat "$TERASTASH_COUNTERS_DIR/start")))" | sed -r 's/(.........)$/\.\1/g' > "$TERASTASH_COUNTERS_DIR/duration"

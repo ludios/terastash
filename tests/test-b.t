@@ -1,6 +1,8 @@
 Setup
 
+  $ function nanos-now() { date -u +%s%N; } # Use nanos instead of seconds.nanos because bash can't do math on decimals
   $ export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-b-state.XXXXXXXXXX)"
+  $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p "$HOME/.config/terastash"
   $ cp -a "$REAL_HOME/.config/terastash/chunk-stores.json" "$HOME/.config/terastash/"
   $ cp -a "$REAL_HOME/.config/terastash/google-tokens.json" "$HOME/.config/terastash/"
@@ -18,3 +20,7 @@ Can store chunks in gdrive
   $ MD5_AFTER="$(cat smallfile | md5sum | cut -f 1 -d " ")"
   $ [[ "$MD5_BEFORE" == "$MD5_AFTER" ]]
   $ ts drop smallfile
+
+End
+
+  $ echo "$(($(nanos-now) - $(cat "$TERASTASH_COUNTERS_DIR/start")))" | sed -r 's/(.........)$/\.\1/g' > "$TERASTASH_COUNTERS_DIR/duration"

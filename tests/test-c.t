@@ -1,6 +1,8 @@
 Setup
 
+  $ function nanos-now() { date -u +%s%N; } # Use nanos instead of seconds.nanos because bash can't do math on decimals
   $ export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-c-state.XXXXXXXXXX)"
+  $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p /tmp/mychunks-c
   $ ts define-chunk-store mychunks-c -t localfs -d /tmp/mychunks-c -s '100*1024'
   $ ts destroy unit_tests_c > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
@@ -78,3 +80,18 @@ Can move files to directories
   $ ts ls -j .. | grep '^y$'
   y
   $ cd ../../
+
+Can shoo files
+
+  $ echo -n hi > hello
+  $ touch --date=1980-01-01 hello
+  $ ts add hello
+  $ ts shoo hello
+  $ stat -c '%y' hello
+  1980-01-01 00:00:00.000000000 +0000
+  $ md5sum hello # md5sum is of two NULL bytes
+  c4103f122d27677c9db144cae1394a66  hello
+
+End
+
+  $ echo "$(($(nanos-now) - $(cat "$TERASTASH_COUNTERS_DIR/start")))" | sed -r 's/(.........)$/\.\1/g' > "$TERASTASH_COUNTERS_DIR/duration"
