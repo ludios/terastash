@@ -524,6 +524,24 @@ const selfTests = {aes: function() {
  */
 function putFile(client, p) {
 	return doWithPath(null, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+		if(parentPath) {
+			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
+		}
+
+		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const throwIfAlreadyInDb = Promise.coroutine(function*() {
+			const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
+			if(typeInDb !== MISSING) {
+				throw new PathAlreadyExistsError(
+					`Cannot add to database:` +
+					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
+					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+			}
+		});
+
+		// Check early to avoid uploading to chunk store and doing other work
+		yield throwIfAlreadyInDb();
+
 		const type = 'f';
 		const stat = yield fs.statAsync(p);
 		const mtime = stat.mtime;
@@ -541,10 +559,6 @@ function putFile(client, p) {
 		let chunkInfo;
 		let size;
 		let key = null;
-
-		if(parentPath) {
-			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
-		}
 
 		if(stat.size >= stashInfo.chunkThreshold) {
 			// TODO: validate storeName
@@ -603,15 +617,6 @@ function putFile(client, p) {
 				`${commaify(stat.size)} bytes; did file change during reading?`);
 		}
 
-		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
-		if(typeInDb !== MISSING) {
-			throw new PathAlreadyExistsError(
-				`Cannot add to database:` +
-				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
-				` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
-		}
-
 		function insert() {
 			return runQuery(
 				client,
@@ -622,6 +627,8 @@ function putFile(client, p) {
 			);
 		}
 
+		// Check again to narrow the race condition
+		yield throwIfAlreadyInDb();
 		try {
 			yield insert();
 		} catch(err) {
@@ -630,6 +637,7 @@ function putFile(client, p) {
 			}
 			yield tryCreateColumnOnStashTable(
 				client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
+			yield throwIfAlreadyInDb();
 			yield insert();
 		}
 	}));
