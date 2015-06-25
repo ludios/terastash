@@ -141,14 +141,14 @@ function hasKey(obj, key) {
 const deleteKey = new Function("obj", "key", "delete obj[key];");
 /* eslint-enable no-new-func */
 
-const writeObjectToConfigFile = Promise.coroutine(function*(fname, object) {
+const writeObjectToConfigFile = Promise.coroutine(function* writeObjectToConfigFile$coro(fname, object) {
 	T(fname, T.string, object, T.object);
 	const configPath = basedir.configPath(path.join("terastash", fname));
 	yield mkdirpAsync(path.dirname(configPath));
 	yield fs.writeFileAsync(configPath, JSON.stringify(object, null, 2));
 });
 
-const readObjectFromConfigFile = Promise.coroutine(function*(fname) {
+const readObjectFromConfigFile = Promise.coroutine(function* readObjectFromConfigFile$coro(fname) {
 	T(fname, T.string);
 	const configPath = basedir.configPath(path.join("terastash", fname));
 	const buf = yield fs.readFileAsync(configPath);
@@ -162,7 +162,7 @@ function clone(obj) {
 
 const makeConfigFileInitializer = function(fname, defaultConfig) {
 	T(fname, T.string, defaultConfig, T.object);
-	return Promise.coroutine(function*() {
+	return Promise.coroutine(function* makeConfigFileInitializer$coro() {
 		try {
 			return (yield readObjectFromConfigFile(fname));
 		} catch(e) {
@@ -222,7 +222,7 @@ function makeHttpsRequest(options, stream) {
 	if(!https) {
 		https = require('https');
 	}
-	return new Promise(function(resolve, reject) {
+	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
 		const req = https.request(options, resolve).once('error', function(err) {
 			reject(err);
 		});
@@ -239,7 +239,7 @@ function makeHttpsRequest(options, stream) {
 
 function streamToBuffer(stream) {
 	T(stream, T.shape({on: T.function, once: T.function, resume: T.function}));
-	return new Promise(function(resolve, reject) {
+	return new Promise(function streamToBuffer$Promise(resolve, reject) {
 		let buf = new Buffer(0);
 		stream.on('data', function(data) {
 			buf = Buffer.concat([buf, data]);
@@ -408,7 +408,7 @@ const NumberOrDateType = T.union([T.number, Date]);
  * https://github.com/joyent/libuv/issues/1371
  * https://github.com/joyent/node/issues/7000#issuecomment-33758278
  */
-const utimesMilliseconds = Promise.coroutine(function*(fname, atime, mtime) {
+const utimesMilliseconds = Promise.coroutine(function* utimesMilliseconds$coro(fname, atime, mtime) {
 	T(fname, T.string, atime, NumberOrDateType, mtime, NumberOrDateType);
 	const outputHandle = yield fs.openAsync(fname, "r");
 	try {
