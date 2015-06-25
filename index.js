@@ -700,9 +700,11 @@ function validateChunks(chunks) {
 
 const getStashInfoForPaths = Promise.coroutine(function*(paths) {
 	// Make sure all paths are in the same stash
-	const stashInfos = yield Promise.all(paths.map(function(p) {
-		return getStashInfoByPath(path.resolve(p));
-	}));
+	const stashInfos = [];
+	// Don't use Promise.all to avoid having too many file handles open
+	for(const p of paths) {
+		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
+	}
 	const stashNames = stashInfos.map(utils.prop('name'));
 	if(!utils.allIdentical(stashNames)) {
 		throw new DifferentStashesError(
