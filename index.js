@@ -707,6 +707,7 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 		yield makeEmptySparseFile(p, stat.size);
 		const withSticky = stat.mode ^ 0o1000;
 		yield fs.chmodAsync(p, withSticky);
+		yield utils.utimesMilliseconds(p, row.mtime, row.mtime);
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
@@ -842,7 +843,7 @@ function getFile(client, stashName, p) {
 				reject(err);
 			});
 		});
-		yield fs.utimesAsync(outputFilename, row.mtime, row.mtime);
+		yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
 		if(row.executable) {
 			// TODO: setting for 0o700 instead?
 			yield fs.chmodAsync(outputFilename, 0o770);

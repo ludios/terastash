@@ -5,7 +5,7 @@ const A = require('ayy');
 const T = require('notmytype');
 const Promise = require('bluebird');
 const mkdirpAsync = Promise.promisify(require('mkdirp'));
-const fs = require('fs');
+const fs = require('./fs-promisified');
 const path = require('path');
 const crypto = require('crypto');
 const PassThrough = require('stream').PassThrough;
@@ -400,6 +400,27 @@ function colsAsString(cols) {
 	}).join(", ");
 }
 
+const NumberOrDateType = T.union([T.number, Date]);
+
+/**
+ * Like fs.utimes, but preserves milliseconds by getting a file handle and
+ * using futimes
+ * https://github.com/joyent/libuv/issues/1371
+ * https://github.com/joyent/node/issues/7000#issuecomment-33758278
+ */
+const utimesMilliseconds = Promise.coroutine(function*(fname, atime, mtime) {
+	// TODO: fix notmytype's union support to handle constructor functions
+	//T(fname, T.string, atime, NumberOrDateType, mtime, NumberOrDateType);
+	const outputHandle = yield fs.openAsync(fname, "r");
+	try {
+		// Use fs.futimes instead of fs.utimes because fs.utimes has
+		// 1-second granularity, losing the milliseconds.
+		yield fs.futimesAsync(outputHandle, atime, mtime);
+	} finally {
+		yield fs.closeAsync(outputHandle);
+	}
+});
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -409,5 +430,5 @@ module.exports = {
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	WILDCARD, colsAsString, ColsType
+	WILDCARD, colsAsString, ColsType, utimesMilliseconds
 };
