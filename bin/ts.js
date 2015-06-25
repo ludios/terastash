@@ -156,7 +156,8 @@ program
 		Add a file to the database`))
 	.action(a(function(files) {
 		T(files, T.list(T.string));
-		catchAndLog(terastash.putFiles(files));
+		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
+		catchAndLog(terastash.putFiles(files, progress));
 	}));
 
 program

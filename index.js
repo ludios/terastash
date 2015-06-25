@@ -638,10 +638,18 @@ function putFile(client, p) {
 /**
  * Put files or directories into the Cassandra database.
  */
-function putFiles(pathnames) {
+function putFiles(pathnames, progress) {
+	T(pathnames, T.list(T.string), progress, T.optional(T.boolean));
 	return doWithClient(Promise.coroutine(function*(client) {
+		let count = 1;
 		for(const p of pathnames) {
+			if(progress) {
+				process.stdout.clearLine();
+				process.stdout.cursorTo(0);
+				process.stdout.write(`${count}/${pathnames.length}...`);
+			}
 			yield putFile(client, p);
+			count++;
 		}
 	}));
 }
