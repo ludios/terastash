@@ -37,6 +37,8 @@ Can add and drop a file
   $ ts add sample1 # can't add again
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   [1]
+  $ ts add -s sample1 # non-0 exit
+  Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   $ mv adir adir.1
   $ touch adir
   $ ts add adir # can't add again

@@ -152,12 +152,13 @@ program
 /* It's 'add' instead of 'put' for left-hand-only typing */
 program
 	.command('add <path...>')
+	.option('-s, --skip-existing', 'If any path already exists in the db, skip it and continue')
 	.description(d(`
 		Add a file to the database`))
-	.action(a(function(files) {
+	.action(a(function(files, options) {
 		T(files, T.list(T.string));
 		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.putFiles(files, progress));
+		catchAndLog(terastash.putFiles(files, options.skipExisting, progress));
 	}));
 
 program
