@@ -105,7 +105,7 @@ program
 program
 	.command('init <name>')
 	.option('-c, --chunk-store <store-name>', 'Store large files in this chunk store')
-	.option('-t, --chunk-threshold <chunk-threshold>', 'If file size >= this number of bytes, put it in chunk store instead of database')
+	.option('-t, --chunk-threshold <chunk-threshold>', 'If file size >= this number of bytes, put it in chunk store instead of database.  Defaults to 200*1024')
 	.description(d(`
 		Initializes a stash in this directory and creates corresponding
 		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
@@ -319,7 +319,7 @@ program
 	.description(d(`
 		Change a setting on a chunk store.`))
 	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
-	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisble by 16.  Defaults to 1024*1024*1024.')
+	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisible by 16.  Defaults to 1024*1024*1024.')
 	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
 	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
