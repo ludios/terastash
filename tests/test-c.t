@@ -91,6 +91,9 @@ Can shoo files
   1980-01-01 00:00:00.000000000 +0000
   $ md5sum hello # md5sum is of two NULL bytes
   c4103f122d27677c9db144cae1394a66  hello
+  $ ts add hello
+  Refusing to add file 'hello' because it has sticky bit set, which may have been set by 'ts shoo'
+  [1]
 
 End
 
