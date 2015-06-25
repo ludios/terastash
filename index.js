@@ -95,7 +95,7 @@ class KeyspaceMissingError extends Error {
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
  */
-const getStashInfoByPath = Promise.coroutine(function*(pathname) {
+const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(pathname) {
 	T(pathname, T.string);
 	const config = yield getStashes();
 	if(!config.stashes || typeof config.stashes !== "object") {
@@ -118,7 +118,7 @@ const getStashInfoByPath = Promise.coroutine(function*(pathname) {
 /**
  * Return a stash for a given stash name
  */
-const getStashInfoByName = Promise.coroutine(function*(stashName) {
+const getStashInfoByName = Promise.coroutine(function* getStashInfoByName$coro(stashName) {
 	T(stashName, T.string);
 	const config = yield getStashes();
 	if(!config.stashes || typeof config.stashes !== "object") {
@@ -165,7 +165,7 @@ function isKeyspaceMissingError(err) {
 function runQuery(client, statement, args) {
 	T(client, CassandraClientType, statement, T.string, args, T.optional(Array));
 	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(args)})`);
-	return new Promise(function(resolve, reject) {
+	return new Promise(function runQuery$Promise(resolve, reject) {
 		client.execute(statement, args, {prepare: true}, function(err, result) {
 			if(err) {
 				reject(err);
@@ -173,7 +173,7 @@ function runQuery(client, statement, args) {
 				resolve(result);
 			}
 		});
-	}).catch(function(err) {
+	}).catch(function runQuery$catch(err) {
 		if(isKeyspaceMissingError(err)) {
 			throw new KeyspaceMissingError(err.message);
 		}
@@ -209,7 +209,7 @@ function doWithClient(f) {
 	);
 }
 
-const doWithPath = Promise.coroutine(function*(stashName, p, fn) {
+const doWithPath = Promise.coroutine(function* doWithPath$coro(stashName, p, fn) {
 	T(stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
@@ -269,7 +269,7 @@ class UnexpectedFileError extends Error {
 	}
 }
 
-const getRowByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename, cols) {
+const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasename$coro(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
 		client,
@@ -287,7 +287,7 @@ const getRowByParentBasename = Promise.coroutine(function*(client, stashName, pa
 	return result.rows[0];
 });
 
-const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
+const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
@@ -302,7 +302,7 @@ const getUuidForPath = Promise.coroutine(function*(client, stashName, p) {
 	return row.uuid;
 });
 
-const getRowByPath = Promise.coroutine(function*(client, stashName, p, cols) {
+const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stashName, p, cols) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, cols, utils.ColsType);
 	const parentPath = utils.getParentPath(p);
 	const parent = yield getUuidForPath(client, stashName, parentPath);
@@ -310,7 +310,7 @@ const getRowByPath = Promise.coroutine(function*(client, stashName, p, cols) {
 	return getRowByParentBasename(client, stashName, parent, basename, cols);
 });
 
-const getChildrenForParent = Promise.coroutine(function*(client, stashName, parent, cols, limit) {
+const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 	const result = yield runQuery(
 		client,
@@ -324,8 +324,8 @@ const getChildrenForParent = Promise.coroutine(function*(client, stashName, pare
 });
 
 function lsPath(stashName, options, p) {
-	return doWithClient(function(client) {
-		return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithClient(function lsPath$doWithClient(client) {
+		return doWithPath(stashName, p, Promise.coroutine(function* lsPath$coro(stashInfo, dbPath, parentPath) {
 			const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 			const rows = yield getChildrenForParent(
 				client, stashInfo.name, parent,
@@ -363,7 +363,7 @@ const MISSING = Symbol('MISSING');
 const DIRECTORY = Symbol('DIRECTORY');
 const FILE = Symbol('FILE');
 
-const getTypeInDbByParentBasename = Promise.coroutine(function*(client, stashName, parent, basename) {
+const getTypeInDbByParentBasename = Promise.coroutine(function* getTypeInDbByParentBasename$coro(client, stashName, parent, basename) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
 	let row;
 	try {
@@ -386,7 +386,7 @@ const getTypeInDbByParentBasename = Promise.coroutine(function*(client, stashNam
 	}
 });
 
-const getTypeInDbByPath = Promise.coroutine(function*(client, stashName, dbPath) {
+const getTypeInDbByPath = Promise.coroutine(function* getTypeInDbByPath$coro(client, stashName, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
 	if(dbPath === "") {
 		// The root directory
@@ -396,7 +396,7 @@ const getTypeInDbByPath = Promise.coroutine(function*(client, stashName, dbPath)
 	return getTypeInDbByParentBasename(client, stashName, parent, utils.getBaseName(dbPath));
 });
 
-const getTypeInWorkingDirectory = Promise.coroutine(function*(p) {
+const getTypeInWorkingDirectory = Promise.coroutine(function* getTypeInWorkingDirectory$coro(p) {
 	T(p, T.string);
 	try {
 		const stat = yield fs.statAsync(p);
@@ -419,7 +419,7 @@ class PathAlreadyExistsError extends Error {
 	}
 }
 
-const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
+const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	let mtime = new Date();
 	try {
@@ -453,7 +453,7 @@ const makeDirsInDb = Promise.coroutine(function*(client, stashName, p, dbPath) {
 	}
 });
 
-const tryCreateColumnOnStashTable = Promise.coroutine(function*(client, stashName, columnName, type) {
+const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnOnStashTable$coro(client, stashName, columnName, type) {
 	T(client, CassandraClientType, stashName, T.string, columnName, T.string, type, T.string);
 	try {
 		yield runQuery(client,
@@ -500,7 +500,7 @@ function makeUuid() {
 	return uuid;
 }
 
-const getChunkStore = Promise.coroutine(function*(stashInfo) {
+const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) {
 	const storeName = stashInfo.chunkStore;
 	if(!storeName) {
 		throw new Error("stash info doesn't specify chunkStore key");
@@ -523,7 +523,7 @@ const selfTests = {aes: function() {
  * Put a file or directory into the Cassandra database.
  */
 function putFile(client, p) {
-	return doWithPath(null, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithPath(null, p, Promise.coroutine(function* putFile$coro(stashInfo, dbPath, parentPath) {
 		if(parentPath) {
 			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
@@ -648,7 +648,7 @@ function putFile(client, p) {
  */
 function putFiles(pathnames, skipExisting, progress) {
 	T(pathnames, T.list(T.string), skipExisting, T.optional(T.boolean), progress, T.optional(T.boolean));
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* putFiles$coro(client) {
 		// Capture ctrl-c and don't exit until the entire upload is done because
 		// we want to avoid leaving around unreferenced chunks in our chunk stores.
 		// Not that we can always prevent that from happening, but it's nice to
@@ -698,7 +698,7 @@ function validateChunks(chunks) {
 	}
 }
 
-const getStashInfoForPaths = Promise.coroutine(function*(paths) {
+const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
 	// Make sure all paths are in the same stash
 	const stashInfos = [];
 	// Don't use Promise.all to avoid having too many file handles open
@@ -716,7 +716,7 @@ const getStashInfoForPaths = Promise.coroutine(function*(paths) {
 
 const StashInfoType = T.shape({path: T.string});
 
-const makeEmptySparseFile = Promise.coroutine(function*(p, size) {
+const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
 	T(p, T.string, size, T.number);
 	const handle = yield fs.openAsync(p, "w");
 	try {
@@ -726,7 +726,7 @@ const makeEmptySparseFile = Promise.coroutine(function*(p, size) {
 	}
 });
 
-const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
+const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
@@ -761,7 +761,7 @@ const shooFile = Promise.coroutine(function*(client, stashInfo, p) {
 
 function shooFiles(pathnames) {
 	T(pathnames, T.list(T.string));
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(pathnames);
 		for(const p of pathnames) {
 			yield shooFile(client, stashInfo, p);
@@ -773,7 +773,7 @@ function shooFiles(pathnames) {
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
-const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
+const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
 	// TODO: instead of checking just this one stash, check all stashes
 	const storeName = stashInfo.chunkStore;
@@ -860,7 +860,7 @@ const streamFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
  * Get a file or directory from the Cassandra database.
  */
 function getFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, Promise.coroutine(function* getFile$coro(stashInfo, dbPath, parentPath) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
 		const row = _[0];
 		const readStream = _[1];
@@ -878,7 +878,7 @@ function getFile(client, stashName, p) {
 
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
-		yield new Promise(function(resolve, reject) {
+		yield new Promise(function getFiles$Promise(resolve, reject) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				resolve();
 			}));
@@ -898,7 +898,7 @@ function getFile(client, stashName, p) {
 }
 
 function getFiles(stashName, pathnames) {
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* getFiles$coro(client) {
 		for(const p of pathnames) {
 			yield getFile(client, stashName, p);
 		}
@@ -906,7 +906,7 @@ function getFiles(stashName, pathnames) {
 }
 
 function catFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, Promise.coroutine(function* catFile$coro(stashInfo, dbPath, parentPath) {
 		const _ = yield streamFile(client, stashInfo, dbPath);
 		//const row = _[0];
 		const readStream = _[1];
@@ -915,7 +915,7 @@ function catFile(client, stashName, p) {
 }
 
 function catFiles(stashName, pathnames) {
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
 		for(const p of pathnames) {
 			yield catFile(client, stashName, p);
 		}
@@ -923,7 +923,7 @@ function catFiles(stashName, pathnames) {
 }
 
 function dropFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithPath(stashName, p, Promise.coroutine(function* doWithPath$coro(stashInfo, dbPath, parentPath) {
 		const chunkStore = yield getChunkStore(stashInfo);
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 		let chunks = null;
@@ -981,7 +981,7 @@ function dropFile(client, stashName, p) {
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, pathnames) {
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
 		for(const p of pathnames) {
 			yield dropFile(client, stashName, p);
 		}
@@ -990,7 +990,7 @@ function dropFiles(stashName, pathnames) {
 
 function makeDirectories(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* makeDirectories$coro(client) {
 		let dbPaths;
 		let stashInfo;
 		if(stashName) { // Explicit stash name provided
@@ -1021,25 +1021,24 @@ function makeDirectories(stashName, paths) {
 	}));
 }
 
-const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
+function moveFiles(stashName, sources, dest) {
 	T(stashName, T.maybe(T.string), sources, T.list(T.string), dest, T.string);
+	return doWithClient(Promise.coroutine(function* moveFiles$coro(client) {
+		let stashInfo;
+		let dbPathSources;
+		let dbPathDest;
+		if(stashName) { // Explicit stash name provided
+			stashInfo = yield getStashInfoByName(stashName);
+			dbPathSources = sources;
+			dbPathDest = dest;
+		} else {
+			stashInfo = yield getStashInfoForPaths(sources.concat(dest));
+			dbPathSources = sources.map(function(p) {
+				return userPathToDatabasePath(stashInfo.path, p);
+			});
+			dbPathDest = userPathToDatabasePath(stashInfo.path, dest);
+		}
 
-	let stashInfo;
-	let dbPathSources;
-	let dbPathDest;
-	if(stashName) { // Explicit stash name provided
-		stashInfo = yield getStashInfoByName(stashName);
-		dbPathSources = sources;
-		dbPathDest = dest;
-	} else {
-		stashInfo = yield getStashInfoForPaths(sources.concat(dest));
-		dbPathSources = sources.map(function(p) {
-			return userPathToDatabasePath(stashInfo.path, p);
-		});
-		dbPathDest = userPathToDatabasePath(stashInfo.path, dest);
-	}
-
-	return doWithClient(Promise.coroutine(function*(client) {
 		// This is inherently racy; type may be different by the time we mv
 		let destTypeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPathDest);
 		// TODO XXX: is this right? what about when -n is specified?
@@ -1132,18 +1131,18 @@ const moveFiles = Promise.coroutine(function*(stashName, sources, dest) {
 		}*/
 		//console.log({dbPathSources, dbPathDest, destTypeInDb});
 	}));
-});
+}
 
 /**
  * List all terastash keyspaces in Cassandra
  */
 function listTerastashKeyspaces() {
-	return doWithClient(function(client) {
+	return doWithClient(function listTerastashKeyspaces$doWithClient(client) {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 		return runQuery(
 			client,
 			`SELECT keyspace_name FROM System.schema_keyspaces;`
-		).then(function(result) {
+		).then(function listTerastashKeyspaces$then(result) {
 			for(const row of result.rows) {
 				const name = row.keyspace_name;
 				if(name.startsWith(KEYSPACE_PREFIX)) {
@@ -1154,14 +1153,14 @@ function listTerastashKeyspaces() {
 	});
 }
 
-const listChunkStores = Promise.coroutine(function*() {
+const listChunkStores = Promise.coroutine(function* listChunkStores$coro() {
 	const config = yield getChunkStores();
 	for(const storeName of Object.keys(config.stores)) {
 		console.log(storeName);
 	}
 });
 
-const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
+const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
 	if(utils.hasKey(config.stores, storeName)) {
@@ -1198,7 +1197,7 @@ const defineChunkStore = Promise.coroutine(function*(storeName, opts) {
 	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
 });
 
-const configChunkStore = Promise.coroutine(function*(storeName, opts) {
+const configChunkStore = Promise.coroutine(function* configChunkStore$coro(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
 	if(!utils.hasKey(config.stores, storeName)) {
@@ -1230,7 +1229,7 @@ const configChunkStore = Promise.coroutine(function*(storeName, opts) {
 const questionAsync = function(question) {
 	T(question, T.string);
 	if(!readline) { readline = require('readline'); }
-	return new Promise(function(resolve) {
+	return new Promise(function questionAsync$Promise(resolve) {
 		const rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout
@@ -1242,7 +1241,7 @@ const questionAsync = function(question) {
 	});
 };
 
-const authorizeGDrive = Promise.coroutine(function*(name) {
+const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	T(name, T.string);
 	if(!gdrive) { gdrive = require('./chunker/gdrive'); }
 	const config = yield getChunkStores();
@@ -1275,9 +1274,9 @@ function assertName(name) {
 	A(name, "Name must not be empty");
 }
 
-const destroyStash = Promise.coroutine(function*(stashName) {
+const destroyStash = Promise.coroutine(function* destroyStash$coro(stashName) {
 	assertName(stashName);
-	yield doWithClient(function(client) {
+	yield doWithClient(function destroyStash$doWithClient(client) {
 		return runQuery(
 			client,
 			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
@@ -1292,7 +1291,7 @@ const destroyStash = Promise.coroutine(function*(stashName) {
 /**
  * Initialize a new stash
  */
-const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
+const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashName, options) {
 	T(
 		stashPath, T.string,
 		stashName, T.string,
@@ -1316,7 +1315,7 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	return doWithClient(Promise.coroutine(function*(client) {
+	return doWithClient(Promise.coroutine(function* initStash$coro$coro(client) {
 		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`);
 
@@ -1362,8 +1361,8 @@ const initStash = Promise.coroutine(function*(stashPath, stashName, options) {
 
 function dumpDb(stashName) {
 	T(stashName, T.maybe(T.string));
-	return doWithClient(function(client) {
-		return doWithPath(stashName, ".", Promise.coroutine(function*(stashInfo, dbPath, parentPath) {
+	return doWithClient(function dumpDb$doWithClient(client) {
+		return doWithPath(stashName, ".", Promise.coroutine(function* dumpDb$coro(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
 			if(!transit) {
 				transit = require('transit-js');
