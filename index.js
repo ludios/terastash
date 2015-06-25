@@ -664,9 +664,6 @@ function putFiles(pathnames, skipExisting, progress) {
 			}
 			try {
 				yield putFile(client, p);
-				if(stopNow) {
-					break;
-				}
 			} catch(err) {
 				if(skipExisting) {
 					console.error(chalk.red(err.message));
@@ -674,6 +671,9 @@ function putFiles(pathnames, skipExisting, progress) {
 					cleanup();
 					throw err;
 				}
+			}
+			if(stopNow) {
+				break;
 			}
 			count++;
 		}
