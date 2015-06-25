@@ -752,7 +752,7 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 		yield makeEmptySparseFile(p, stat.size);
 		// Set the mtime because the truncate() in makeEmptySparseFile reset it
 		yield utils.utimesMilliseconds(p, row.mtime, row.mtime);
-		const withSticky = stat.mode ^ 0o1000;
+		const withSticky = stat.mode | 0o1000;
 		yield fs.chmodAsync(p, withSticky);
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
