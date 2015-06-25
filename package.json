@@ -24,7 +24,7 @@
     "googleapis": "^2.0.5",
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
-    "notmytype": "^1.0.0",
+    "notmytype": "^1.1.0",
     "object-assign": "^3.0.0",
     "request": "^2.58.0",
     "sse4_crc32": "^3.2.0",

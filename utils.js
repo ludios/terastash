@@ -409,8 +409,7 @@ const NumberOrDateType = T.union([T.number, Date]);
  * https://github.com/joyent/node/issues/7000#issuecomment-33758278
  */
 const utimesMilliseconds = Promise.coroutine(function*(fname, atime, mtime) {
-	// TODO: fix notmytype's union support to handle constructor functions
-	//T(fname, T.string, atime, NumberOrDateType, mtime, NumberOrDateType);
+	T(fname, T.string, atime, NumberOrDateType, mtime, NumberOrDateType);
 	const outputHandle = yield fs.openAsync(fname, "r");
 	try {
 		// Use fs.futimes instead of fs.utimes because fs.utimes has
