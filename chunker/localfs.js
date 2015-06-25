@@ -13,7 +13,7 @@ const utils = require('../utils');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
 
-const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSize) {
+const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, cipherStream, chunkSize) {
 	T(directory, T.string, cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
 
 	// Chunk size must be a multiple of an AES block, for implementation convenience.
@@ -30,7 +30,7 @@ const writeChunks = Promise.coroutine(function*(directory, cipherStream, chunkSi
 		const hasher = utils.streamHasher(chunkStream, 'crc32c');
 		utils.pipeWithErrors(hasher.stream, writeStream);
 
-		yield new Promise(function(resolve) {
+		yield new Promise(function writeChunks$Promise(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				const size = (yield fs.statAsync(tempFname)).size;
 				A.lte(size, chunkSize);
@@ -65,7 +65,7 @@ function readChunks(directory, chunks) {
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
-	Promise.coroutine(function*() {
+	Promise.coroutine(function* readChunks$coro() {
 		for(const chunk of chunks) {
 			const digest = chunk.crc32c;
 			A.eq(digest.length, 32/8);
@@ -74,7 +74,7 @@ function readChunks(directory, chunks) {
 			const hasher = utils.streamHasher(chunkStream, 'crc32c');
 			cipherStream.append(hasher.stream);
 
-			yield new Promise(function(resolve, reject) {
+			yield new Promise(function readChunks$Promise(resolve, reject) {
 				hasher.stream.once('end', function() {
 					const readDigest = hasher.hash.digest();
 					if(readDigest.equals(digest)) {
@@ -99,7 +99,7 @@ function readChunks(directory, chunks) {
 /**
  * Deletes chunks
  */
-const deleteChunks = Promise.coroutine(function*(directory, chunks) {
+const deleteChunks = Promise.coroutine(function* deleteChunks$coro(directory, chunks) {
 	T(directory, T.string, chunks, utils.ChunksType);
 	for(const chunk of chunks) {
 		try {

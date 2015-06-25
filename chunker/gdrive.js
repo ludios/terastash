@@ -394,7 +394,7 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-const writeChunks = Promise.coroutine(function*(gdriver, parents, cipherStream, chunkSize) {
+const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, cipherStream, chunkSize) {
 	T(gdriver, GDriver, parents, T.list(T.string), cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
 
 	// Chunk size must be a multiple of an AES block, for implementation convenience.
@@ -438,7 +438,7 @@ function readChunks(gdriver, chunks) {
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
-	Promise.coroutine(function*() {
+	Promise.coroutine(function* readChunks$coro() {
 		for(const chunk of chunks) {
 			const _ = yield gdriver.getData(chunk.file_id);
 			const chunkStream = _[0];
@@ -471,7 +471,7 @@ function readChunks(gdriver, chunks) {
 /**
  * Deletes chunks
  */
-const deleteChunks = Promise.coroutine(function*(gdriver, chunks) {
+const deleteChunks = Promise.coroutine(function* deleteChunks$coro(gdriver, chunks) {
 	T(gdriver, GDriver, chunks, utils.ChunksType);
 	for(const chunk of chunks) {
 		try {
