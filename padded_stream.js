@@ -37,9 +37,10 @@ class Unpadder extends Transform {
 	}
 
 	_transform(data, encoding, callback) {
-		// If we already read past  the length we want, drop the rest of the data.
+		// If we already read past the length we want, drop the rest of the data.
 		if(this.bytesRead >= this._unpadToLength) {
 			callback();
+			return;
 		}
 		this.bytesRead += data.length;
 		if(this.bytesRead <= this._unpadToLength) {
