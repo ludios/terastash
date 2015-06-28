@@ -1386,10 +1386,17 @@ function dumpDb(stashName) {
 				})
 			])});
 			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
-			for(const row of result.rows) {
-				//console.log(row);
-				console.log(writer.write(row));
-			}
+
+			yield new Promise(function(resolve, reject) {
+				client.eachRow(`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true}, function dumpDb$eachRow(n, row) {
+					console.log(writer.write(row));
+				}, function dumpDb$eachRow$end(err) {
+					if(err) { // Does this fn actually get err?
+						reject(err);
+					}
+					resolve();
+				});
+			});
 		}));
 	});
 }
