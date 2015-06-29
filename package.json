@@ -18,7 +18,7 @@
     "cache-require-paths": "^0.1.2",
     "cassandra-driver": "^2.1.1",
     "chalk": "^1.0.0",
-    "chopshop": "^0.2.3",
+    "chopshop": "^0.2.4",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
     "googleapis": "^2.0.5",
