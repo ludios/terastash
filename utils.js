@@ -420,6 +420,17 @@ const utimesMilliseconds = Promise.coroutine(function* utimesMilliseconds$coro(f
 	}
 });
 
+const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
+	try {
+		yield fs.unlinkAsync(fname);
+	} catch(err) {
+		if(err.code !== "ENOENT") {
+			throw err;
+		}
+		// else, ignore error
+	}
+});
+
 module.exports = {
 	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
 	numberWithCommas, getParentPath, getBaseName, ol,
@@ -429,5 +440,5 @@ module.exports = {
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	WILDCARD, colsAsString, ColsType, utimesMilliseconds
+	WILDCARD, colsAsString, ColsType, utimesMilliseconds, tryUnlink
 };

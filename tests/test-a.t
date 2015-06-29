@@ -93,7 +93,10 @@ Can add and drop a file
   $ ls -1 sample1
   ls: cannot access sample1: No such file or directory
   [2]
+  $ touch sample1 && chmod +x sample1 # Create an executable sample1 so that we can ensure permissions are reset
   $ ts get sample1
+  $ ls -f sample1 # in output, no trailing '*', so it's not executable
+  sample1
   $ stat -c %y sample1
   1970-01-01 00:00:00.000000000 +0000
   $ cat sample1

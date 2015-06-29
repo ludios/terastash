@@ -876,6 +876,10 @@ function getFile(client, stashName, p) {
 
 		yield mkdirpAsync(path.dirname(outputFilename));
 
+		// Delete the existing file because it may have the sticky bit set
+		// or other unwanted permissions.
+		yield utils.tryUnlink(outputFilename);
+
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
 		yield new Promise(function getFiles$Promise(resolve, reject) {
