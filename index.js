@@ -1388,7 +1388,7 @@ function dumpDb(stashName) {
 			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
 
 			yield new Promise(function(resolve, reject) {
-				client.eachRow(`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true}, function dumpDb$eachRow(n, row) {
+				client.eachRow(`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true}, function dumpDb$eachRow(n, row) {
 					console.log(writer.write(row));
 				}, function dumpDb$eachRow$end(err) {
 					if(err) { // Does this fn actually get err?
