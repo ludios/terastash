@@ -1391,14 +1391,24 @@ function dumpDb(stashName) {
 			])});
 			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
 
+			function dumpDb$writeMore() {
+				let row;
+				let drained = true;
+				while(drained && (row = this.read())) {
+					drained = process.stdout.write(writer.write(row) + "\n");
+				}
+			}
+
 			yield new Promise(function(resolve, reject) {
-				client.eachRow(`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true}, function dumpDb$eachRow(n, row) {
-					console.log(writer.write(row));
-				}, function dumpDb$eachRow$end(err) {
-					if(err) { // Does this fn actually get err?
-						reject(err);
-					}
+				const s = client.stream(
+					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true});
+				s.on('readable', dumpDb$writeMore.bind(s));
+				process.stdout.on('drained', dumpDb$writeMore.bind(s));
+				s.once('end', function dumpDb$end() {
 					resolve();
+				});
+				s.once('error', function dumpDb$error(err) {
+					reject(err);
 				});
 			});
 		}));
