@@ -684,7 +684,7 @@ function putFiles(pathnames, skipExisting, progress) {
 			try {
 				yield putFile(client, p);
 			} catch(err) {
-				if(skipExisting) {
+				if(skipExisting && err instanceof PathAlreadyExistsError) {
 					console.error(chalk.red(err.message));
 				} else {
 					cleanup();
