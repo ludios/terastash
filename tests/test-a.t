@@ -142,6 +142,9 @@ Parent directories are automatically created as needed
   d3
   $ ts ls -j d1/d2/d3
   empty
+  $ ts mkdir d1/d2/d3 # make sure this doesn't overwrite existing dir
+  $ ts ls -j d1/d2/d3
+  empty
   $ ts drop d1/d2/d3/empty d1/d2/d3 d1/d2 d1
 
 Dropping file again throws an error
