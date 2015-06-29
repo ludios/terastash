@@ -313,15 +313,25 @@ const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stash
 
 const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
-	const result = yield runQuery(
-		client,
+
+	const rows = [];
+	const rowStream = client.stream(
 		`SELECT ${utils.colsAsString(cols)}
 		from "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ?
 		${limit === undefined ? "" : "LIMIT " + limit}`,
-		[parent]
+		[parent], {autoPage: true, prepare: true}
 	);
-	return result.rows;
+	rowStream.on('readable', function() {
+		let row;
+		while(row = this.read()) {
+			rows.push(row);
+		}
+	});
+	return new Promise(function(resolve, reject) {
+		rowStream.on('end', function() { resolve(rows); });
+		rowStream.once('error', reject);
+	});
 });
 
 function lsPath(stashName, options, p) {
