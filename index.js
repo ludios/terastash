@@ -12,6 +12,7 @@ const chalk = require('chalk');
 const inspect = require('util').inspect;
 const streamifier = require('streamifier');
 const noop = require('lodash.noop');
+const Transform = require('stream').Transform;
 
 const utils = require('./utils');
 const commaify = utils.numberWithCommas;
@@ -1363,53 +1364,65 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 	}));
 });
 
+let transitWriter;
+function getTransitWriter() {
+	if(!cassandra) {
+		loadCassandra();
+	}
+	if(!transit) {
+		transit = require('transit-js');
+	}
+	if(!objectAssign) {
+		objectAssign = require('object-assign');
+	}
+	if(!transitWriter) {
+		transitWriter = transit.writer("json-verbose", {handlers: transit.map([
+			cassandra.types.Row,
+			transit.makeWriteHandler({
+				tag: function(v, h) { return "Row"; },
+				rep: function(v, h) { return objectAssign({}, v); }
+			}),
+			cassandra.types.Long,
+			transit.makeWriteHandler({
+				tag: function(v, h) { return "Long"; },
+				rep: function(v, h) { return String(v); }
+			})
+		])});
+	}
+	return transitWriter;
+}
+
+class RowToTransit extends Transform {
+	constructor(options) {
+		super(options);
+		this.transitWriter = getTransitWriter();
+	}
+
+	_transform(row, encoding, callback) {
+		let s;
+		try {
+			s = this.transitWriter.write(row) + "\n";
+		} catch(err) {
+			callback(err);
+			return;
+		}
+		callback(null, s);
+	}
+}
+
 function dumpDb(stashName) {
 	T(stashName, T.maybe(T.string));
 	return doWithClient(function dumpDb$doWithClient(client) {
 		return doWithPath(stashName, ".", Promise.coroutine(function* dumpDb$coro(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
-			if(!transit) {
-				transit = require('transit-js');
-			}
-			if(!cassandra) {
-				loadCassandra();
-			}
-			if(!objectAssign) {
-				objectAssign = require('object-assign');
-			}
-			const writer = transit.writer("json-verbose", {handlers: transit.map([
-				cassandra.types.Row,
-				transit.makeWriteHandler({
-					tag: function(v, h) { return "Row"; },
-					rep: function(v, h) { return objectAssign({}, v); }
-				}),
-				cassandra.types.Long,
-				transit.makeWriteHandler({
-					tag: function(v, h) { return "Long"; },
-					rep: function(v, h) { return String(v); }
-				})
-			])});
-			const result = yield runQuery(client, `SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`);
-
-			function dumpDb$writeMore() {
-				let row;
-				let drained = true;
-				while(drained && (row = this.read())) {
-					drained = process.stdout.write(writer.write(row) + "\n");
-				}
-			}
-
 			yield new Promise(function(resolve, reject) {
-				const s = client.stream(
+				const rowStream = client.stream(
 					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true});
-				s.on('readable', dumpDb$writeMore.bind(s));
-				process.stdout.on('drained', dumpDb$writeMore.bind(s));
-				s.once('end', function dumpDb$end() {
-					resolve();
-				});
-				s.once('error', function dumpDb$error(err) {
-					reject(err);
-				});
+				const transitStream = new RowToTransit({objectMode: true});
+				utils.pipeWithErrors(rowStream, transitStream);
+				utils.pipeWithErrors(transitStream, process.stdout);
+				transitStream.on('end', resolve);
+				transitStream.once('error', reject);
 			});
 		}));
 	});
