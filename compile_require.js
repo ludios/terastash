@@ -19,10 +19,35 @@ function maybeCompileAndRequire(name, verbose) {
 		if(verbose) {
 			console.error(`${name} doesn't appear to be built; building it...\n`);
 		}
-		const nodeGyp = path.join(
-			path.dirname(path.dirname(process.execPath)),
-			'lib', 'node_modules', 'npm', 'bin', 'node-gyp-bin', 'node-gyp'
-		);
+		let candidates;
+		if(process.platform === "win32") {
+			candidates = [
+				// Official io.js release
+				path.join(
+					path.dirname(process.execPath),
+					'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'
+				),
+				// From-source compile
+				path.join(
+					path.dirname(path.dirname(process.execPath)),
+					'deps', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'
+				)
+			]
+		} else {
+			candidates = [
+				path.join(
+					path.dirname(path.dirname(process.execPath)),
+					'lib', 'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'
+				)
+			]
+		}
+		let nodeGyp;
+		for(const candidate of candidates) {
+			if(fs.existsSync(candidate)) {
+				nodeGyp = candidate;
+				break;
+			}
+		}
 		if(!fs.existsSync(nodeGyp)) {
 			throw new Error("Could not find node-gyp");
 		}
@@ -33,8 +58,8 @@ function maybeCompileAndRequire(name, verbose) {
 		let child;
 
 		child = child_process.spawnSync(
-			nodeGyp,
-			['clean', 'configure', 'build'],
+			process.execPath,
+			[nodeGyp, 'clean', 'configure', 'build'],
 			{
 				stdio: verbose ?
 					[0, 1, 2] :
