@@ -107,7 +107,7 @@ const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(p
 	for(const stashName of Object.keys(config.stashes)) {
 		const stash = config.stashes[stashName];
 		//console.log(resolvedPathname, stash.path);
-		if(resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + '/')) {
+		if(resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + path.sep)) {
 			stash.name = stashName;
 			return stash;
 		}
