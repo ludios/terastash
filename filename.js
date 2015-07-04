@@ -1,6 +1,7 @@
 "use strong";
 "use strict";
 
+const T = require('notmytype');
 const inspect = require('util').inspect;
 
 class BadFilename extends Error {
@@ -21,6 +22,7 @@ for(const dev of
  * If it isn't, throws `BadFilename`
  */
 function check(s) {
+	T(s, T.string);
 	if(/\.$/.test(s)) {
 		throw new BadFilename(`Windows shell does not support filenames that end with '.'; got ${inspect(s)}`);
 	}
