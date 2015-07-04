@@ -32,14 +32,14 @@ function maybeCompileAndRequire(name, verbose) {
 					path.dirname(path.dirname(process.execPath)),
 					'deps', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'
 				)
-			]
+			];
 		} else {
 			candidates = [
 				path.join(
 					path.dirname(path.dirname(process.execPath)),
 					'lib', 'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'
 				)
-			]
+			];
 		}
 		let nodeGyp;
 		for(const candidate of candidates) {
