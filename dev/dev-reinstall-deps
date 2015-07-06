@@ -1,0 +1,9 @@
+set -e
+
+cd dev
+rm -rf node_modules
+mkdir node_modules
+npm install npm-hax
+rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.min.js
+rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.min.js.gz
+rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.browser.js.gz

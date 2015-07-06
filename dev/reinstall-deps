@@ -8,9 +8,6 @@ rm -f node_modules/bluebird/js/browser/bluebird.min.js
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js.gz
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.map
-rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.min.js
-rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.min.js.gz
-rm -f node_modules/npm-hax/node_modules/read-package-json/node_modules/normalize-package-data/node_modules/semver/semver.browser.js.gz
 # Re-patch node_modules/
 patch -p1 < ./dev/patches/000-cache-require-paths-env-var.patch
 patch -p1 < ./dev/patches/001-lazy-requires.patch

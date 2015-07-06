@@ -6,4 +6,4 @@ gapitoken/request \
 tap/mkdirp \
 mocha/mkdirp \
 jade/mkdirp"
-./node_modules/.bin/npm-hax "$@"
+./dev/node_modules/.bin/npm-hax "$@"
