@@ -9,5 +9,7 @@ rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js.gz
 rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.map
 # Re-patch node_modules/
-patch -p1 < ./dev/patches/000-cache-require-paths-env-var.patch
-patch -p1 < ./dev/patches/001-lazy-requires.patch
+for patchfile in ./dev/patches/???-*.patch; do
+	echo -E "Applying $patchfile"
+	patch -p1 < "$patchfile"
+done
