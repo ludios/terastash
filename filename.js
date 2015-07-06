@@ -38,6 +38,9 @@ function check(s) {
 		throw new BadFilename(`Windows does not support filenames that contain ` +
 			`\\x00-\\x1F or any of: | < > : " / \\ ? *; got ${inspect(s)}`);
 	}
+	if(s.length > 255) {
+		throw new BadFilename(`Windows does not support filenames with > 255 characters`);
+	}
 }
 
 module.exports = {check};
