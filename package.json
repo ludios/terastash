@@ -14,14 +14,14 @@
     "ayy": "^0.2.0",
     "better-buffer-inspect": "^0.1.3",
     "blake2": "^1.0.2",
-    "bluebird": "^2.9.30",
+    "bluebird": "^2.9.32",
     "cache-require-paths": "^0.1.2",
     "cassandra-driver": "^2.1.1",
-    "chalk": "^1.0.0",
+    "chalk": "^1.1.0",
     "chopshop": "^0.2.4",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
-    "googleapis": "^2.0.5",
+    "googleapis": "^2.0.6",
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
     "notmytype": "^1.1.0",
@@ -33,9 +33,8 @@
     "xdg": "^0.1.1"
   },
   "devDependencies": {
-    "eslint": "^0.23.0",
+    "eslint": "^0.24.0",
     "mocha": "^2.2.5",
-    "npm-hax": "^0.1.1",
     "require-times-tree": "^2.0.0"
   },
   "engines": {
