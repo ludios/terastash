@@ -96,6 +96,19 @@ Can shoo files
   Refusing to add file 'hello2' because it has sticky bit set, which may have been set by 'ts shoo'
   [1]
 
+Cannot create files with illegal filenames
+
+  $ touch 'con.c'
+  $ ts add con.c
+  Some Windows APIs do not support filenames whose non-extension component is 'CON'; got 'con.c'
+  [1]
+  $ ts mkdir aux.c
+  Some Windows APIs do not support filenames whose non-extension component is 'AUX'; got 'aux.c'
+  [1]
+  $ ts mv hello aux.c
+  Some Windows APIs do not support filenames whose non-extension component is 'AUX'; got 'aux.c'
+  [1]
+
 End
 
   $ echo "$(($(nanos-now) - $(cat "$TERASTASH_COUNTERS_DIR/start")))" | sed -r 's/(.........)$/\.\1/g' > "$TERASTASH_COUNTERS_DIR/duration"
