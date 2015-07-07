@@ -4,7 +4,7 @@
 const filename = require('../filename');
 const assert = require('assert');
 
-describe('.check()', function() {
+describe('filename.check', function() {
 	it("throws Error for illegal filenames", function() {
 		assert.throws(() => filename.check("x/y"), /^BadFilename:.*cannot contain '\/'/);
 		assert.throws(() => filename.check("x\x00y"), /^BadFilename:.*cannot contain NULL/);
@@ -44,9 +44,9 @@ describe('.check()', function() {
 	});
 
 	it("doesn't throw Error for legal filenames", function() {
-		assert.doesNotThrow(() => filename.check("hello"));
-		assert.doesNotThrow(() => filename.check("hello world"));
-		assert.doesNotThrow(() => filename.check("hello\uccccworld"));
-		assert.doesNotThrow(() => filename.check("h".repeat(255)));
+		assert.strictEqual(filename.check("hello"), "hello");
+		assert.strictEqual(filename.check("hello world"), "hello world");
+		assert.strictEqual(filename.check("hello\uccccworld"), "hello\uccccworld");
+		assert.strictEqual(filename.check("h".repeat(255)), "h".repeat(255));
 	});
 });

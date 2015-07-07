@@ -15,6 +15,7 @@ const noop = require('lodash.noop');
 const Transform = require('stream').Transform;
 
 const utils = require('./utils');
+const filename = require('./filename');
 const commaify = utils.numberWithCommas;
 const compile_require = require('./compile_require');
 let cassandra;

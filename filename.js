@@ -59,6 +59,7 @@ function check(s) {
 	if(osxIgnorable.test(s)) {
 		throw new BadFilename(`Filename contains one or more codepoints that are ignorable on HFS+; ${osxIgnorable}.test(${inspect(s)})`);
 	}
+	return s;
 }
 
 module.exports = {check};
