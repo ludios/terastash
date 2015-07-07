@@ -12,17 +12,27 @@ class BadFilename extends Error {
 
 const deviceNames = Object.create(null);
 for(const dev of
-	`CON PRN AUX NUL COM1 COM2 COM3 COM4 COM5 COM6 COM7 ` +
-	`COM8 COM9 LPT1 LPT2 LPT3 LPT4 LPT5 LPT6 LPT7 LPT8 LPT9`.split(" ")) {
+	(`CON PRN AUX NUL COM1 COM2 COM3 COM4 COM5 COM6 COM7 ` +
+	`COM8 COM9 LPT1 LPT2 LPT3 LPT4 LPT5 LPT6 LPT7 LPT8 LPT9`).split(" ")) {
 	deviceNames[dev] = true;
 }
 
 /**
- * Checks that a basename is legal on both Windows and Linux.
- * If it isn't, throws `BadFilename`
+ * Checks that a unicode basename is legal on Windows, Linux, and OS X.
+ * If it isn't, throws `BadFilename`.
  */
 function check(s) {
 	T(s, T.string);
+	if(/\x00/.test(s)) {
+		throw new BadFilename(`Filename cannot contain NULL; got ${inspect(s)}`);
+	}
+	if(/\//.test(s)) {
+		throw new BadFilename(`Filename cannot contain '/'; got ${inspect(s)}`);
+	}
+	const trimmed = s.trim();
+	if(trimmed === "" || trimmed === "." || trimmed === "..") {
+		throw new BadFilename(`Trimmed filename cannot be '', '.', or '..'; got ${inspect(trimmed)} from ${inspect(s)}`);
+	}
 	if(/\.$/.test(s)) {
 		throw new BadFilename(`Windows shell does not support filenames that end with '.'; got ${inspect(s)}`);
 	}
@@ -39,7 +49,15 @@ function check(s) {
 			`\\x00-\\x1F or any of: | < > : " / \\ ? *; got ${inspect(s)}`);
 	}
 	if(s.length > 255) {
-		throw new BadFilename(`Windows does not support filenames with > 255 characters`);
+		throw new BadFilename(`Windows does not support filenames with > 255 characters; ${inspect(s)} has ${s.length}`);
+	}
+	const buf = new Buffer(s, "utf-8");
+	if(buf.length > 255) {
+		throw new BadFilename(`Linux does not support filenames with > 255 bytes; ${inspect(s)} has ${buf.length}`);
+	}
+	const osxIgnorable = /[\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u206a\u206b\u206c\u206d\u206e\u206f\ufeff]/;
+	if(osxIgnorable.test(s)) {
+		throw new BadFilename(`Filename contains one or more codepoints that are ignorable on HFS+; ${osxIgnorable}.test(${inspect(s)})`);
 	}
 }
 
