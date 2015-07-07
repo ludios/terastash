@@ -62,4 +62,4 @@ function check(s) {
 	return s;
 }
 
-module.exports = {check};
+module.exports = {BadFilename, check};

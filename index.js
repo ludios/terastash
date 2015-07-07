@@ -431,8 +431,18 @@ class PathAlreadyExistsError extends Error {
 	}
 }
 
+function checkDbPath(dbPath) {
+	T(dbPath, T.string);
+	if(!dbPath) {
+		// Empty dbPath is OK; it means root directory
+		return;
+	}
+	dbPath.split('/').map(filename.check);
+}
+
 const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
+	checkDbPath(dbPath);
 	let mtime = new Date();
 	try {
 		mtime = (yield fs.statAsync(p)).mtime;
@@ -536,6 +546,8 @@ const selfTests = {aes: function() {
  */
 function putFile(client, p) {
 	return doWithPath(null, p, Promise.coroutine(function* putFile$coro(stashInfo, dbPath, parentPath) {
+		checkDbPath(dbPath);
+
 		if(parentPath) {
 			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
@@ -1021,6 +1033,7 @@ function makeDirectories(stashName, paths) {
 		for(let i=0; i < dbPaths.length; i++) {
 			const p = paths[i];
 			const dbPath = dbPaths[i];
+			checkDbPath(dbPath);
 			try {
 				yield mkdirpAsync(p);
 			} catch(err) {
@@ -1054,6 +1067,7 @@ function moveFiles(stashName, sources, dest) {
 			});
 			dbPathDest = userPathToDatabasePath(stashInfo.path, dest);
 		}
+		checkDbPath(dbPathDest);
 
 		// This is inherently racy; type may be different by the time we mv
 		let destTypeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPathDest);

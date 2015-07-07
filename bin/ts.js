@@ -37,6 +37,7 @@ require('better-buffer-inspect');
 
 const terastash = require('..');
 const utils = require('../utils');
+const filename = require('../filename');
 const T = require('notmytype');
 const program = require('commander');
 const chalk = require('chalk');
@@ -61,7 +62,8 @@ function catchAndLog(p) {
 		err instanceof terastash.NotInWorkingDirectoryError ||
 		err instanceof terastash.KeyspaceMissingError ||
 		err instanceof terastash.DifferentStashesError ||
-		err instanceof terastash.UnexpectedFileError) {
+		err instanceof terastash.UnexpectedFileError ||
+		err instanceof filename.BadFilename) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);
