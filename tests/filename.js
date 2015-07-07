@@ -25,11 +25,28 @@ describe('.check()', function() {
 		assert.throws(() => filename.check("lpt9"), /^BadFilename: .*not support filenames whose non-extension component is /);
 		assert.throws(() => filename.check("lpt9.c"), /^BadFilename: .*not support filenames whose non-extension component is /);
 		assert.throws(() => filename.check("lpt9.c.last"), /^BadFilename: .*not support filenames whose non-extension component is /);
+		assert.throws(() => filename.check("hello\\world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello:world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello?world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello>world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello<world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello|world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello\"world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello\*world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello\x01world"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello\nworld"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("hello\x1Fworld"), /^BadFilename: .*not support filenames that contain /);
+		assert.throws(() => filename.check("\ucccc".repeat(256)), /^BadFilename: .*not support filenames with > 255 characters/);
+		assert.throws(() => filename.check("\ucccc".repeat(128)), /^BadFilename: .*not support filenames with > 255 bytes/);
+		assert.throws(() => filename.check("hello\u200cworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
+		assert.throws(() => filename.check("hello\u206fworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
+		assert.throws(() => filename.check("hello\ufeffworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
 	});
 
 	it("doesn't throw Error for legal filenames", function() {
 		assert.doesNotThrow(() => filename.check("hello"));
 		assert.doesNotThrow(() => filename.check("hello world"));
 		assert.doesNotThrow(() => filename.check("hello\uccccworld"));
+		assert.doesNotThrow(() => filename.check("h".repeat(255)));
 	});
 });
