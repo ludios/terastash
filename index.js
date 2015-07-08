@@ -18,6 +18,7 @@ const utils = require('./utils');
 const filename = require('./filename');
 const commaify = utils.numberWithCommas;
 const compile_require = require('./compile_require');
+const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 let cassandra;
 let localfs;
 let blake2;
@@ -45,11 +46,37 @@ function loadCassandra() {
 	CassandraClientType = cassandra.Client;
 }
 
+class CustomRetryPolicy extends RetryPolicy {
+	onReadTimeout(requestInfo, consistency, received, blockFor, isDataPresent) {
+		if(requestInfo.nbRetry > 10) {
+			return this.rethrowResult();
+		}
+		if(received >= blockFor && !this.isDataPresent) {
+			return this.retryResult();
+		} else {
+			return this.rethrowResult();
+		}
+	}
+
+	onWriteTimeout(requestInfo, consistency, received, blockFor, writeType) {
+		if(requestInfo.nbRetry > 10) {
+			return this.rethrowResult();
+		}
+		// We assume it's safe to retry our writes
+		return this.retryResult();
+	}
+}
+
 function getNewClient() {
 	if(!cassandra) {
 		loadCassandra();
 	}
-	return new cassandra.Client({contactPoints: ['localhost']});
+	return new cassandra.Client({
+		contactPoints: ['localhost'],
+		policies: {
+			retry: new CustomRetryPolicy()
+		}
+	});
 }
 
 const getStashes = utils.makeConfigFileInitializer(
