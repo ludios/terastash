@@ -51,11 +51,7 @@ class CustomRetryPolicy extends RetryPolicy {
 		if(requestInfo.nbRetry > 10) {
 			return this.rethrowResult();
 		}
-		if(received >= blockFor && !this.isDataPresent) {
-			return this.retryResult();
-		} else {
-			return this.rethrowResult();
-		}
+		return this.retryResult();
 	}
 
 	onWriteTimeout(requestInfo, consistency, received, blockFor, writeType) {
