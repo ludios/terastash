@@ -38,9 +38,6 @@ describe('filename.check', function() {
 		assert.throws(() => filename.check("hello\x1Fworld"), /^BadFilename: .*not support filenames that contain /);
 		assert.throws(() => filename.check("\ucccc".repeat(256)), /^BadFilename: .*not support filenames with > 255 characters/);
 		assert.throws(() => filename.check("\ucccc".repeat(128)), /^BadFilename: .*not support filenames with > 255 bytes/);
-		assert.throws(() => filename.check("hello\u200cworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
-		assert.throws(() => filename.check("hello\u206fworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
-		assert.throws(() => filename.check("hello\ufeffworld"), /^BadFilename: .*one or more codepoints that are ignorable on HFS/);
 	});
 
 	it("doesn't throw Error for legal filenames", function() {

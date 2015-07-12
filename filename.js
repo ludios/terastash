@@ -55,10 +55,6 @@ function check(s) {
 	if(buf.length > 255) {
 		throw new BadFilename(`Linux does not support filenames with > 255 bytes; ${inspect(s)} has ${buf.length}`);
 	}
-	const osxIgnorable = /[\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u206a\u206b\u206c\u206d\u206e\u206f\ufeff]/;
-	if(osxIgnorable.test(s)) {
-		throw new BadFilename(`Filename contains one or more codepoints that are ignorable on HFS+; ${osxIgnorable}.test(${inspect(s)})`);
-	}
 	return s;
 }
 
