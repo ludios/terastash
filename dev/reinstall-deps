@@ -4,10 +4,11 @@ rm -rf node_modules || true
 ./dev/npm install
 ./dev/npm dedupe
 # Unneeded files
-rm -f node_modules/bluebird/js/browser/bluebird.min.js
-rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js
-rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.js.gz
-rm -f node_modules/cassandra-driver/node_modules/long/dist/Long.min.map
+rm -f  node_modules/bluebird/js/browser/bluebird.min.js
+rm -f  node_modules/cassandra-driver/node_modules/long/dist/Long.min.js
+rm -f  node_modules/cassandra-driver/node_modules/long/dist/Long.min.js.gz
+rm -f  node_modules/cassandra-driver/node_modules/long/dist/Long.min.map
+rm -rf node_modules/eslint/node_modules/js-yaml/node_modules/argparse/node_modules/sprintf-js/dist
 # Re-patch node_modules/
 for patchfile in ./dev/patches/???-*.patch; do
 	echo -E "Applying $patchfile"
