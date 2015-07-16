@@ -312,7 +312,8 @@ const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasenam
 	return result.rows[0];
 });
 
-const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
+let getUuidForPath;
+getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
@@ -463,7 +464,8 @@ function checkDbPath(dbPath) {
 	dbPath.split('/').map(filename.check);
 }
 
-const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
+let makeDirsInDb;
+makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	checkDbPath(dbPath);
 	let mtime = new Date();
@@ -559,7 +561,8 @@ const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) 
 	return chunkStore;
 });
 
-const selfTests = {aes: function() {
+let selfTests;
+selfTests = {aes: function() {
 	require('./aes').selfTest();
 	selfTests.aes = noop;
 }};
