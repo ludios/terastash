@@ -372,7 +372,7 @@ class GDriver {
 			});
 			return [hasher.stream, res];
 		} else {
-			const body = yield utils.streamToBuffer(res);
+			let body = yield utils.streamToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 				try {
 					body = JSON.parse(body);
