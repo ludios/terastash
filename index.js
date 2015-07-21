@@ -795,7 +795,9 @@ function addFiles(paths, continueOnExists, replaceIfDifferent, progress) {
 				try {
 					yield addFile(client, stashInfo, p, dbPath, replaceIfDifferent);
 				} catch(err) {
-					if(!(err instanceof PathAlreadyExistsError) || !continueOnExists) {
+					if(!(err instanceof PathAlreadyExistsError ||
+						err instanceof UnexpectedFileError /* was sticky */
+					) || !continueOnExists) {
 						throw err;
 					}
 					console.error(chalk.red(err.message));
