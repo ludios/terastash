@@ -102,7 +102,7 @@ function a(f) {
 }
 
 program
-	.version('0.0.1');
+	.version(require('../package.json').version);
 
 program
 	.command('init <name>')
