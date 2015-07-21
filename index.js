@@ -570,8 +570,8 @@ selfTests = {aes: function() {
 /**
  * Put a file or directory into the Cassandra database.
  */
-function putFile(client, p) {
-	return doWithPath(null, p, Promise.coroutine(function* putFile$coro(stashInfo, dbPath, parentPath) {
+function addFile(client, p) {
+	return doWithPath(null, p, Promise.coroutine(function* addFile$coro(stashInfo, dbPath, parentPath) {
 		checkDbPath(dbPath);
 
 		if(parentPath) {
@@ -696,9 +696,9 @@ function putFile(client, p) {
 /**
  * Put files or directories into the Cassandra database.
  */
-function putFiles(pathnames, skipExisting, progress) {
+function addFiles(pathnames, skipExisting, progress) {
 	T(pathnames, T.list(T.string), skipExisting, T.optional(T.boolean), progress, T.optional(T.boolean));
-	return doWithClient(Promise.coroutine(function* putFiles$coro(client) {
+	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
 		// Capture ctrl-c and don't exit until the entire upload is done because
 		// we want to avoid leaving around unreferenced chunks in our chunk stores.
 		// Not that we can always prevent that from happening, but it's nice to
@@ -721,7 +721,7 @@ function putFiles(pathnames, skipExisting, progress) {
 				process.stdout.write(`${count}/${pathnames.length}...`);
 			}
 			try {
-				yield putFile(client, p);
+				yield addFile(client, p);
 			} catch(err) {
 				if(skipExisting && err instanceof PathAlreadyExistsError) {
 					console.error(chalk.red(err.message));
@@ -1482,7 +1482,7 @@ function dumpDb(stashName) {
 module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
-	putFile, putFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
+	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,

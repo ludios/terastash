@@ -160,7 +160,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string));
 		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.putFiles(files, options.skipExisting, progress));
+		catchAndLog(terastash.addFiles(files, options.skipExisting, progress));
 	}));
 
 program
