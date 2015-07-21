@@ -63,6 +63,7 @@ function catchAndLog(p) {
 		err instanceof terastash.KeyspaceMissingError ||
 		err instanceof terastash.DifferentStashesError ||
 		err instanceof terastash.UnexpectedFileError ||
+		err instanceof terastash.UsageError ||
 		err instanceof filename.BadFilename) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
@@ -155,12 +156,13 @@ program
 program
 	.command('add <path...>')
 	.option('-s, --skip-existing', 'If any path already exists in the db, skip it and continue')
+	.option('-r, --replace-existing', 'If any path already exists in the db, drop the old file and add the new file')
 	.description(d(`
 		Add a file to the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string));
 		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.addFiles(files, options.skipExisting, progress));
+		catchAndLog(terastash.addFiles(files, options.skipExisting, options.replaceExisting, progress));
 	}));
 
 program

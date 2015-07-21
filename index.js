@@ -98,6 +98,12 @@ const getChunkStores = utils.makeConfigFileInitializer(
 	}
 );
 
+class UsageError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 class DirectoryNotEmptyError extends Error {
 	get name() {
 		return this.constructor.name;
@@ -254,11 +260,11 @@ const doWithPath = Promise.coroutine(function* doWithPath$coro(stashName, p, fn)
 	return fn(stashInfo, dbPath, parentPath);
 });
 
-const pathnameSorterAsc = utils.comparedBy(function(row) {
+const pathsorterAsc = utils.comparedBy(function(row) {
 	return row.basename;
 });
 
-const pathnameSorterDesc = utils.comparedBy(function(row) {
+const pathsorterDesc = utils.comparedBy(function(row) {
 	return row.basename;
 }, true);
 
@@ -370,7 +376,7 @@ function lsPath(stashName, options, p) {
 			if(options.sortByMtime) {
 				rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
 			} else {
-				rows.sort(options.reverse ? pathnameSorterDesc : pathnameSorterAsc);
+				rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
 			}
 			for(const row of rows) {
 				if(options.justNames) {
@@ -568,185 +574,129 @@ selfTests = {aes: function() {
 }};
 
 /**
- * Put a file or directory into the Cassandra database.
+ * Put file `p` into the Cassandra database as path `dbPath`.
  */
-function addFile(client, p) {
-	return doWithPath(null, p, Promise.coroutine(function* addFile$coro(stashInfo, dbPath, parentPath) {
-		checkDbPath(dbPath);
+const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
+	checkDbPath(dbPath);
+	const parentPath = utils.getParentPath(dbPath);
 
-		if(parentPath) {
-			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
-		}
-
-		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		const throwIfAlreadyInDb = Promise.coroutine(function*() {
-			const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
-			if(typeInDb !== MISSING) {
-				throw new PathAlreadyExistsError(
-					`Cannot add to database:` +
-					` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
-					` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
-			}
-		});
-
-		// Check early to avoid uploading to chunk store and doing other work
-		yield throwIfAlreadyInDb();
-
-		const type = 'f';
-		const stat = yield fs.statAsync(p);
-		const mtime = stat.mtime;
-		const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
-		const sticky = Boolean(stat.mode & 0o1000);
-		if(sticky) {
-			throw new UnexpectedFileError(
-				`Refusing to add file ${inspect(p)} because it has sticky bit set,` +
-				` which may have been set by 'ts shoo'`
-			);
-		}
-		const chunkStore = yield getChunkStore(stashInfo);
-		let blake2b224;
-		let content = null;
-		let chunkInfo;
-		let size;
-		let key = null;
-
-		if(stat.size >= stashInfo.chunkThreshold) {
-			// TODO: validate storeName
-			key = makeKey();
-
-			const inputStream = fs.createReadStream(p);
-			if(!padded_stream) {
-				padded_stream = require('./padded_stream');
-			}
-			const hasher = utils.streamHasher(inputStream, 'blake2b');
-			const concealedSize = utils.concealSize(stat.size);
-			const padder = new padded_stream.Padder(concealedSize);
-			utils.pipeWithErrors(hasher.stream, padder);
-			selfTests.aes();
-			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-			utils.pipeWithErrors(padder, cipherStream);
-
-			let _;
-			if(chunkStore.type === "localfs") {
-				if(!localfs) {
-					localfs = require('./chunker/localfs');
-				}
-				_ = yield localfs.writeChunks(chunkStore.directory, cipherStream, chunkStore.chunkSize);
-			} else if(chunkStore.type === "gdrive") {
-				if(!gdrive) {
-					gdrive = require('./chunker/gdrive');
-				}
-				const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-				yield gdriver.loadCredentials();
-				_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, cipherStream, chunkStore.chunkSize);
-			} else {
-				throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
-			}
-
-			const totalSize = _[0];
-			chunkInfo = _[1];
-			A.eq(padder.bytesRead, stat.size,
-				`For ${dbPath}, read\n` +
-				`${commaify(padder.bytesRead)} bytes instead of the expected\n` +
-				`${commaify(stat.size)} bytes; did file change during reading?`);
-			A.eq(totalSize, concealedSize,
-				`For ${dbPath}, wrote to chunks\n` +
-				`${commaify(totalSize)} bytes instead of the expected\n` +
-				`${commaify(concealedSize)} (concealed) bytes`);
-			T(chunkInfo, Array);
-
-			blake2b224 = hasher.hash.digest().slice(0, 224/8);
-			size = stat.size;
-		} else {
-			content = yield fs.readFileAsync(p);
-			blake2b224 = blake2b224Buffer(content);
-			size = content.length;
-			A.eq(size, stat.size,
-				`For ${dbPath}, read\n` +
-				`${commaify(size)} bytes instead of the expected\n` +
-				`${commaify(stat.size)} bytes; did file change during reading?`);
-		}
-
-		function insert() {
-			return runQuery(
-				client,
-				`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-				(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-				[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, blake2b224, mtime, executable]
-			);
-		}
-
-		// Check again to narrow the race condition
-		yield throwIfAlreadyInDb();
-		try {
-			yield insert();
-		} catch(err) {
-			if(!isColumnMissingError(err)) {
-				throw err;
-			}
-			yield tryCreateColumnOnStashTable(
-				client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
-			yield throwIfAlreadyInDb();
-			yield insert();
-		}
-	}));
-}
-
-/**
- * Put files or directories into the Cassandra database.
- */
-function addFiles(pathnames, skipExisting, progress) {
-	T(pathnames, T.list(T.string), skipExisting, T.optional(T.boolean), progress, T.optional(T.boolean));
-	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
-		// Capture ctrl-c and don't exit until the entire upload is done because
-		// we want to avoid leaving around unreferenced chunks in our chunk stores.
-		// Not that we can always prevent that from happening, but it's nice to
-		// avoid it.
-		let stopNow = false;
-		function stopSoon() {
-			console.log('Got SIGINT.  Stopping after I add the current file.');
-			stopNow = true;
-		}
-		process.on('SIGINT', stopSoon);
-		function cleanup() {
-			process.removeListener('SIGINT', stopSoon);
-		}
-
-		let count = 1;
-		for(const p of pathnames) {
-			if(progress) {
-				process.stdout.clearLine();
-				process.stdout.cursorTo(0);
-				process.stdout.write(`${count}/${pathnames.length}...`);
-			}
-			try {
-				yield addFile(client, p);
-			} catch(err) {
-				if(skipExisting && err instanceof PathAlreadyExistsError) {
-					console.error(chalk.red(err.message));
-				} else {
-					cleanup();
-					throw err;
-				}
-			}
-			if(stopNow) {
-				break;
-			}
-			count++;
-		}
-		cleanup();
-	}));
-}
-
-function validateChunks(chunks) {
-	T(chunks, utils.ChunksType);
-	let expectIdx = 0;
-	for(const chunk of chunks) {
-		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
-		expectIdx += 1;
+	if(parentPath) {
+		yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 	}
-}
+
+	const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
+	const throwIfAlreadyInDb = Promise.coroutine(function*() {
+		const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
+		if(typeInDb !== MISSING) {
+			throw new PathAlreadyExistsError(
+				`Cannot add to database:` +
+				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
+				` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+		}
+	});
+
+	// Check early to avoid uploading to chunk store and doing other work
+	yield throwIfAlreadyInDb();
+
+	const type = 'f';
+	const stat = yield fs.statAsync(p);
+	const mtime = stat.mtime;
+	const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
+	const sticky = Boolean(stat.mode & 0o1000);
+	if(sticky) {
+		throw new UnexpectedFileError(
+			`Refusing to add file ${inspect(p)} because it has sticky bit set,` +
+			` which may have been set by 'ts shoo'`
+		);
+	}
+	const chunkStore = yield getChunkStore(stashInfo);
+	let blake2b224;
+	let content = null;
+	let chunkInfo;
+	let size;
+	let key = null;
+
+	if(stat.size >= stashInfo.chunkThreshold) {
+		// TODO: validate storeName
+		key = makeKey();
+
+		const inputStream = fs.createReadStream(p);
+		if(!padded_stream) {
+			padded_stream = require('./padded_stream');
+		}
+		const hasher = utils.streamHasher(inputStream, 'blake2b');
+		const concealedSize = utils.concealSize(stat.size);
+		const padder = new padded_stream.Padder(concealedSize);
+		utils.pipeWithErrors(hasher.stream, padder);
+		selfTests.aes();
+		const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+		utils.pipeWithErrors(padder, cipherStream);
+
+		let _;
+		if(chunkStore.type === "localfs") {
+			if(!localfs) {
+				localfs = require('./chunker/localfs');
+			}
+			_ = yield localfs.writeChunks(chunkStore.directory, cipherStream, chunkStore.chunkSize);
+		} else if(chunkStore.type === "gdrive") {
+			if(!gdrive) {
+				gdrive = require('./chunker/gdrive');
+			}
+			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+			yield gdriver.loadCredentials();
+			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, cipherStream, chunkStore.chunkSize);
+		} else {
+			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
+		}
+
+		const totalSize = _[0];
+		chunkInfo = _[1];
+		A.eq(padder.bytesRead, stat.size,
+			`For ${dbPath}, read\n` +
+			`${commaify(padder.bytesRead)} bytes instead of the expected\n` +
+			`${commaify(stat.size)} bytes; did file change during reading?`);
+		A.eq(totalSize, concealedSize,
+			`For ${dbPath}, wrote to chunks\n` +
+			`${commaify(totalSize)} bytes instead of the expected\n` +
+			`${commaify(concealedSize)} (concealed) bytes`);
+		T(chunkInfo, Array);
+
+		blake2b224 = hasher.hash.digest().slice(0, 224/8);
+		size = stat.size;
+	} else {
+		content = yield fs.readFileAsync(p);
+		blake2b224 = blake2b224Buffer(content);
+		size = content.length;
+		A.eq(size, stat.size,
+			`For ${dbPath}, read\n` +
+			`${commaify(size)} bytes instead of the expected\n` +
+			`${commaify(stat.size)} bytes; did file change during reading?`);
+	}
+
+	function insert() {
+		return runQuery(
+			client,
+			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
+			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, blake2b224, mtime, executable]
+		);
+	}
+
+	// Check again to narrow the race condition
+	yield throwIfAlreadyInDb();
+	try {
+		yield insert();
+	} catch(err) {
+		if(!isColumnMissingError(err)) {
+			throw err;
+		}
+		yield tryCreateColumnOnStashTable(
+			client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
+		yield throwIfAlreadyInDb();
+		yield insert();
+	}
+});
 
 const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
 	// Make sure all paths are in the same stash
@@ -763,6 +713,77 @@ const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$co
 	}
 	return stashInfos[0];
 });
+
+/**
+ * Put files or directories into the Cassandra database.
+ */
+function addFiles(paths, skipExisting, replaceExisting, progress) {
+	T(
+		paths, T.list(T.string),
+		skipExisting, T.optional(T.boolean),
+		replaceExisting, T.optional(T.boolean),
+		progress, T.optional(T.boolean)
+	);
+	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
+		if(skipExisting && replaceExisting) {
+			throw new UsageError("skipExisting and replaceExisting are mutually exclusive");
+		}
+
+		const stashInfo = yield getStashInfoForPaths(paths);
+
+		// Capture ctrl-c and don't exit until the entire upload is done because
+		// we want to avoid leaving around unreferenced chunks in our chunk stores.
+		// Not that we can always prevent that from happening, but it's nice to
+		// avoid it.
+		let stopNow = false;
+		function stopSoon() {
+			console.log('Got SIGINT.  Stopping after I add the current file.');
+			stopNow = true;
+		}
+		process.on('SIGINT', stopSoon);
+		try {
+			let count = 1;
+			for(const p of paths) {
+				if(progress) {
+					process.stdout.clearLine();
+					process.stdout.cursorTo(0);
+					process.stdout.write(`${count}/${paths.length}...`);
+				}
+				const dbPath = userPathToDatabasePath(stashInfo.path, p);
+				try {
+					yield addFile(client, stashInfo, p, dbPath);
+				} catch(err) {
+					if(!(err instanceof PathAlreadyExistsError)) {
+						throw err;
+					}
+					if(skipExisting) {
+						console.error(chalk.red(err.message));
+					} else if(replaceExisting) {
+						yield dropFile(client, stashInfo.name, p);
+						yield addFile(client, stashInfo, p, dbPath);
+					} else {
+						throw err;
+					}
+				}
+				if(stopNow) {
+					break;
+				}
+				count++;
+			}
+		} finally {
+			process.removeListener('SIGINT', stopSoon);
+		}
+	}));
+}
+
+function validateChunks(chunks) {
+	T(chunks, utils.ChunksType);
+	let expectIdx = 0;
+	for(const chunk of chunks) {
+		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
+		expectIdx += 1;
+	}
+}
 
 const StashInfoType = T.shape({path: T.string});
 
@@ -809,11 +830,11 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 	}
 });
 
-function shooFiles(pathnames) {
-	T(pathnames, T.list(T.string));
+function shooFiles(paths) {
+	T(paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* shooFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(pathnames);
-		for(const p of pathnames) {
+		const stashInfo = yield getStashInfoForPaths(paths);
+		for(const p of paths) {
 			yield shooFile(client, stashInfo, p);
 		}
 	}));
@@ -951,9 +972,9 @@ function getFile(client, stashName, p) {
 	}));
 }
 
-function getFiles(stashName, pathnames) {
+function getFiles(stashName, paths) {
 	return doWithClient(Promise.coroutine(function* getFiles$coro(client) {
-		for(const p of pathnames) {
+		for(const p of paths) {
 			yield getFile(client, stashName, p);
 		}
 	}));
@@ -968,9 +989,9 @@ function catFile(client, stashName, p) {
 	}));
 }
 
-function catFiles(stashName, pathnames) {
+function catFiles(stashName, paths) {
 	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
-		for(const p of pathnames) {
+		for(const p of paths) {
 			yield catFile(client, stashName, p);
 		}
 	}));
@@ -1034,9 +1055,9 @@ function dropFile(client, stashName, p) {
 /**
  * Remove files from the Cassandra database and their corresponding chunks.
  */
-function dropFiles(stashName, pathnames) {
+function dropFiles(stashName, paths) {
 	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
-		for(const p of pathnames) {
+		for(const p of paths) {
 			yield dropFile(client, stashName, p);
 		}
 	}));
@@ -1223,31 +1244,31 @@ const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(stor
 		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
 	if(typeof opts.chunkSize !== "number") {
-		throw new Error(`.chunkSize is missing or not a number on ${inspect(opts)}`);
+		throw new UsageError(`.chunkSize is missing or not a number on ${inspect(opts)}`);
 	}
 	const storeDef = {type: opts.type, chunkSize: opts.chunkSize};
 	if(opts.type === "localfs") {
 		if(typeof opts.directory !== "string") {
-			throw new Error(`Chunk store type localfs requires a -d/--directory ` +
+			throw new UsageError(`Chunk store type localfs requires a -d/--directory ` +
 				`parameter with a string; got ${opts.directory}`
 			);
 		}
 		storeDef.directory = opts.directory;
 	} else if(opts.type === "gdrive") {
 		if(typeof opts.clientId !== "string") {
-			throw new Error(`Chunk store type gdrive requires a --client-id ` +
+			throw new UsageError(`Chunk store type gdrive requires a --client-id ` +
 				`parameter with a string; got ${opts.clientId}`
 			);
 		}
 		storeDef.clientId = opts.clientId;
 		if(typeof opts.clientSecret !== "string") {
-			throw new Error(`Chunk store type gdrive requires a --client-secret ` +
+			throw new UsageError(`Chunk store type gdrive requires a --client-secret ` +
 				`parameter with a string; got ${opts.clientSecret}`
 			);
 		}
 		storeDef.clientSecret = opts.clientSecret;
 	} else {
-		throw new Error(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
+		throw new UsageError(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
 	}
 	config.stores[storeName] = storeDef;
 	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
@@ -1486,5 +1507,5 @@ module.exports = {
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
-	DifferentStashesError, UnexpectedFileError
+	DifferentStashesError, UnexpectedFileError, UsageError
 };
