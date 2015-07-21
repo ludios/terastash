@@ -44,7 +44,7 @@ Can add and drop a file
   [1]
   $ touch --date=1971-01-01 sample1
   $ ts add -r sample1 # different now, can replace
-  Notice: replacing 'sample1' in db with 'sample1'
+  Notice: replacing 'sample1' in db
   ┌───────┬─────────────────────────────────────────┬──────┬────────────┐
   │ which │ mtime                                   │ size │ executable │
   │ old   │ Thu Jan 01 1970 00:00:00 GMT+0000 (GMT) │ 12   │ false      │

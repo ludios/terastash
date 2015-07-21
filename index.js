@@ -648,7 +648,7 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replac
 			});
 			table.push(['old', String(oldRow.mtime), oldRow.size, oldRow.executable]);
 			table.push(['new', String(mtime), stat.size, executable]);
-			console.log(`Notice: replacing ${inspect(dbPath)} in db with ${inspect(p)}\n${table.toString()}`);
+			console.log(`Notice: replacing ${inspect(dbPath)} in db\n${table.toString()}`);
 			yield dropFile(client, stashInfo.name, p);
 		} else {
 			throw e;
