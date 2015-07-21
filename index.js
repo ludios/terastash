@@ -630,13 +630,14 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replac
 		);
 	}
 
-	// Check early to avoid uploading to chunk store and doing other work
 	try {
+		// Check early to avoid uploading to chunk store and doing other work
 		yield throwIfAlreadyInDb();
 	} catch(e) {
 		if(!(e instanceof PathAlreadyExistsError) || !replaceIfDifferent) {
 			throw e;
 		}
+		// User wants to replace old file in db only if new file is different
 		const newFile = {type: 'f', mtime, executable, size: stat.size};
 		oldRow.size = Number(oldRow.size);
 		//console.log({newFile, oldRow});
