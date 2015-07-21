@@ -19,6 +19,8 @@ const filename = require('./filename');
 const commaify = utils.numberWithCommas;
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
+const deepEqual = require('deep-equal');
+const Table = require('cli-table');
 let cassandra;
 let localfs;
 let blake2;
@@ -121,6 +123,8 @@ class KeyspaceMissingError extends Error {
 		return this.constructor.name;
 	}
 }
+
+const StashInfoType = T.shape({path: T.string});
 
 /**
  * For a given pathname, return a stash that contains the file,
@@ -575,8 +579,18 @@ selfTests = {aes: function() {
 
 /**
  * Put file `p` into the Cassandra database as path `dbPath`.
+ *
+ * If `replaceIfDifferent`, if the path in db already exists and the corresponding local
+ * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
+const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replaceIfDifferent) {
+	T(
+		client, CassandraClientType,
+		stashInfo, StashInfoType,
+		p, T.string,
+		dbPath, T.string,
+		replaceIfDifferent, T.optional(T.boolean)
+	);
 	checkDbPath(dbPath);
 	const parentPath = utils.getParentPath(dbPath);
 
@@ -585,18 +599,24 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 	}
 
 	const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
+	let oldRow;
 	const throwIfAlreadyInDb = Promise.coroutine(function*() {
-		const typeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPath);
-		if(typeInDb !== MISSING) {
+		let caught = false;
+		try {
+			oldRow = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type', 'executable']);
+		} catch(e) {
+			if(!(e instanceof NoSuchPathError)) {
+				throw e;
+			}
+			caught = true;
+		}
+		if(!caught) {
 			throw new PathAlreadyExistsError(
 				`Cannot add to database:` +
 				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
-				` already exists as a ${typeInDb === DIRECTORY ? "directory" : "file"}`);
+				` already exists as a ${oldRow.type === 'd' ? "directory" : "file"}`);
 		}
 	});
-
-	// Check early to avoid uploading to chunk store and doing other work
-	yield throwIfAlreadyInDb();
 
 	const type = 'f';
 	const stat = yield fs.statAsync(p);
@@ -609,6 +629,31 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath) {
 			` which may have been set by 'ts shoo'`
 		);
 	}
+
+	// Check early to avoid uploading to chunk store and doing other work
+	try {
+		yield throwIfAlreadyInDb();
+	} catch(e) {
+		if(!(e instanceof PathAlreadyExistsError) || !replaceIfDifferent) {
+			throw e;
+		}
+		const newFile = {type: 'f', mtime, executable, size: stat.size};
+		oldRow.size = Number(oldRow.size);
+		//console.log({newFile, oldRow});
+		if(!deepEqual(newFile, oldRow)) {
+			const table = new Table({
+				chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''},
+				head: ['which', 'mtime', 'size', 'executable']
+			});
+			table.push(['old', String(oldRow.mtime), oldRow.size, oldRow.executable]);
+			table.push(['new', String(mtime), stat.size, executable]);
+			console.log(`Notice: replacing ${inspect(dbPath)} in db with ${inspect(p)}\n${table.toString()}`);
+			yield dropFile(client, stashInfo.name, p);
+		} else {
+			throw e;
+		}
+	}
+
 	const chunkStore = yield getChunkStore(stashInfo);
 	let blake2b224;
 	let content = null;
@@ -717,18 +762,14 @@ const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$co
 /**
  * Put files or directories into the Cassandra database.
  */
-function addFiles(paths, skipExisting, replaceExisting, progress) {
+function addFiles(paths, continueOnExists, replaceIfDifferent, progress) {
 	T(
 		paths, T.list(T.string),
-		skipExisting, T.optional(T.boolean),
-		replaceExisting, T.optional(T.boolean),
+		continueOnExists, T.optional(T.boolean),
+		replaceIfDifferent, T.optional(T.boolean),
 		progress, T.optional(T.boolean)
 	);
 	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
-		if(skipExisting && replaceExisting) {
-			throw new UsageError("skipExisting and replaceExisting are mutually exclusive");
-		}
-
 		const stashInfo = yield getStashInfoForPaths(paths);
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
@@ -751,19 +792,12 @@ function addFiles(paths, skipExisting, replaceExisting, progress) {
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
 				try {
-					yield addFile(client, stashInfo, p, dbPath);
+					yield addFile(client, stashInfo, p, dbPath, replaceIfDifferent);
 				} catch(err) {
-					if(!(err instanceof PathAlreadyExistsError)) {
+					if(!(err instanceof PathAlreadyExistsError) || !continueOnExists) {
 						throw err;
 					}
-					if(skipExisting) {
-						console.error(chalk.red(err.message));
-					} else if(replaceExisting) {
-						yield dropFile(client, stashInfo.name, p);
-						yield addFile(client, stashInfo, p, dbPath);
-					} else {
-						throw err;
-					}
+					console.error(chalk.red(err.message));
 				}
 				if(stopNow) {
 					break;
@@ -784,8 +818,6 @@ function validateChunks(chunks) {
 		expectIdx += 1;
 	}
 }
-
-const StashInfoType = T.shape({path: T.string});
 
 const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
 	T(p, T.string, size, T.number);

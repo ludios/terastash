@@ -37,12 +37,19 @@ Can add and drop a file
   $ ts add sample1 # can't add again
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   [1]
-  $ ts add -s sample1 # exit code 0
+  $ ts add -c sample1 # exit code 0
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
-  $ ts add -s -r sample1
-  skipExisting and replaceExisting are mutually exclusive
+  $ ts add -r sample1 # still the same, can't replace
+  Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   [1]
-  $ ts add -r sample1 # can replace
+  $ touch --date=1971-01-01 sample1
+  $ ts add -r sample1 # different now, can replace
+  Notice: replacing 'sample1' in db with 'sample1'
+  ┌───────┬─────────────────────────────────────────┬──────┬────────────┐
+  │ which │ mtime                                   │ size │ executable │
+  │ old   │ Thu Jan 01 1970 00:00:00 GMT+0000 (GMT) │ 12   │ false      │
+  │ new   │ Fri Jan 01 1971 00:00:00 GMT+0000 (GMT) │ 12   │ false      │
+  └───────┴─────────────────────────────────────────┴──────┴────────────┘
   $ mv adir adir.1
   $ touch adir
   $ ts add adir # can't add again
@@ -55,14 +62,14 @@ Can add and drop a file
   [1]
   $ ts ls
                    0 1995-01-01 00:00 adir/
-                  12 1970-01-01 00:00 sample1
+                  12 1971-01-01 00:00 sample1
                   14 1980-01-01 00:00 sample2*
   $ ts ls -t
                    0 1995-01-01 00:00 adir/
                   14 1980-01-01 00:00 sample2*
-                  12 1970-01-01 00:00 sample1
+                  12 1971-01-01 00:00 sample1
   $ ts ls -rt
-                  12 1970-01-01 00:00 sample1
+                  12 1971-01-01 00:00 sample1
                   14 1980-01-01 00:00 sample2*
                    0 1995-01-01 00:00 adir/
   $ ts ls -j
@@ -102,7 +109,7 @@ Can add and drop a file
   $ ls -f sample1 # in output, no trailing '*', so it's not executable
   sample1
   $ stat -c %y sample1
-  1970-01-01 00:00:00.000000000 +0000
+  1971-01-01 00:00:00.000000000 +0000
   $ cat sample1
   hello
   world
@@ -112,13 +119,13 @@ Can add and drop a file
   b6d81b360a5672d80c27430f39153e2c
   $ ts get sample1 adir/bigfile # Make sure 'ts get' works with > 1 file
   $ stat -c %y sample1
-  1970-01-01 00:00:00.000000000 +0000
+  1971-01-01 00:00:00.000000000 +0000
   $ stat -c %y adir/bigfile
   1990-01-01 00:00:00.000000000 +0000
   $ ts dump-db
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"bigfile","blake2b224":"~bqDSxkpHlSAi6g2fKYOar2cdEE4VBKEsSu2yqUw==","chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~b48LuFQ==","size":{"~#Long":"102400"}},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~bCrR7Sg==","size":{"~#Long":"102400"}},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~bVW//Eg==","size":{"~#Long":"102400"}},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~bFug3SQ==","size":{"~#Long":"102400"}},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~boHMCAw==","size":{"~#Long":"102400"}},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~bTgPuIA==","size":{"~#Long":"102400"}},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~b0kilEQ==","size":{"~#Long":"102400"}},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~b35dApA==","size":{"~#Long":"102400"}},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~bvreN+Q==","size":{"~#Long":"102400"}},{"idx":9,"file_id":"deterministic-filename-9","md5":null,"crc32c":"~bB4umJw==","size":{"~#Long":"102400"}},{"idx":10,"file_id":"deterministic-filename-10","md5":null,"crc32c":"~bFmm9ow==","size":{"~#Long":"24576"}}],"content":null,"crtime":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAA==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":null}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","blake2b224":null,"chunks_in_mychunks":null,"content":null,"crtime":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAAAQ=="}}
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","blake2b224":"~b8fTjgJNl8/J4zGdDxIzJ9raMZ/C3DCok5tCw4Q==","chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crtime":null,"executable":false,"key":null,"mtime":"~t1970-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":null}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","blake2b224":"~b8fTjgJNl8/J4zGdDxIzJ9raMZ/C3DCok5tCw4Q==","chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crtime":null,"executable":false,"key":null,"mtime":"~t1971-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":null}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","blake2b224":"~b91UqIiWOC4GSfm1sthj+37PkP8fFJuzmd9Ffkg==","chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crtime":null,"executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":null}}
   $ ts drop adir # Can't drop a non-empty directory
   Refusing to drop 'adir' because it is a non-empty directory
