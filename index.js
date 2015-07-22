@@ -990,9 +990,9 @@ function getFile(client, stashName, p) {
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
 		yield new Promise(function getFiles$Promise(resolve, reject) {
-			writeStream.once('finish', Promise.coroutine(function*() {
+			writeStream.once('finish', function() {
 				resolve();
-			}));
+			});
 			writeStream.once('error', function(err) {
 				reject(err);
 			});
