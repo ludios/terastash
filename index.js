@@ -650,7 +650,7 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replac
 			table.push(['old', String(oldRow.mtime), oldRow.size, oldRow.executable]);
 			table.push(['new', String(mtime), stat.size, executable]);
 			console.log(`Notice: replacing ${inspect(dbPath)} in db\n${table.toString()}`);
-			yield dropFile(client, stashInfo.name, p);
+			yield dropFile(client, stashInfo, dbPath);
 		} else {
 			throw e;
 		}
@@ -1033,68 +1033,70 @@ function catFiles(stashName, paths) {
 	}));
 }
 
-function dropFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function* doWithPath$coro(stashInfo, dbPath, parentPath) {
-		const chunkStore = yield getChunkStore(stashInfo);
-		const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		let chunks = null;
-		try {
-			const row = yield getRowByParentBasename(
-				client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
-				[`chunks_in_${chunkStore.name}`]
-			);
-			chunks = row[`chunks_in_${chunkStore.name}`];
-		} catch(err) {
-			if(!isColumnMissingError(err)) {
-				throw err;
-			}
-		}
+const dropFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+
+	const chunkStore = yield getChunkStore(stashInfo);
+	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+	let chunks = null;
+	try {
 		const row = yield getRowByParentBasename(
 			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
-			["type", "uuid"]
+			[`chunks_in_${chunkStore.name}`]
 		);
-		if(row.type === 'd') {
-			const childRows = yield getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
-			if(childRows.length) {
-				throw new DirectoryNotEmptyError(
-					`Refusing to drop ${inspect(dbPath)} because it is a non-empty directory`
-				);
-			}
+		chunks = row[`chunks_in_${chunkStore.name}`];
+	} catch(err) {
+		if(!isColumnMissingError(err)) {
+			throw err;
 		}
-		// TODO: Instead of DELETE, mark file with 'deleting' or something in case
-		// the chunk-deletion process needs to be resumed later.
-		yield runQuery(
-			client,
-			`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			WHERE parent = ? AND basename = ?;`,
-			[parentUuid, utils.getBaseName(dbPath)]
-		);
-		if(chunks !== null) {
-			validateChunks(chunks);
-			if(chunkStore.type === "localfs") {
-				if(!localfs) {
-					localfs = require('./chunker/localfs');
-				}
-				yield localfs.deleteChunks(chunkStore.directory, chunks);
-			} else {
-				if(!gdrive) {
-					gdrive = require('./chunker/gdrive');
-				}
-				const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-				yield gdriver.loadCredentials();
-				yield gdrive.deleteChunks(gdriver, chunks);
-			}
+	}
+	const row = yield getRowByParentBasename(
+		client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
+		["type", "uuid"]
+	);
+	if(row.type === 'd') {
+		const childRows = yield getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
+		if(childRows.length) {
+			throw new DirectoryNotEmptyError(
+				`Refusing to drop ${inspect(dbPath)} because it is a non-empty directory`
+			);
 		}
-	}));
-}
+	}
+	// TODO: Instead of DELETE, mark file with 'deleting' or something in case
+	// the chunk-deletion process needs to be resumed later.
+	yield runQuery(
+		client,
+		`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
+		WHERE parent = ? AND basename = ?;`,
+		[parentUuid, utils.getBaseName(dbPath)]
+	);
+	if(chunks !== null) {
+		validateChunks(chunks);
+		if(chunkStore.type === "localfs") {
+			if(!localfs) {
+				localfs = require('./chunker/localfs');
+			}
+			yield localfs.deleteChunks(chunkStore.directory, chunks);
+		} else {
+			if(!gdrive) {
+				gdrive = require('./chunker/gdrive');
+			}
+			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+			yield gdriver.loadCredentials();
+			yield gdrive.deleteChunks(gdriver, chunks);
+		}
+	}
+});
 
 /**
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, paths) {
 	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
+		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
-			yield dropFile(client, stashName, p);
+			const dbPath = userPathToDatabasePath(stashInfo.path, p);
+			yield dropFile(client, stashInfo, dbPath);
 		}
 	}));
 }
