@@ -638,7 +638,7 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replac
 		if(!(e instanceof PathAlreadyExistsError) || !replaceIfDifferent) {
 			throw e;
 		}
-		// User wants to replace old file in db only if new file is different
+		// User wants to replace old file in db, but only if new file is different
 		const newFile = {type: 'f', mtime, executable, size: stat.size};
 		oldRow.size = Number(oldRow.size);
 		//console.log({newFile, oldRow});
