@@ -581,16 +581,16 @@ selfTests = {aes: function() {
 /**
  * Put file `p` into the Cassandra database as path `dbPath`.
  *
- * If `replaceIfDifferent`, if the path in db already exists and the corresponding local
+ * If `dropOldIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, dbPath, replaceIfDifferent) {
+const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, dbPath, dropOldIfDifferent) {
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
 		p, T.string,
 		dbPath, T.string,
-		replaceIfDifferent, T.optional(T.boolean)
+		dropOldIfDifferent, T.optional(T.boolean)
 	);
 	checkDbPath(dbPath);
 	const parentPath = utils.getParentPath(dbPath);
@@ -635,7 +635,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// Check early to avoid uploading to chunk store and doing other work
 		yield throwIfAlreadyInDb();
 	} catch(e) {
-		if(!(e instanceof PathAlreadyExistsError) || !replaceIfDifferent) {
+		if(!(e instanceof PathAlreadyExistsError) || !dropOldIfDifferent) {
 			throw e;
 		}
 		// User wants to replace old file in db, but only if new file is different
@@ -764,11 +764,11 @@ const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$co
 /**
  * Put files or directories into the Cassandra database.
  */
-function addFiles(paths, continueOnExists, replaceIfDifferent, progress) {
+function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
 	T(
 		paths, T.list(T.string),
 		continueOnExists, T.optional(T.boolean),
-		replaceIfDifferent, T.optional(T.boolean),
+		dropOldIfDifferent, T.optional(T.boolean),
 		progress, T.optional(T.boolean)
 	);
 	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
@@ -794,7 +794,7 @@ function addFiles(paths, continueOnExists, replaceIfDifferent, progress) {
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
 				try {
-					yield addFile(client, stashInfo, p, dbPath, replaceIfDifferent);
+					yield addFile(client, stashInfo, p, dbPath, dropOldIfDifferent);
 				} catch(err) {
 					if(!(err instanceof PathAlreadyExistsError ||
 						err instanceof UnexpectedFileError /* was sticky */

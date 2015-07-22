@@ -155,7 +155,7 @@ program
 /* It's 'add' instead of 'put' for left-hand-only typing */
 program
 	.command('add <path...>')
-	.option('-r, --replace-if-different',
+	.option('-d, --drop-old-if-different',
 		"If path already exists in the db, and (mtime, size, executable) of " +
 		"new file is different, drop the old file instead of throwing 'already exists'")
 	.option('-c, --continue-on-exists', "Keep going on 'already exists' errors")
@@ -164,7 +164,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.addFiles(files, options.continueOnExists, options.replaceIfDifferent, progress));
+		catchAndLog(terastash.addFiles(files, options.continueOnExists, options.dropOldIfDifferent, progress));
 	}));
 
 program
