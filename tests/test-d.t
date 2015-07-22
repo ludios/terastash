@@ -14,6 +14,7 @@ Can add and drop a file
   $ cd unit_tests_d
   $ ts init unit_tests_d --chunk-store=mychunks
   $ echo hi > x
+  $ touch --date=2015-01-01 x
   $ ts add x
   $ cd ..
   $ ts cat -n unit_tests_d x
@@ -21,6 +22,10 @@ Can add and drop a file
   $ ts get -n unit_tests_d x
   $ cat x
   hi
+  $ ts dump-db -n unit_tests_d
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","blake2b224":"~bfqWeegAOwAOEa2YH39X5IXtoHcGoGweJtGTDmQ==","chunks_in_mychunks":null,"content":"~baGkK","crtime":null,"executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null}}
+  $ ts drop -n unit_tests_d x
+  $ ts dump-db -n unit_tests_d
 
 End
 

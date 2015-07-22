@@ -185,6 +185,17 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
+/**
+ * If stashName === null, convert p to database path, else just return p.
+ */
+function eitherPathToDatabasePath(stashName, base, p) {
+	T(stashName, T.maybe(T.string), base, T.string, p, T.string);
+	if(stashName === null) {
+		return userPathToDatabasePath(base, p);
+	}
+	return p;
+}
+
 function isColumnMissingError(err) {
 	return /^ResponseError: (Undefined name .* in selection clause|Unknown identifier )/.test(String(err));
 }
@@ -1053,10 +1064,7 @@ function catFiles(stashName, paths) {
 	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			const dbPath =
-				stashName === null ?
-					userPathToDatabasePath(stashInfo.path, p) :
-					p;
+			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			yield catFile(client, stashInfo, dbPath);
 		}
 	}));
@@ -1122,9 +1130,9 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 function dropFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(paths);
+		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			const dbPath = userPathToDatabasePath(stashInfo.path, p);
+			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			yield dropFile(client, stashInfo, dbPath);
 		}
 	}));

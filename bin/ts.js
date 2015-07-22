@@ -134,7 +134,7 @@ program
 
 program
 	.command('dump-db')
-	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from current directory')
 	.description(d(`
 		Dump a backup of the database to stdout`))
 	.action(a(function(options) {
