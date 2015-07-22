@@ -584,7 +584,7 @@ selfTests = {aes: function() {
  * If `replaceIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replaceIfDifferent) {
+const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, dbPath, replaceIfDifferent) {
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
@@ -601,7 +601,7 @@ const addFile = Promise.coroutine(function*(client, stashInfo, p, dbPath, replac
 
 	const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
 	let oldRow;
-	const throwIfAlreadyInDb = Promise.coroutine(function*() {
+	const throwIfAlreadyInDb = Promise.coroutine(function* throwIfAlreadyInDb$coro() {
 		let caught = false;
 		try {
 			oldRow = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type', 'executable']);
@@ -1033,7 +1033,7 @@ function catFiles(stashName, paths) {
 	}));
 }
 
-const dropFile = Promise.coroutine(function*(client, stashInfo, dbPath) {
+const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
 
 	const chunkStore = yield getChunkStore(stashInfo);
