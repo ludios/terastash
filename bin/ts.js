@@ -162,13 +162,14 @@ program
 	.description(d(`
 		Add a file to the database`))
 	.action(a(function(files, options) {
-		T(files, T.list(T.string));
+		T(files, T.list(T.string), options, T.object);
 		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
 		catchAndLog(terastash.addFiles(files, options.continueOnExists, options.replaceIfDifferent, progress));
 	}));
 
 program
 	.command('shoo <path...>')
+	.option('-c, --continue-on-mismatch', "Keep going on mtime/size mismatch errors")
 	.description(d(`
 		Removes a file in the working directory and replaces it with a 'fake'
 		(a zero'ed sparse file of the same length).  File must already be in the
@@ -180,9 +181,9 @@ program
 
 		The 'fake' will have the sticky bit set to make it obvious that it does not
 		contain real content.`))
-	.action(a(function(files) {
-		T(files, T.list(T.string));
-		catchAndLog(terastash.shooFiles(files));
+	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
+		catchAndLog(terastash.shooFiles(files, options.continueOnMismatch));
 	}));
 
 

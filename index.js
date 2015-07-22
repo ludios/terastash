@@ -866,12 +866,19 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 	}
 });
 
-function shooFiles(paths) {
-	T(paths, T.list(T.string));
+function shooFiles(paths, continueOnMismatch) {
+	T(paths, T.list(T.string), continueOnMismatch, T.optional(T.boolean));
 	return doWithClient(Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
-			yield shooFile(client, stashInfo, p);
+			try {
+				yield shooFile(client, stashInfo, p);
+			} catch(err) {
+				if(!(err instanceof UnexpectedFileError) || !continueOnMismatch) {
+					throw err;
+				}
+				console.error(chalk.red(err.message));
+			}
 		}
 	}));
 }
