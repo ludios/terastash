@@ -383,6 +383,7 @@ function lsPath(stashName, options, p) {
 				rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
 			}
 			for(const row of rows) {
+				A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 				if(options.justNames) {
 					console.log(row.basename);
 				} else {
