@@ -134,7 +134,7 @@ program
 
 program
 	.command('dump-db')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		Dump a backup of the database to stdout`))
 	.action(a(function(options) {
@@ -189,7 +189,7 @@ program
 
 program
 	.command('get <path...>')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		Get a file or directory (recursively) from the database`))
 	.action(a(function(files, options) {
@@ -200,7 +200,7 @@ program
 
 program
 	.command('cat <file...>')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		Dump the contents of a file in the database to stdout`))
 	.action(a(function(files, options) {
@@ -211,7 +211,7 @@ program
 
 program
 	.command('drop <file...>')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		Removes files from the database and their corresponding chunks, if any.
 		Chunks in both localfs and gdrive are permanently deleted, not moved to the trash.
@@ -228,7 +228,7 @@ program
 
 program
 	.command('mkdir <path...>')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		Creates directories in the database and in the working directory.
 		Parent directories are automatically created as needed.`))
@@ -240,7 +240,7 @@ program
 
 program
 	.command('mv <args...>')
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`
 		mv src dest
 		mv src1 src2 dest/
@@ -260,7 +260,7 @@ program
 	.command('ls [path...]')
 	.description(d(`
 		List directory in the database`))
-	.option('-n, --name <name>', 'Ignore .terastash.json and use this stash name')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.option('-j, --just-names', 'Print just the filenames without any decoration')
 	.option('-t, --sort-by-mtime', 'Sort by modification time, newest first') /* newest first to match ls behavior */
 	.option('-r, --reverse', 'Reverse order while sorting')
