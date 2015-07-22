@@ -1051,9 +1051,12 @@ const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPa
 function catFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(paths);
+		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			const dbPath = userPathToDatabasePath(stashInfo.path, p);
+			const dbPath =
+				stashName === null ?
+					userPathToDatabasePath(stashInfo.path, p) :
+					p;
 			yield catFile(client, stashInfo, dbPath);
 		}
 	}));
