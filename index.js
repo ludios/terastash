@@ -1023,26 +1023,27 @@ function getFiles(stashName, paths) {
 	}));
 }
 
-function catFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function* catFile$coro(stashInfo, dbPath, parentPath) {
-		const _ = yield streamFile(client, stashInfo, dbPath);
-		//const row = _[0];
-		const readStream = _[1];
-		utils.pipeWithErrors(readStream, process.stdout);
-	}));
-}
+const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+	const _ = yield streamFile(client, stashInfo, dbPath);
+	//const row = _[0];
+	const readStream = _[1];
+	utils.pipeWithErrors(readStream, process.stdout);
+});
 
 function catFiles(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
+		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
-			yield catFile(client, stashName, p);
+			const dbPath = userPathToDatabasePath(stashInfo.path, p);
+			yield catFile(client, stashInfo, dbPath);
 		}
 	}));
 }
 
 const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
-
 	const chunkStore = yield getChunkStore(stashInfo);
 	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	let chunks = null;
@@ -1099,6 +1100,7 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
