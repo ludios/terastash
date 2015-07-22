@@ -761,6 +761,15 @@ const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$co
 	return stashInfos[0];
 });
 
+const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+	if(stashName !== null) {
+		return yield getStashInfoByName(stashName);
+	} else {
+		return yield getStashInfoForPaths(paths);
+	}
+});
+
 /**
  * Put files or directories into the Cassandra database.
  */
@@ -973,52 +982,56 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 /**
  * Get a file or directory from the Cassandra database.
  */
-function getFile(client, stashName, p) {
-	return doWithPath(stashName, p, Promise.coroutine(function* getFile$coro(stashInfo, dbPath, parentPath) {
-		const _ = yield streamFile(client, stashInfo, dbPath);
-		const row = _[0];
-		const readStream = _[1];
+const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string);
 
-		let outputFilename;
-		// If stashName was given, write file to current directory
-		if(stashName) {
-			outputFilename = utils.getBaseName(dbPath);
-		} else {
-			T(stashInfo.path, T.string);
-			outputFilename = stashInfo.path + '/' + dbPath;
-		}
+	const _ = yield streamFile(client, stashInfo, dbPath);
+	const row = _[0];
+	const readStream = _[1];
 
-		yield mkdirpAsync(path.dirname(outputFilename));
+	yield mkdirpAsync(path.dirname(outputFilename));
 
-		// Delete the existing file because it may have the sticky bit set
-		// or other unwanted permissions.
-		yield utils.tryUnlink(outputFilename);
+	// Delete the existing file because it may have the sticky bit set
+	// or other unwanted permissions.
+	yield utils.tryUnlink(outputFilename);
 
-		const writeStream = fs.createWriteStream(outputFilename);
-		utils.pipeWithErrors(readStream, writeStream);
-		yield new Promise(function getFiles$Promise(resolve, reject) {
-			writeStream.once('finish', function() {
-				resolve();
-			});
-			writeStream.once('error', function(err) {
-				reject(err);
-			});
-			readStream.once('error', function(err) {
-				reject(err);
-			});
+	const writeStream = fs.createWriteStream(outputFilename);
+	utils.pipeWithErrors(readStream, writeStream);
+	yield new Promise(function getFiles$Promise(resolve, reject) {
+		writeStream.once('finish', function() {
+			resolve();
 		});
-		yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
-		if(row.executable) {
-			// TODO: setting for 0o700 instead?
-			yield fs.chmodAsync(outputFilename, 0o770);
-		}
-	}));
-}
+		writeStream.once('error', function(err) {
+			reject(err);
+		});
+		readStream.once('error', function(err) {
+			reject(err);
+		});
+	});
+	yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
+	if(row.executable) {
+		// TODO: setting for 0o700 instead?
+		yield fs.chmodAsync(outputFilename, 0o770);
+	}
+});
 
 function getFiles(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(Promise.coroutine(function* getFiles$coro(client) {
+		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			yield getFile(client, stashName, p);
+			let dbPath;
+			let outputFilename;
+			// If stashName was given, write file to current directory
+			if(stashName) {
+				dbPath = p;
+				outputFilename = p;
+			} else {
+				dbPath = userPathToDatabasePath(stashInfo.path, p);
+				outputFilename = stashInfo.path + '/' + dbPath;
+			}
+
+			yield getFile(client, stashInfo, dbPath, outputFilename);
 		}
 	}));
 }
