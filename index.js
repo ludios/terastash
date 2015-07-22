@@ -1029,6 +1029,10 @@ const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPa
 	//const row = _[0];
 	const readStream = _[1];
 	utils.pipeWithErrors(readStream, process.stdout);
+	yield new Promise(function(resolve, reject) {
+		readStream.on('finish', resolve);
+		readStream.once('error', reject);
+	});
 });
 
 function catFiles(stashName, paths) {
