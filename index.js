@@ -578,6 +578,31 @@ selfTests = {aes: function() {
 	selfTests.aes = noop;
 }};
 
+const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
+	// Make sure all paths are in the same stash
+	const stashInfos = [];
+	// Don't use Promise.all to avoid having too many file handles open
+	for(const p of paths) {
+		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
+	}
+	const stashNames = stashInfos.map(utils.prop('name'));
+	if(!utils.allIdentical(stashNames)) {
+		throw new DifferentStashesError(
+			`All paths used in command must be in the same stash;` +
+			` stashes were ${inspect(stashNames)}`);
+	}
+	return stashInfos[0];
+});
+
+const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+	if(stashName !== null) {
+		return yield getStashInfoByName(stashName);
+	} else {
+		return yield getStashInfoForPaths(paths);
+	}
+});
+
 /**
  * Put file `p` into the Cassandra database as path `dbPath`.
  *
@@ -742,31 +767,6 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 			client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
 		yield throwIfAlreadyInDb();
 		yield insert();
-	}
-});
-
-const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
-	// Make sure all paths are in the same stash
-	const stashInfos = [];
-	// Don't use Promise.all to avoid having too many file handles open
-	for(const p of paths) {
-		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
-	}
-	const stashNames = stashInfos.map(utils.prop('name'));
-	if(!utils.allIdentical(stashNames)) {
-		throw new DifferentStashesError(
-			`All paths used in command must be in the same stash;` +
-			` stashes were ${inspect(stashNames)}`);
-	}
-	return stashInfos[0];
-});
-
-const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
-	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	if(stashName !== null) {
-		return yield getStashInfoByName(stashName);
-	} else {
-		return yield getStashInfoForPaths(paths);
 	}
 });
 
