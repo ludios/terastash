@@ -655,8 +655,11 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		}
 	});
 
-	const type = 'f';
 	const stat = yield fs.statAsync(p);
+	if(!stat.isFile()) {
+		throw new Error(`Cannot add ${inspect(p)} because it is not a file`);
+	}
+	const type = 'f';
 	const mtime = stat.mtime;
 	const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 	const sticky = Boolean(stat.mode & 0o1000);
