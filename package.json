@@ -28,7 +28,7 @@
     "mkdirp": "^0.5.1",
     "notmytype": "^1.2.0",
     "object-assign": "^3.0.0",
-    "request": "^2.58.0",
+    "request": "^2.60.0",
     "sse4_crc32": "^3.2.0",
     "streamifier": "^0.1.1",
     "transit-js": "^0.8.807",
