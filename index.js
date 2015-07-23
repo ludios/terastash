@@ -345,7 +345,11 @@ getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashNa
 	const parent = yield getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
 
-	const row = yield getRowByParentBasename(client, stashName, parent, basename, ['uuid']);
+	const row = yield getRowByParentBasename(client, stashName, parent, basename, ['type', 'uuid']);
+	if(row.type !== "d") {
+		throw new NoSuchPathError(`${inspect(p)} in ${stashName} is not a directory`);
+	}
+	T(row.uuid, Buffer);
 	return row.uuid;
 });
 
@@ -629,13 +633,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		dropOldIfDifferent, T.optional(T.boolean)
 	);
 	checkDbPath(dbPath);
-	const parentPath = utils.getParentPath(dbPath);
 
-	if(parentPath) {
-		yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
-	}
-
-	const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
 	let oldRow;
 	const throwIfAlreadyInDb = Promise.coroutine(function* throwIfAlreadyInDb$coro() {
 		let caught = false;
@@ -759,15 +757,20 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 			`${commaify(stat.size)} bytes; did file change during reading?`);
 	}
 
-	function insert() {
-		return runQuery(
+	const insert = Promise.coroutine(function* insert$coro() {
+		const parentPath = utils.getParentPath(dbPath);
+		if(parentPath) {
+			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
+		}
+		const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
+		return yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, blake2b224, mtime, executable]
 		);
-	}
+	});
 
 	// Check again to narrow the race condition
 	yield throwIfAlreadyInDb();
