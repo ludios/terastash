@@ -5,7 +5,7 @@ const fs = require('fs');
 const Promise = require('bluebird');
 
 // Promisify only the functions we need to avoid a 24+ ms require
-// penalty with promisifyAll (tested Intel 4970K)
+// penalty with promisifyAll (tested Intel 4790K)
 module.exports = {
 	chmodAsync: Promise.promisify(fs.chmod),
 	closeAsync: Promise.promisify(fs.close),
