@@ -762,6 +762,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		if(parentPath) {
 			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
+		// TODO: make makeDirsInDb return uuid so that we don't have to get it again
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
 		return yield runQuery(
 			client,
