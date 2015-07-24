@@ -355,7 +355,7 @@ function allIdentical(arr) {
 
 function filledArray(n, obj) {
 	T(n, T.number, obj, T.any);
-	A(Number.isInteger(n), n);
+	assertSafeNonNegativeInteger(n);
 	return Array.apply(null, new Array(n)).map(function(_) { return obj; });
 }
 

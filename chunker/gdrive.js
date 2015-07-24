@@ -322,9 +322,8 @@ class GDriver {
 	*getData(fileId, range) {
 		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])));
 		if(range) {
-			A(Number.isInteger(range[0]), range[0], "must be an integer");
-			A(Number.isInteger(range[1]), range[1], "must be an integer");
-			A.gte(range[0], 0);
+			utils.assertSafeNonNegativeInteger(range[0]);
+			utils.assertSafeNonNegativeInteger(range[1]);
 			A.gte(range[1], range[0], "end must be >= start in range [start, end]");
 		}
 		yield this._maybeRefreshAndSaveToken();
