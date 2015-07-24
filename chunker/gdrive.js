@@ -9,6 +9,7 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const retry = require('../retry');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
 
@@ -395,32 +396,6 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-function waitPromise(ms) {
-	T(ms, T.number);
-	A.gte(ms, 0);
-	return new Promise(function(resolve) {
-		setTimeout(resolve, ms);
-	});
-}
-
-const retryPromiseFunc = Promise.coroutine(function* retryPromiseFunc$coro(func, tries) {
-	T(func, T.function, tries, T.number);
-	utils.assertSafeNonNegativeInteger(tries);
-	let caught = null;
-	while(tries) {
-		try {
-			return yield func();
-		} catch(e) {
-			A(e, "expected e to be truthy");
-			caught = e;
-		}
-		tries--;
-		yield waitPromise(2000);
-	}
-	A.neq(caught, null);
-	throw caught;
-});
-
 const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getCipherStream, chunkSize) {
 	T(gdriver, GDriver, parents, T.list(T.string), getCipherStream, T.function, chunkSize, T.number);
 
@@ -434,9 +409,10 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 	for(const chunkStream of chopshop.chunk(getCipherStream(), chunkSize)) {
 		const fname = utils.makeChunkFilename();
 		const crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
-		const response = yield retryPromiseFunc(function() {
+		const decayer = new retry.Decayer(3*1000, 1.5, 120*1000);
+		const response = yield retry.retryFunction(function() {
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
-		}, 1); /* TODO: 10 */
+		}, 1, decayer); /* TODO: 10 tries */
 		// We can trust the md5Checksum in response; createFile checked it for us
 		const md5Digest = new Buffer(response['md5Checksum'], 'hex');
 		chunkInfo.push({
