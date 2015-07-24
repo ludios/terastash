@@ -395,8 +395,34 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, cipherStream, chunkSize) {
-	T(gdriver, GDriver, parents, T.list(T.string), cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
+function waitPromise(ms) {
+	T(ms, T.number);
+	A.gte(ms, 0);
+	return new Promise(function(resolve) {
+		setTimeout(resolve, ms);
+	});
+}
+
+const retryPromiseFunc = Promise.coroutine(function* retryPromiseFunc$coro(func, tries) {
+	T(func, T.function, tries, T.number);
+	utils.assertSafeNonNegativeInteger(tries);
+	let caught = null;
+	while(tries) {
+		try {
+			return yield func();
+		} catch(e) {
+			A(e, "expected e to be truthy");
+			caught = e;
+		}
+		tries--;
+		yield waitPromise(2000);
+	}
+	A.neq(caught, null);
+	throw caught;
+});
+
+const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getCipherStream, chunkSize) {
+	T(gdriver, GDriver, parents, T.list(T.string), getCipherStream, T.function, chunkSize, T.number);
 
 	// Chunk size must be a multiple of an AES block, for implementation convenience.
 	A.eq(chunkSize % 128/8, 0);
@@ -405,10 +431,12 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 	let idx = 0;
 	const chunkInfo = [];
 
-	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
+	for(const chunkStream of chopshop.chunk(getCipherStream(), chunkSize)) {
 		const fname = utils.makeChunkFilename();
 		const crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
-		const response = yield gdriver.createFile(fname, {parents}, crc32Hasher.stream);
+		const response = yield retryPromiseFunc(function() {
+			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
+		}, 1); /* TODO: 10 */
 		// We can trust the md5Checksum in response; createFile checked it for us
 		const md5Digest = new Buffer(response['md5Checksum'], 'hex');
 		chunkInfo.push({

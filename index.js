@@ -704,31 +704,39 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// TODO: validate storeName
 		key = makeKey();
 
-		const inputStream = fs.createReadStream(p);
 		if(!padded_stream) {
 			padded_stream = require('./padded_stream');
 		}
-		const hasher = utils.streamHasher(inputStream, 'blake2b');
 		const concealedSize = utils.concealSize(stat.size);
-		const padder = new padded_stream.Padder(concealedSize);
-		utils.pipeWithErrors(hasher.stream, padder);
-		selfTests.aes();
-		const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
-		utils.pipeWithErrors(padder, cipherStream);
+
+		// Because chunk upload may fail, we may need to restart the stream,
+		// hence this function.
+		let hasher;
+		let padder;
+		const getCipherStream = function getCipherStream() {
+			const inputStream = fs.createReadStream(p);
+			hasher = utils.streamHasher(inputStream, 'blake2b');
+			padder = new padded_stream.Padder(concealedSize);
+			utils.pipeWithErrors(hasher.stream, padder);
+			selfTests.aes();
+			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+			utils.pipeWithErrors(padder, cipherStream);
+			return cipherStream;
+		};
 
 		let _;
 		if(chunkStore.type === "localfs") {
 			if(!localfs) {
 				localfs = require('./chunker/localfs');
 			}
-			_ = yield localfs.writeChunks(chunkStore.directory, cipherStream, chunkStore.chunkSize);
+			_ = yield localfs.writeChunks(chunkStore.directory, getCipherStream, chunkStore.chunkSize);
 		} else if(chunkStore.type === "gdrive") {
 			if(!gdrive) {
 				gdrive = require('./chunker/gdrive');
 			}
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
-			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, cipherStream, chunkStore.chunkSize);
+			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, getCipherStream, chunkStore.chunkSize);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}

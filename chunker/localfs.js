@@ -13,8 +13,8 @@ const utils = require('../utils');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, cipherStream, chunkSize) {
-	T(directory, T.string, cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, getCipherStream, chunkSize) {
+	T(directory, T.string, getCipherStream, T.function, chunkSize, T.number);
 
 	// Chunk size must be a multiple of an AES block, for implementation convenience.
 	A.eq(chunkSize % 128/8, 0);
@@ -23,7 +23,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, ciph
 	const chunkInfo = [];
 
 	let idx = 0;
-	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
+	for(const chunkStream of chopshop.chunk(getCipherStream(), chunkSize)) {
 		const tempFname = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
 		const writeStream = fs.createWriteStream(tempFname);
 
