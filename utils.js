@@ -19,6 +19,13 @@ let sse4_crc32;
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
 
+function assertSafeNonNegativeInteger(num) {
+	T(num, T.number);
+	A(Number.isInteger(num), num);
+	A.gte(num, 0);
+	A.lte(num, Number.MAX_SAFE_INTEGER);
+}
+
 function randInt(min, max) {
 	const range = max - min;
 	const rand = Math.floor(Math.random() * (range + 1));
@@ -58,6 +65,7 @@ function shortISO(d) {
 
 function pad(s, wantLength) {
 	T(s, T.string, wantLength, T.number);
+	assertSafeNonNegativeInteger(wantLength);
 	return " ".repeat(Math.max(0, wantLength - s.length)) + s;
 }
 
@@ -178,8 +186,8 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 
 function roundUpToNearest(n, nearest) {
 	T(n, T.number, nearest, T.number);
-	A(Number.isInteger(n), n);
-	A(Number.isInteger(nearest), nearest);
+	assertSafeNonNegativeInteger(n);
+	assertSafeNonNegativeInteger(nearest);
 	return Math.ceil(n/nearest) * nearest;
 }
 
@@ -188,13 +196,12 @@ function roundUpToNearest(n, nearest) {
  * For non-tiny files, return (2^floor(log2(n)))/64
  */
 function getConcealmentSize(n) {
-	T(n, T.number);
-	A(Number.isInteger(n), n);
+	assertSafeNonNegativeInteger(n);
 	const averageWasteage = 1/128; // ~= .78%
 	let ret = Math.pow(2, Math.floor(Math.log2(n))) * (averageWasteage*2);
 	// This also takes care of non-integers we get out of the above fn
 	ret = Math.max(16, ret);
-	A(Number.isInteger(ret), ret);
+	assertSafeNonNegativeInteger(ret);
 	return ret;
 }
 
@@ -203,8 +210,7 @@ function getConcealmentSize(n) {
  * to a size 0% to 1.5625% of the original size.
  */
 function concealSize(n) {
-	T(n, T.number);
-	A(Number.isInteger(n), n);
+	assertSafeNonNegativeInteger(n);
 	const ret = roundUpToNearest(Math.max(1, n), getConcealmentSize(n));
 	A.gte(ret, n);
 	return ret;
@@ -358,6 +364,7 @@ class PersistentCounter {
 		T(fname, T.string, start, T.optional(T.number));
 		this.fname = fname;
 		this.start = start !== undefined ? start : 0;
+		assertSafeNonNegativeInteger(this.start);
 	}
 
 	getNext() {
@@ -370,13 +377,13 @@ class PersistentCounter {
 			}
 			n = this.start;
 		}
+		assertSafeNonNegativeInteger(n);
 		this.setNumber(n + 1);
 		return n;
 	}
 
 	setNumber(num) {
-		T(num, T.number);
-		A(Number.isInteger(num), num);
+		assertSafeNonNegativeInteger(num);
 		return Number(fs.writeFileSync(this.fname, String(num)));
 	}
 
@@ -432,8 +439,8 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 });
 
 module.exports = {
-	emptyFrozenArray, randInt, sameArrayValues, prop, shortISO, pad,
-	numberWithCommas, getParentPath, getBaseName, ol,
+	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
+	prop, shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,

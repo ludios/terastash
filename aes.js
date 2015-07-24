@@ -4,6 +4,7 @@
 const A = require('ayy');
 const T = require('notmytype');
 const crypto = require('crypto');
+const utils = require('./utils');
 
 /**
  * Make sure that OpenSSL's AES-128-CTR cipher works as expected, including
@@ -37,22 +38,15 @@ function selfTest() {
 	A.eq(decrypted.toString('utf-8'), text.substr(16));
 }
 
-function assertSafeNonNegativeInteger(num) {
-	T(num, T.number);
-	A(Number.isInteger(num), num);
-	A.gte(num, 0);
-	A.lte(num, Number.MAX_SAFE_INTEGER);
-}
-
 function strictZeroPad(s, num) {
 	T(s, T.string, num, T.number);
-	assertSafeNonNegativeInteger(num);
+	utils.assertSafeNonNegativeInteger(num);
 	A.lte(s.length, num);
 	return '0'.repeat(num - s.length) + s;
 }
 
 function blockNumberToIv(blockNum) {
-	assertSafeNonNegativeInteger(blockNum);
+	utils.assertSafeNonNegativeInteger(blockNum);
 	const buf = new Buffer(strictZeroPad(blockNum.toString(16), 32), 'hex');
 	A(buf.length, 16);
 	return buf;
