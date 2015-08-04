@@ -696,8 +696,8 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 				chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''},
 				head: ['which', 'mtime', 'size', 'executable']
 			});
-			table.push(['old', String(oldRow.mtime), oldRow.size, oldRow.executable]);
-			table.push(['new', String(mtime), stat.size, executable]);
+			table.push(['old', String(oldRow.mtime), commaify(oldRow.size), oldRow.executable]);
+			table.push(['new', String(mtime), commaify(stat.size), executable]);
 			console.log(`Notice: replacing ${inspect(dbPath)} in db\n${table.toString()}`);
 			yield dropFile(client, stashInfo, dbPath);
 		} else {
