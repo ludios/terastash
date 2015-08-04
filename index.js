@@ -726,7 +726,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		const concealedSize = utils.concealSize(stat.size);
 
 		let hash = blake2.createHash("blake2b");
-		let hashBackup = hash.copy();
+		let hashBackup;
 
 		let hasher;
 		let padder;
