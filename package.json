@@ -18,7 +18,6 @@
     "cache-require-paths": "^0.1.2",
     "cassandra-driver": "^2.1.2",
     "chalk": "^1.1.0",
-    "chopshop": "^0.3.2",
     "cli-table": "^0.3.1",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
