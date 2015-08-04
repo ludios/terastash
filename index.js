@@ -549,9 +549,6 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnO
 	}
 });
 
-const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
-A.eq(iv0.length, 128/8);
-
 function makeKey() {
 	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
@@ -1043,7 +1040,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
 		selfTests.aes();
-		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, iv0);
+		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
 		utils.pipeWithErrors(cipherStream, clearStream);
 		if(!padded_stream) {
 			padded_stream = require('./padded_stream');
