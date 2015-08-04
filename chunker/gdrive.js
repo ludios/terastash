@@ -415,11 +415,16 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 				return null;
 			}
 			crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
+			if(Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
+				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
+			}
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
-		}), function writeChunks$errorHandler(e) {
+		}), function writeChunks$errorHandler(e, triesLeft) {
 			repeatLastChunk = true;
-			// TODO: log only when TERASTASH_LOGGING
-			console.log(e);
+			if(Number(process.env.TERASTASH_LOG_LEVEL) > 0) {
+				console.error(`Error while uploading chunk ${idx}; ${triesLeft} tries left:`);
+				console.error(e.stack);
+			}
 		}, 10, decayer);
 		if(response === null) {
 			break;

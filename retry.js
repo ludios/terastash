@@ -59,7 +59,7 @@ const retryFunction = Promise.coroutine(function* retryPromiseFunc$coro(func, er
 		} catch(e) {
 			A(e, "expected e to be truthy");
 			caught = e;
-			errorHandler(caught);
+			errorHandler(caught, tries);
 		}
 		tries--;
 		yield wait(decayer.decay());
