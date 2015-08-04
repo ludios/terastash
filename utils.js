@@ -286,6 +286,7 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	if(existingLength === undefined) {
 		existingLength = 0;
 	}
+	assertSafeNonNegativeInteger(existingLength);
 	let hash;
 	if(typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
