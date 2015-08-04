@@ -277,27 +277,39 @@ function crc32$digest(encoding) {
  *		length: number of bytes read from input stream
  * }
  */
-function streamHasher(inputStream, algo) {
-	T(inputStream, T.shape({pipe: T.function}), algo, T.string);
+function streamHasher(inputStream, algoOrExistingHash, existingLength) {
+	T(
+		inputStream, T.shape({pipe: T.function}),
+		algoOrExistingHash, T.union([T.string, T.object]),
+		existingLength, T.optional(T.number)
+	);
+	if(existingLength === undefined) {
+		existingLength = 0;
+	}
 	let hash;
-	if(/^blake2/.test(algo)) {
-		if(!blake2) {
-			blake2 = compile_require('blake2');
+	if(typeof algoOrExistingHash === "string") {
+		const algo = algoOrExistingHash;
+		if(/^blake2/.test(algo)) {
+			if(!blake2) {
+				blake2 = compile_require('blake2');
+			}
+			hash = blake2.createHash(algo);
+		} else if(algo === "crc32c") {
+			if(!sse4_crc32) {
+				sse4_crc32 = compile_require('sse4_crc32');
+			}
+			hash = new sse4_crc32.CRC32();
+			hash.digest = crc32$digest;
+		} else {
+			hash = crypto.createHash(algo);
 		}
-		hash = blake2.createHash(algo);
-	} else if(algo === "crc32c") {
-		if(!sse4_crc32) {
-			sse4_crc32 = compile_require('sse4_crc32');
-		}
-		hash = new sse4_crc32.CRC32();
-		hash.digest = crc32$digest;
 	} else {
-		hash = crypto.createHash(algo);
+		hash = algoOrExistingHash;
 	}
 
 	const stream = new PassThrough();
 	pipeWithErrors(inputStream, stream);
-	const out = {stream, hash, length: 0};
+	const out = {stream, hash, length: existingLength};
 	stream.on('data', function(data) {
 		out.length += data.length;
 		hash.update(data);

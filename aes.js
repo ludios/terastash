@@ -6,6 +6,23 @@ const T = require('notmytype');
 const crypto = require('crypto');
 const utils = require('./utils');
 
+const BLOCK_SIZE = 16;
+const IV_SIZE = 16;
+
+function strictZeroPad(s, num) {
+	T(s, T.string, num, T.number);
+	utils.assertSafeNonNegativeInteger(num);
+	A.lte(s.length, num);
+	return '0'.repeat(num - s.length) + s;
+}
+
+function blockNumberToIv(blockNum) {
+	utils.assertSafeNonNegativeInteger(blockNum);
+	const buf = new Buffer(strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
+	A(buf.length, IV_SIZE);
+	return buf;
+}
+
 /**
  * Make sure that OpenSSL's AES-128-CTR cipher works as expected, including
  * our use of the IV as the counter.
@@ -14,8 +31,8 @@ function selfTest() {
 	let cipher;
 	let decrypted;
 	const key = new Buffer('12300000000000045600000000000789', 'hex');
-	const iv0 = new Buffer('00000000000000000000000000000000', 'hex');
-	const iv1 = new Buffer('00000000000000000000000000000001', 'hex');
+	const iv0 = blockNumberToIv(0);
+	const iv1 = blockNumberToIv(1);
 
 	// Test for exact ciphertext
 	cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
@@ -34,22 +51,8 @@ function selfTest() {
 
 	// Test that we can decrypt the middle of the ciphertext with an incremented IV
 	cipher = crypto.createCipheriv('aes-128-ctr', key, iv1);
-	decrypted = cipher.update(encrypted.slice(16));
-	A.eq(decrypted.toString('utf-8'), text.substr(16));
+	decrypted = cipher.update(encrypted.slice(BLOCK_SIZE));
+	A.eq(decrypted.toString('utf-8'), text.substr(BLOCK_SIZE));
 }
 
-function strictZeroPad(s, num) {
-	T(s, T.string, num, T.number);
-	utils.assertSafeNonNegativeInteger(num);
-	A.lte(s.length, num);
-	return '0'.repeat(num - s.length) + s;
-}
-
-function blockNumberToIv(blockNum) {
-	utils.assertSafeNonNegativeInteger(blockNum);
-	const buf = new Buffer(strictZeroPad(blockNum.toString(16), 32), 'hex');
-	A(buf.length, 16);
-	return buf;
-}
-
-module.exports = {selfTest, blockNumberToIv};
+module.exports = {BLOCK_SIZE, blockNumberToIv, selfTest};

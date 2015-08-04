@@ -7,23 +7,23 @@ const fs = require('../fs-promisified');
 const path = require('path');
 const crypto = require('crypto');
 const Promise = require('bluebird');
-const chopshop = require('chopshop');
 const Combine = require('combine-streams');
 const utils = require('../utils');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, cipherStream, chunkSize) {
-	T(directory, T.string, cipherStream, T.shape({pipe: T.function}), chunkSize, T.number);
-
-	// Chunk size must be a multiple of an AES block, for implementation convenience.
-	A.eq(chunkSize % 128/8, 0);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, getChunkStream) {
+	T(directory, T.string, getChunkStream, T.function);
 
 	let totalSize = 0;
+	let idx = 0;
 	const chunkInfo = [];
 
-	let idx = 0;
-	for(const chunkStream of chopshop.chunk(cipherStream, chunkSize)) {
+	while(true) {
+		const chunkStream = yield getChunkStream(false);
+		if(chunkStream === null) {
+			break;
+		}
 		const tempFname = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
 		const writeStream = fs.createWriteStream(tempFname);
 
@@ -33,7 +33,6 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, ciph
 		yield new Promise(function writeChunks$Promise(resolve) {
 			writeStream.once('finish', Promise.coroutine(function*() {
 				const size = (yield fs.statAsync(tempFname)).size;
-				A.lte(size, chunkSize);
 				totalSize += size;
 				const crc32c = hasher.hash.digest();
 				const file_id = utils.makeChunkFilename();
