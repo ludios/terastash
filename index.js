@@ -21,6 +21,7 @@ const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const deepEqual = require('deep-equal');
 const Table = require('cli-table');
+let aes;
 let cassandra;
 let localfs;
 let blake2;
@@ -315,6 +316,12 @@ class UnexpectedFileError extends Error {
 	}
 }
 
+class FileChangedError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
 const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasename$coro(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
@@ -372,14 +379,16 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 		${limit === undefined ? "" : "LIMIT " + limit}`,
 		[parent], {autoPage: true, prepare: true}
 	);
-	rowStream.on('readable', function() {
+	rowStream.on('readable', function getChildForParent$rowStream$readable() {
 		let row;
 		while(row = this.read()) {
 			rows.push(row);
 		}
 	});
-	return new Promise(function(resolve, reject) {
-		rowStream.on('end', function() { resolve(rows); });
+	return new Promise(function getChildForParent$Promise(resolve, reject) {
+		rowStream.on('end', function getChildForParent$rowStream$end() {
+			resolve(rows);
+		});
 		rowStream.once('error', reject);
 	});
 });
@@ -588,8 +597,11 @@ const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) 
 });
 
 let selfTests;
-selfTests = {aes: function() {
-	require('./aes').selfTest();
+selfTests = {aes: function selfTests$aes() {
+	if(!aes) {
+		aes = require('./aes');
+	}
+	aes.selfTest();
 	selfTests.aes = noop;
 }};
 
@@ -707,46 +719,102 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		if(!padded_stream) {
 			padded_stream = require('./padded_stream');
 		}
+		if(!blake2) {
+			blake2 = compile_require('blake2');
+		}
+
 		const concealedSize = utils.concealSize(stat.size);
 
-		// Because chunk upload may fail, we may need to restart the stream,
-		// hence this function.
+		let hash = blake2.createHash("blake2b");
+		let hashBackup = hash.copy();
+
 		let hasher;
 		let padder;
-		const getCipherStream = function getCipherStream() {
-			const inputStream = fs.createReadStream(p);
-			hasher = utils.streamHasher(inputStream, 'blake2b');
-			padder = new padded_stream.Padder(concealedSize);
+		let start = -chunkStore.chunkSize;
+		// getChunkStream is like a next() on an iterator, except caller can pass
+		// in `true` to get the last chunk again.  This "rewinding" is necessary
+		// because upload of a chunk may fail and need to be retried.   We don't
+		// want to re-read the entire file just to continue with the chunk we need
+		// again.
+		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(repeatLastChunk) {
+			T(repeatLastChunk, T.boolean);
+
+			if(!aes) {
+				aes = require('./aes');
+			}
+
+			// Chunk size must be a multiple of an AES block, for implementation convenience.
+			A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
+
+			if(!repeatLastChunk) {
+				hashBackup = hash.copy();
+				start += chunkStore.chunkSize;
+			} else {
+				hash = hashBackup.copy();
+			}
+
+			utils.assertSafeNonNegativeInteger(start);
+			A.eq(start % aes.BLOCK_SIZE, 0);
+			if(start >= concealedSize) {
+				// No more chunk streams
+				return null;
+			}
+
+			// Ensure that file is still the same size before opening it again
+			const statAgain = yield fs.statAsync(p);
+			if(statAgain.size !== stat.size) {
+				throw new FileChangedError(
+					`Size of ${inspect(p)} changed from\n` +
+					`${commaify(stat.size)} to\n${commaify(statAgain.size)}`
+				);
+			}
+			if(statAgain.mtime.getTime() !== stat.mtime.getTime()) {
+				throw new FileChangedError(
+					`mtime of ${inspect(p)} changed from\n` +
+					`${inspect(stat.mtime)} to\n${inspect(statAgain.mtime)}`
+				);
+			}
+
+			// - 1 because byte range is inclusive on both start and end
+			// This may get us a stream with 0 bytes because we've already
+			// read everything.  We still need to continue because we may
+			// not have finished streaming the padding.
+			//console.log({start, end: (start + chunkStore.chunkSize - 1)});
+			const inputStream = fs.createReadStream(
+				p, {start, end: (start + chunkStore.chunkSize - 1)});
+
+			hasher = utils.streamHasher(inputStream, hash, start);
+			padder = new padded_stream.Padder(
+				Math.min(chunkStore.chunkSize, concealedSize - start));
 			utils.pipeWithErrors(hasher.stream, padder);
+
 			selfTests.aes();
-			const cipherStream = crypto.createCipheriv('aes-128-ctr', key, iv0);
+			const cipherStream = crypto.createCipheriv(
+				'aes-128-ctr', key, aes.blockNumberToIv(start / aes.BLOCK_SIZE));
 			utils.pipeWithErrors(padder, cipherStream);
+
 			return cipherStream;
-		};
+		});
 
 		let _;
 		if(chunkStore.type === "localfs") {
 			if(!localfs) {
 				localfs = require('./chunker/localfs');
 			}
-			_ = yield localfs.writeChunks(chunkStore.directory, getCipherStream, chunkStore.chunkSize);
+			_ = yield localfs.writeChunks(chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
 			if(!gdrive) {
 				gdrive = require('./chunker/gdrive');
 			}
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
-			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, getCipherStream, chunkStore.chunkSize);
+			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, getChunkStream);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
 
 		const totalSize = _[0];
 		chunkInfo = _[1];
-		A.eq(padder.bytesRead, stat.size,
-			`For ${dbPath}, read\n` +
-			`${commaify(padder.bytesRead)} bytes instead of the expected\n` +
-			`${commaify(stat.size)} bytes; did file change during reading?`);
 		A.eq(totalSize, concealedSize,
 			`For ${dbPath}, wrote to chunks\n` +
 			`${commaify(totalSize)} bytes instead of the expected\n` +
@@ -985,7 +1053,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		const streamWrapper = streamifier.createReadStream(row.content);
 		hasher = utils.streamHasher(streamWrapper, 'blake2b');
 	}
-	hasher.stream.once('end', function() {
+	hasher.stream.once('end', function streamFile$hasher$end() {
 		if(hasher.length !== Number(row.size)) {
 			hasher.stream.emit('error', new Error(
 				`For dbPath=${dbPath}, expected length of content to be\n` +
@@ -1024,13 +1092,13 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 	const writeStream = fs.createWriteStream(outputFilename);
 	utils.pipeWithErrors(readStream, writeStream);
 	yield new Promise(function getFiles$Promise(resolve, reject) {
-		writeStream.once('finish', function() {
+		writeStream.once('finish', function getFile$writeStream$finish() {
 			resolve();
 		});
-		writeStream.once('error', function(err) {
+		writeStream.once('error', function getFile$writeStream$error(err) {
 			reject(err);
 		});
-		readStream.once('error', function(err) {
+		readStream.once('error', function getFile$readStream$error(err) {
 			reject(err);
 		});
 	});
@@ -1597,5 +1665,5 @@ module.exports = {
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
-	DifferentStashesError, UnexpectedFileError, UsageError
+	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError
 };

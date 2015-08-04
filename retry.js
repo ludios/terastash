@@ -42,20 +42,24 @@ function wait(ms) {
 }
 
 /**
- * func may return a Promise or a non-Promise value
- * tries is number of times to try before giving up
- * decayer is an instance of Decayer
+ * func - function to call; it must return a Promise
+ * errorHandler - function to call with error, if error was caught
+ * tries - number of times to try before giving up
+ * decayer - an instance of Decayer
  */
-const retryFunction = Promise.coroutine(function* retryPromiseFunc$coro(func, tries, decayer) {
-	T(func, T.function, tries, T.number, decayer, Decayer);
+const retryFunction = Promise.coroutine(function* retryPromiseFunc$coro(func, errorHandler, tries, decayer) {
+	T(func, T.function, errorHandler, T.function, tries, T.number, decayer, Decayer);
 	utils.assertSafeNonNegativeInteger(tries);
 	let caught = null;
 	while(tries) {
 		try {
-			return func();
+			// Need the 'yield' here to make sure errors are caught
+			// in *this* function
+			return yield func();
 		} catch(e) {
 			A(e, "expected e to be truthy");
 			caught = e;
+			errorHandler(caught);
 		}
 		tries--;
 		yield wait(decayer.decay());

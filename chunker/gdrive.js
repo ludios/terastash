@@ -3,7 +3,6 @@
 
 const google = require('googleapis');
 const Promise = require('bluebird');
-const chopshop = require('chopshop');
 const A = require('ayy');
 const T = require('notmytype');
 const Combine = require('combine-streams');
@@ -360,7 +359,7 @@ class GDriver {
 				A(googHash.startsWith("crc32c="), googHash);
 				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
 			}
-			hasher.stream.once('end', function() {
+			hasher.stream.once('end', function getData$hasher$end() {
 				const computedCRC = hasher.hash.digest();
 				if(googCRC && !computedCRC.equals(googCRC)) {
 					hasher.stream.emit('error', new Error(
@@ -396,23 +395,35 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getCipherStream, chunkSize) {
-	T(gdriver, GDriver, parents, T.list(T.string), getCipherStream, T.function, chunkSize, T.number);
-
-	// Chunk size must be a multiple of an AES block, for implementation convenience.
-	A.eq(chunkSize % 128/8, 0);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getChunkStream) {
+	T(gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
 
 	let totalSize = 0;
 	let idx = 0;
 	const chunkInfo = [];
 
-	for(const chunkStream of chopshop.chunk(getCipherStream(), chunkSize)) {
-		const fname = utils.makeChunkFilename();
-		const crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
+	while(true) {
 		const decayer = new retry.Decayer(3*1000, 1.5, 120*1000);
-		const response = yield retry.retryFunction(function() {
+		let repeatLastChunk = false;
+		let crc32Hasher;
+		const response = yield retry.retryFunction(Promise.coroutine(function* writeChunks$retry() {
+			// Make a new filename each time, in case server reports error
+			// when it actually succeeded.
+			const fname = utils.makeChunkFilename();
+			const chunkStream = yield getChunkStream(repeatLastChunk);
+			if(chunkStream === null) {
+				return null;
+			}
+			crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
-		}, 1, decayer); /* TODO: 10 tries */
+		}), function writeChunks$errorHandler(e) {
+			repeatLastChunk = true;
+			// TODO: log only when TERASTASH_LOGGING
+			console.log(e);
+		}, 10, decayer);
+		if(response === null) {
+			break;
+		}
 		// We can trust the md5Checksum in response; createFile checked it for us
 		const md5Digest = new Buffer(response['md5Checksum'], 'hex');
 		chunkInfo.push({
