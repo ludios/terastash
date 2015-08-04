@@ -404,13 +404,13 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 
 	while(true) {
 		const decayer = new retry.Decayer(3*1000, 1.5, 120*1000);
-		let repeatLastChunk = false;
+		let lastChunkAgain = false;
 		let crc32Hasher;
 		const response = yield retry.retryFunction(Promise.coroutine(function* writeChunks$retry() {
 			// Make a new filename each time, in case server reports error
 			// when it actually succeeded.
 			const fname = utils.makeChunkFilename();
-			const chunkStream = yield getChunkStream(repeatLastChunk);
+			const chunkStream = yield getChunkStream(lastChunkAgain);
 			if(chunkStream === null) {
 				return null;
 			}
@@ -420,7 +420,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 			}
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}), function writeChunks$errorHandler(e, triesLeft) {
-			repeatLastChunk = true;
+			lastChunkAgain = true;
 			if(Number(process.env.TERASTASH_LOG_LEVEL) > 0) {
 				console.error(`Error while uploading chunk ${idx}; ${triesLeft} tries left:`);
 				console.error(e.stack);

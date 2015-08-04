@@ -736,8 +736,8 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// because upload of a chunk may fail and need to be retried.   We don't
 		// want to re-read the entire file just to continue with the chunk we need
 		// again.
-		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(repeatLastChunk) {
-			T(repeatLastChunk, T.boolean);
+		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(lastChunkAgain) {
+			T(lastChunkAgain, T.boolean);
 
 			if(!aes) {
 				aes = require('./aes');
@@ -746,7 +746,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 			// Chunk size must be a multiple of an AES block, for implementation convenience.
 			A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
 
-			if(!repeatLastChunk) {
+			if(!lastChunkAgain) {
 				hashBackup = hash.copy();
 				start += chunkStore.chunkSize;
 			} else {
