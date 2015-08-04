@@ -733,6 +733,8 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// because upload of a chunk may fail and need to be retried.   We don't
 		// want to re-read the entire file just to continue with the chunk we need
 		// again.
+		//
+		// If called with false, last chunk *must* have been fully read!
 		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(lastChunkAgain) {
 			T(lastChunkAgain, T.boolean);
 
