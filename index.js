@@ -900,8 +900,8 @@ function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
 					yield addFile(client, stashInfo, p, dbPath, dropOldIfDifferent);
 				} catch(err) {
 					if(!(err instanceof PathAlreadyExistsError ||
-						err instanceof UnexpectedFileError /* was sticky */
-					) || !continueOnExists) {
+						err instanceof UnexpectedFileError /* was sticky */)
+					|| !continueOnExists) {
 						throw err;
 					}
 					console.error(chalk.red(err.message));
@@ -969,15 +969,17 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 	}
 });
 
-function shooFiles(paths, continueOnMismatch) {
-	T(paths, T.list(T.string), continueOnMismatch, T.optional(T.boolean));
+function shooFiles(paths, continueOnError) {
+	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
 	return doWithClient(Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
 			try {
 				yield shooFile(client, stashInfo, p);
 			} catch(err) {
-				if(!(err instanceof UnexpectedFileError) || !continueOnMismatch) {
+				if(!(err instanceof UnexpectedFileError ||
+					err instanceof NoSuchPathError)
+				|| !continueOnError) {
 					throw err;
 				}
 				console.error(chalk.red(err.message));

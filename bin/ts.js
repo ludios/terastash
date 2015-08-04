@@ -169,7 +169,7 @@ program
 
 program
 	.command('shoo <path...>')
-	.option('-c, --continue-on-mismatch', "Keep going on mtime/size mismatch errors")
+	.option('-c, --continue-on-error', "Keep going on mtime/size mismatches and no-such-path-in-db errors")
 	.description(d(`
 		Removes a file in the working directory and replaces it with a 'fake'
 		(a zero'ed sparse file of the same length).  File must already be in the
@@ -183,7 +183,7 @@ program
 		contain real content.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		catchAndLog(terastash.shooFiles(files, options.continueOnMismatch));
+		catchAndLog(terastash.shooFiles(files, options.continueOnError));
 	}));
 
 
