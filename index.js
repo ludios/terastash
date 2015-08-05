@@ -1006,6 +1006,16 @@ const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro
 	}
 });
 
+const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size, mtime) {
+	T(p, T.string, size, T.number, mtime, Date);
+	yield makeEmptySparseFile(p, size);
+	yield utils.utimesMilliseconds(p, mtime, mtime);
+	// TODO: do this without a stat?
+	const stat = yield fs.statAsync(p);
+	const withSticky = stat.mode | 0o1000;
+	yield fs.chmodAsync(p, withSticky);
+});
+
 const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
@@ -1029,11 +1039,7 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
 			);
 		}
-		yield makeEmptySparseFile(p, stat.size);
-		// Set the mtime because the truncate() in makeEmptySparseFile reset it
-		yield utils.utimesMilliseconds(p, row.mtime, row.mtime);
-		const withSticky = stat.mode | 0o1000;
-		yield fs.chmodAsync(p, withSticky);
+		yield makeFakeFile(p, stat.size, row.mtime);
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
@@ -1148,8 +1154,8 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 /**
  * Get a file or directory from the Cassandra database.
  */
-const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string);
+const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename, fake) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
 
 	const _ = yield streamFile(client, stashInfo, dbPath);
 	const row = _[0];
@@ -1163,28 +1169,32 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 	// 3) have other unwanted permissions set
 	yield utils.tryUnlink(outputFilename);
 
-	const writeStream = fs.createWriteStream(outputFilename);
-	utils.pipeWithErrors(readStream, writeStream);
-	yield new Promise(function getFiles$Promise(resolve, reject) {
-		writeStream.once('finish', function getFile$writeStream$finish() {
-			resolve();
+	if(fake) {
+		yield makeFakeFile(outputFilename, Number(row.size), row.mtime);
+	} else {
+		const writeStream = fs.createWriteStream(outputFilename);
+		utils.pipeWithErrors(readStream, writeStream);
+		yield new Promise(function getFiles$Promise(resolve, reject) {
+			writeStream.once('finish', function getFile$writeStream$finish() {
+				resolve();
+			});
+			writeStream.once('error', function getFile$writeStream$error(err) {
+				reject(err);
+			});
+			readStream.once('error', function getFile$readStream$error(err) {
+				reject(err);
+			});
 		});
-		writeStream.once('error', function getFile$writeStream$error(err) {
-			reject(err);
-		});
-		readStream.once('error', function getFile$readStream$error(err) {
-			reject(err);
-		});
-	});
-	yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
-	if(row.executable) {
-		// TODO: setting for 0o700 instead?
-		yield fs.chmodAsync(outputFilename, 0o770);
+		yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
+		if(row.executable) {
+			// TODO: setting for 0o700 instead?
+			yield fs.chmodAsync(outputFilename, 0o770);
+		}
 	}
 });
 
-function getFiles(stashName, paths) {
-	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+function getFiles(stashName, paths, fake) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean);
 	return doWithClient(Promise.coroutine(function* getFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
@@ -1199,7 +1209,7 @@ function getFiles(stashName, paths) {
 				outputFilename = stashInfo.path + '/' + dbPath;
 			}
 
-			yield getFile(client, stashInfo, dbPath, outputFilename);
+			yield getFile(client, stashInfo, dbPath, outputFilename, fake);
 		}
 	}));
 }

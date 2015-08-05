@@ -190,12 +190,13 @@ program
 program
 	.command('get <path...>')
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
+	.option('-f, --fake', 'Get a fake (NULLed + sticky bit) file instead of file with real content')
 	.description(d(`
 		Get a file or directory (recursively) from the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		catchAndLog(terastash.getFiles(name, files));
+		catchAndLog(terastash.getFiles(name, files, options.fake || false));
 	}));
 
 program

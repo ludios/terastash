@@ -101,6 +101,12 @@ Can shoo files
   Refusing to add file 'hello2' because it has sticky bit set, which may have been set by 'ts shoo'
   [1]
 
+Can get a fake file
+
+  $ ts get --fake hello
+  $ md5sum hello # md5sum is of two NULL bytes
+  c4103f122d27677c9db144cae1394a66  hello
+
 Cannot create files with illegal filenames
 
   $ touch 'con.c'
