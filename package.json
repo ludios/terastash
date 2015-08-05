@@ -28,9 +28,9 @@
     "notmytype": "^1.2.1",
     "object-assign": "^3.0.0",
     "request": "^2.60.0",
-    "sse4_crc32": "3.3.0",
+    "sse4_crc32": "^4.0.0",
     "streamifier": "^0.1.1",
-    "transit-js": "^0.8.807",
+    "transit-js": "^0.8.812",
     "xdg": "^0.1.1"
   },
   "devDependencies": {
