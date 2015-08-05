@@ -376,7 +376,7 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 		`SELECT ${utils.colsAsString(cols)}
 		from "${KEYSPACE_PREFIX + stashName}".fs
 		WHERE parent = ?
-		${limit === undefined ? "" : "LIMIT " + limit}`,
+		${limit === undefined ? "" : `LIMIT ${limit}`}`,
 		[parent], {autoPage: true, prepare: true}
 	);
 	rowStream.on('readable', function getChildForParent$rowStream$readable() {
