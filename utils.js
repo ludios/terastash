@@ -73,7 +73,7 @@ const StringOrNumber = T.union([T.string, T.number]);
 function numberWithCommas(stringOrNum) {
 	T(stringOrNum, StringOrNumber);
 	// http://stackoverflow.com/questions/2901102/
-	return ("" + stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+	return String(stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 /**
