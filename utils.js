@@ -376,8 +376,11 @@ class PersistentCounter {
 	constructor(fname, start) {
 		T(fname, T.string, start, T.optional(T.number));
 		this.fname = fname;
-		this.start = start !== undefined ? start : 0;
-		assertSafeNonNegativeInteger(this.start);
+		if(start === undefined) {
+			start = 0;
+		}
+		assertSafeNonNegativeInteger(start);
+		this.start = start;
 	}
 
 	getNext() {
