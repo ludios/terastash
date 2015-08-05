@@ -999,7 +999,7 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
 	if(row.type === 'd') {
-		throw new NotAFileError(`Can't put away dbPath=${inspect(dbPath)}; it is a directory`);
+		throw new NotAFileError(`Can't shoo dbPath=${inspect(dbPath)}; it is a directory`);
 	} else if(row.type === 'f') {
 		const stat = yield fs.statAsync(p);
 		T(stat.mtime, Date);
