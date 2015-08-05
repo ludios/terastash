@@ -12,9 +12,6 @@ const PassThrough = require('stream').PassThrough;
 const basedir = require('xdg').basedir;
 const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
-let https;
-let blake2;
-let sse4_crc32;
 
 class LazyModule {
 	constructor(path, requireFunc, postRequireHook) {
@@ -44,6 +41,10 @@ function loadNow(obj) {
 	}
 	return obj;
 }
+
+let blake2 = new LazyModule('blake2', compile_require);
+let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+let https = new LazyModule('https');
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
@@ -254,9 +255,7 @@ function pipeWithErrors(src, dest) {
 
 function makeHttpsRequest(options, stream) {
 	T(options, T.object, stream, T.optional(T.shape({pipe: T.function})));
-	if(!https) {
-		https = require('https');
-	}
+	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
 		const req = https.request(options, resolve).once('error', function(err) {
 			reject(err);
@@ -320,14 +319,10 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	if(typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
 		if(/^blake2/.test(algo)) {
-			if(!blake2) {
-				blake2 = compile_require('blake2');
-			}
+			blake2 = loadNow(blake2);
 			hash = blake2.createHash(algo);
 		} else if(algo === "crc32c") {
-			if(!sse4_crc32) {
-				sse4_crc32 = compile_require('sse4_crc32');
-			}
+			sse4_crc32 = loadNow(sse4_crc32);
 			hash = new sse4_crc32.CRC32();
 			hash.digest = crc32$digest;
 		} else {
