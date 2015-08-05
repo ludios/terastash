@@ -995,6 +995,9 @@ function validateChunks(chunks) {
 
 const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
 	T(p, T.string, size, T.number);
+	// First delete the existing file because it may have hard links, and we
+	// don't want to overwrite the content of said hard links.
+	yield utils.tryUnlink(p);
 	const handle = yield fs.openAsync(p, "w");
 	try {
 		yield fs.truncateAsync(handle, size);
@@ -1154,8 +1157,10 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 
 	yield mkdirpAsync(path.dirname(outputFilename));
 
-	// Delete the existing file because it may have the sticky bit set
-	// or other unwanted permissions.
+	// Delete the existing file because it may
+	// 1) have hard links
+	// 2) have the sticky bit set
+	// 3) have other unwanted permissions set
 	yield utils.tryUnlink(outputFilename);
 
 	const writeStream = fs.createWriteStream(outputFilename);

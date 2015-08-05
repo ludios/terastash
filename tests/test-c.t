@@ -86,7 +86,12 @@ Can shoo files
   $ echo -n hi > hello
   $ touch --date=1980-01-01 hello
   $ ts add hello
+  $ ln hello hello-hard-linked
+  $ md5sum hello-hard-linked
+  49f68a5c8493ec2c0bf489821c21fc3b  hello-hard-linked
   $ ts shoo hello
+  $ md5sum hello-hard-linked # make sure hello-hard-linked was unaffected
+  49f68a5c8493ec2c0bf489821c21fc3b  hello-hard-linked
   $ stat -c '%y' hello
   1980-01-01 00:00:00.000000000 +0000
   $ md5sum hello # md5sum is of two NULL bytes
