@@ -17,36 +17,34 @@ const Transform = require('stream').Transform;
 const utils = require('./utils');
 const filename = require('./filename');
 const commaify = utils.numberWithCommas;
+const LazyModule = utils.LazyModule;
+const loadNow = utils.loadNow;
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const deepEqual = require('deep-equal');
 const Table = require('cli-table');
-let aes;
+
+let CassandraClientType = T.object;
+
+let aes = new LazyModule('./aes.js');
 let cassandra;
-let localfs;
-let blake2;
-let gdrive;
-let readline;
-let padded_stream;
-let transit;
-let objectAssign = Object.assign;
+cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
+	CassandraClientType = realModule.Client;
+});
+let localfs = new LazyModule('./chunker/localfs');
+let gdrive = new LazyModule('./chunker/gdrive');
+let blake2 = new LazyModule('blake2', compile_require);
+let readline = new LazyModule('readline');
+let padded_stream = new LazyModule('./padded_stream');
+let transit = new LazyModule('transit-js');
 
 const KEYSPACE_PREFIX = "ts_";
 
 // TODO: get rid of this, use streamifier
 function blake2b224Buffer(buf) {
 	T(buf, Buffer);
-	if(!blake2) {
-		blake2 = compile_require('blake2');
-	}
+	blake2 = loadNow(blake2);
 	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
-}
-
-let CassandraClientType = T.object;
-
-function loadCassandra() {
-	cassandra = require('cassandra-driver');
-	CassandraClientType = cassandra.Client;
 }
 
 class CustomRetryPolicy extends RetryPolicy {
@@ -67,9 +65,7 @@ class CustomRetryPolicy extends RetryPolicy {
 }
 
 function getNewClient() {
-	if(!cassandra) {
-		loadCassandra();
-	}
+	cassandra = loadNow(cassandra);
 	return new cassandra.Client({
 		contactPoints: ['localhost'],
 		policies: {
@@ -595,9 +591,7 @@ const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) 
 
 let selfTests;
 selfTests = {aes: function selfTests$aes() {
-	if(!aes) {
-		aes = require('./aes');
-	}
+	aes = loadNow(aes);
 	aes.selfTest();
 	selfTests.aes = noop;
 }};
@@ -666,14 +660,10 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 	if(chunks !== null) {
 		validateChunks(chunks);
 		if(chunkStore.type === "localfs") {
-			if(!localfs) {
-				localfs = require('./chunker/localfs');
-			}
+			localfs = loadNow(localfs);
 			yield localfs.deleteChunks(chunkStore.directory, chunks);
 		} else {
-			if(!gdrive) {
-				gdrive = require('./chunker/gdrive');
-			}
+			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
 			yield gdrive.deleteChunks(gdriver, chunks);
@@ -781,15 +771,9 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// TODO: validate storeName
 		key = makeKey();
 
-		if(!padded_stream) {
-			padded_stream = require('./padded_stream');
-		}
-		if(!blake2) {
-			blake2 = compile_require('blake2');
-		}
-
 		const concealedSize = utils.concealSize(stat.size);
 
+		blake2 = loadNow(blake2);
 		let hash = blake2.createHash("blake2b");
 		let hashBackup;
 
@@ -806,10 +790,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(lastChunkAgain) {
 			T(lastChunkAgain, T.boolean);
 
-			if(!aes) {
-				aes = require('./aes');
-			}
-
+			aes = loadNow(aes);
 			// Chunk size must be a multiple of an AES block, for implementation convenience.
 			A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
 
@@ -851,6 +832,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 				p, {start, end: (start + chunkStore.chunkSize - 1)});
 
 			hasher = utils.streamHasher(inputStream, hash, start);
+			padded_stream = loadNow(padded_stream);
 			padder = new padded_stream.Padder(
 				Math.min(chunkStore.chunkSize, concealedSize - start));
 			utils.pipeWithErrors(hasher.stream, padder);
@@ -865,14 +847,10 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 
 		let _;
 		if(chunkStore.type === "localfs") {
-			if(!localfs) {
-				localfs = require('./chunker/localfs');
-			}
+			localfs = loadNow(localfs);
 			_ = yield localfs.writeChunks(chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
-			if(!gdrive) {
-				gdrive = require('./chunker/gdrive');
-			}
+			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
 			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, getChunkStream);
@@ -1103,15 +1081,11 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		A.eq(row.key.length, 128/8);
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
-			if(!localfs) {
-				localfs = require('./chunker/localfs');
-			}
+			localfs = loadNow(localfs);
 			const chunksDir = chunkStore.directory;
 			cipherStream = localfs.readChunks(chunksDir, chunks);
 		} else if(chunkStore.type === "gdrive") {
-			if(!gdrive) {
-				gdrive = require('./chunker/gdrive');
-			}
+			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
 			cipherStream = gdrive.readChunks(gdriver, chunks);
@@ -1121,9 +1095,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		selfTests.aes();
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
 		utils.pipeWithErrors(cipherStream, clearStream);
-		if(!padded_stream) {
-			padded_stream = require('./padded_stream');
-		}
+		padded_stream = loadNow(padded_stream);
 		const unpadder = new padded_stream.Unpadder(Number(row.size));
 		utils.pipeWithErrors(clearStream, unpadder);
 		hasher = utils.streamHasher(unpadder, 'blake2b');
@@ -1479,7 +1451,7 @@ const configChunkStore = Promise.coroutine(function* configChunkStore$coro(store
 
 const questionAsync = function(question) {
 	T(question, T.string);
-	if(!readline) { readline = require('readline'); }
+	readline = loadNow(readline);
 	return new Promise(function questionAsync$Promise(resolve) {
 		const rl = readline.createInterface({
 			input: process.stdin,
@@ -1494,7 +1466,7 @@ const questionAsync = function(question) {
 
 const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	T(name, T.string);
-	if(!gdrive) { gdrive = require('./chunker/gdrive'); }
+	gdrive = loadNow(gdrive);
 	const config = yield getChunkStores();
 	const chunkStore = config.stores[name];
 	if(!(typeof chunkStore === "object" && chunkStore !== null)) {
@@ -1612,21 +1584,14 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 
 let transitWriter;
 function getTransitWriter() {
-	if(!cassandra) {
-		loadCassandra();
-	}
-	if(!transit) {
-		transit = require('transit-js');
-	}
-	if(!objectAssign) {
-		objectAssign = require('object-assign');
-	}
+	cassandra = loadNow(cassandra);
+	transit = loadNow(transit);
 	if(!transitWriter) {
 		transitWriter = transit.writer("json-verbose", {handlers: transit.map([
 			cassandra.types.Row,
 			transit.makeWriteHandler({
 				tag: function(v, h) { return "Row"; },
-				rep: function(v, h) { return objectAssign({}, v); }
+				rep: function(v, h) { return Object.assign({}, v); }
 			}),
 			cassandra.types.Long,
 			transit.makeWriteHandler({

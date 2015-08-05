@@ -8,4 +8,4 @@ SELF="$(dirname "${BASH_SOURCE[0]}")"
 if [ -f /usr/bin/cygpath ]; then
 	SELF="$(/usr/bin/cygpath -w "$SELF")"
 fi
-iojs --harmony --harmony-rest-parameters --harmony-arrow-functions --strong-mode "$SELF/ts.js" "$@"
+iojs --harmony --harmony-rest-parameters --harmony-arrow-functions --harmony-object --strong-mode "$SELF/ts.js" "$@"

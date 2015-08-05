@@ -15,7 +15,7 @@ integration_pid=$!
 ./node_modules/.bin/eslint .
 eslint_ret="$?"
 
-iojs --harmony --harmony-rest-parameters --harmony-arrow-functions --strong-mode ./node_modules/.bin/_mocha tests/*.js
+iojs --harmony --harmony-rest-parameters --harmony-arrow-functions --harmony-object --strong-mode ./node_modules/.bin/_mocha tests/*.js
 mocha_ret="$?"
 
 echo 'Waiting for integration tests to finish...'

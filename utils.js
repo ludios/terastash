@@ -16,6 +16,35 @@ let https;
 let blake2;
 let sse4_crc32;
 
+class LazyModule {
+	constructor(path, requireFunc, postRequireHook) {
+		T(path, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
+		this.path = path;
+		this.requireFunc = requireFunc || require;
+		this.postRequireHook = postRequireHook;
+	}
+
+	load() {
+		const realModule = this.requireFunc(this.path);
+		if(this.postRequireHook) {
+			this.postRequireHook(realModule);
+		}
+		return realModule;
+	}
+}
+
+/**
+ * We must make the user do  x = loadNow(x);  instead of just loadNow(x);
+ * because setting module['x'] = x; doesn't affect the variable in the function
+ * until called again.
+ */
+function loadNow(obj) {
+	if(obj instanceof LazyModule) {
+		return obj.load();
+	}
+	return obj;
+}
+
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
 
@@ -455,6 +484,8 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 });
 
 module.exports = {
+	LazyModule, loadNow,
+
 	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
 	prop, shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey,
