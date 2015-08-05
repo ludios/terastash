@@ -26,7 +26,6 @@
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
     "notmytype": "^1.2.1",
-    "object-assign": "^3.0.0",
     "request": "^2.60.0",
     "sse4_crc32": "^4.0.0",
     "streamifier": "^0.1.1",
