@@ -426,6 +426,41 @@ function lsPath(stashName, options, p) {
 	});
 }
 
+let listRecursively;
+listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, dbPath) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+	//console.log({start: "start", dbPath});
+	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
+	const rows = yield getChildrenForParent(
+		client, stashInfo.name, parent,
+		["basename", "type"]
+	);
+	rows.sort(pathsorterAsc);
+	for(const row of rows) {
+		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
+		//console.log({dbPath, basename: row.basename});
+		let fullPath = "";
+		if(dbPath) {
+			fullPath += `${dbPath}/`;
+		}
+		fullPath += row.basename;
+		console.log(fullPath);
+		if(row.type === "d") {
+			yield listRecursively(client, stashInfo, fullPath);
+		}
+	}
+});
+
+// Like "find" utility
+function findPath(stashName, p) {
+	T(stashName, T.maybe(T.string), p, T.string);
+	return doWithClient(function lsPath$doWithClient(client) {
+		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
+			yield listRecursively(client, stashInfo, dbPath);
+		}));
+	});
+}
+
 const MISSING = Symbol('MISSING');
 const DIRECTORY = Symbol('DIRECTORY');
 const FILE = Symbol('FILE');
@@ -1643,7 +1678,7 @@ module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, KEYSPACE_PREFIX, dumpDb,
+	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError

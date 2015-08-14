@@ -287,6 +287,28 @@ program
 	}));
 
 program
+	.command('find [path...]')
+	.description(d(`
+		Recursively list files and directories`))
+	.option('-t, --type <type>', 'Find files of this type ("f" or "d")')
+	.option('-0', 'Print filenames separated by NULL instead of LF')
+	.action(a(function(paths, options) {
+		T(paths, T.list(T.string), options, T.object);
+		const name = stringOrNull(options.name);
+		if(name !== null && !paths.length) {
+			console.error("When using -n/--name, a database path is required");
+			process.exit(1);
+		}
+		// When not using -n, and no path given, use '.'
+		if(name === null && !paths.length) {
+			paths[0] = '.';
+		}
+		catchAndLog(terastash.findPath(
+			name, paths[0]
+		));
+	}));
+
+program
 	.command('list-stashes')
 	.description(d(`
 		List all terastash keyspaces in Cassandra`))
