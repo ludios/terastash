@@ -429,7 +429,6 @@ function lsPath(stashName, options, p) {
 let listRecursively;
 listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
-	//console.log({start: "start", dbPath});
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = yield getChildrenForParent(
 		client, stashInfo.name, parent,
@@ -438,17 +437,8 @@ listRecursively = Promise.coroutine(function* listRecursively$coro(client, stash
 	rows.sort(pathsorterAsc);
 	for(const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
-		//console.log({dbPath, basename: row.basename});
-		let fullPath = "";
-		if(dbPath !== "") {
-			fullPath += `${dbPath}/`;
-		}
-		fullPath += row.basename;
-		let logLine = fullPath;
-		if(baseDbPath !== "") {
-			logLine = logLine.replace(baseDbPath + "/", "")
-		}
-		console.log(logLine);
+		let fullPath = `${dbPath}/${row.basename}`;
+		console.log(fullPath.replace(baseDbPath + "/", ""));
 		if(row.type === "d") {
 			yield listRecursively(client, stashInfo, baseDbPath, fullPath);
 		}
