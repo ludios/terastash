@@ -18,3 +18,4 @@ for patchfile in ./dev/patches/???-*.patch; do
 	echo -E "Applying $patchfile"
 	patch -p1 < "$patchfile"
 done
+rm -f node_modules/request/request.js.orig
