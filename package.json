@@ -17,7 +17,7 @@
     "bluebird": "^2.9.34",
     "cache-require-paths": "^0.1.2",
     "cassandra-driver": "^2.2.0",
-    "chalk": "^1.1.0",
+    "chalk": "^1.1.1",
     "cli-table": "^0.3.1",
     "combine-streams": "^1.0.0",
     "commander": "^2.8.1",
@@ -26,14 +26,14 @@
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
     "notmytype": "^1.2.1",
-    "request": "^2.60.0",
-    "sse4_crc32": "^4.0.0",
+    "request": "^2.61.0",
+    "sse4_crc32": "^4.0.1",
     "streamifier": "^0.1.1",
     "transit-js": "^0.8.812",
     "xdg": "^0.1.1"
   },
   "devDependencies": {
-    "eslint": "^1.1.0",
+    "eslint": "^1.2.1",
     "mocha": "^2.2.5",
     "require-times": "^1.1.0"
   },
