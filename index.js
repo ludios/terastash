@@ -427,8 +427,8 @@ function lsPath(stashName, options, p) {
 }
 
 let listRecursively;
-listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean);
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = yield getChildrenForParent(
 		client, stashInfo.name, parent,
@@ -438,19 +438,20 @@ listRecursively = Promise.coroutine(function* listRecursively$coro(client, stash
 	for(const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 		let fullPath = `${dbPath}/${row.basename}`;
-		console.log(fullPath.replace(baseDbPath + "/", ""));
+		const pathWithoutBase = fullPath.replace(baseDbPath + "/", "");
+		process.stdout.write(pathWithoutBase + (print0 ? "\0" : "\n"));
 		if(row.type === "d") {
-			yield listRecursively(client, stashInfo, baseDbPath, fullPath);
+			yield listRecursively(client, stashInfo, baseDbPath, fullPath, print0);
 		}
 	}
 });
 
 // Like "find" utility
-function findPath(stashName, p) {
-	T(stashName, T.maybe(T.string), p, T.string);
+function findPath(stashName, p, options) {
+	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
 	return doWithClient(function lsPath$doWithClient(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
-			yield listRecursively(client, stashInfo, dbPath, dbPath);
+			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0);
 		}));
 	});
 }
