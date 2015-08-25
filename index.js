@@ -1593,7 +1593,6 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			blake2b224 blob,
 			key blob,
 			mtime timestamp,
-			crtime timestamp,
 			executable boolean,
 			PRIMARY KEY (parent, basename)
 		);`);
