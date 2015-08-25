@@ -427,8 +427,8 @@ function lsPath(stashName, options, p) {
 }
 
 let listRecursively;
-listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean);
+listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, type) {
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = yield getChildrenForParent(
 		client, stashInfo.name, parent,
@@ -438,10 +438,12 @@ listRecursively = Promise.coroutine(function* listRecursively$coro(client, stash
 	for(const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 		let fullPath = `${dbPath}/${row.basename}`;
-		const pathWithoutBase = fullPath.replace(baseDbPath + "/", "");
-		process.stdout.write(pathWithoutBase + (print0 ? "\0" : "\n"));
+		if(type === undefined || type === row.type) {
+			const pathWithoutBase = fullPath.replace(baseDbPath + "/", "");
+			process.stdout.write(pathWithoutBase + (print0 ? "\0" : "\n"));
+		}
 		if(row.type === "d") {
-			yield listRecursively(client, stashInfo, baseDbPath, fullPath, print0);
+			yield listRecursively(client, stashInfo, baseDbPath, fullPath, print0, type);
 		}
 	}
 });
@@ -451,7 +453,7 @@ function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
 	return doWithClient(function lsPath$doWithClient(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
-			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0);
+			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
 		}));
 	});
 }

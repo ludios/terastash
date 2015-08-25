@@ -304,7 +304,7 @@ program
 			paths[0] = '.';
 		}
 		catchAndLog(terastash.findPath(
-			name, paths[0], {print0: Boolean(options["0"])}
+			name, paths[0], {print0: Boolean(options["0"]), type: options.type}
 		));
 	}));
 

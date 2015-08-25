@@ -21,6 +21,31 @@ ts find from the root directory
   b
   c
   d
+  $ ts find -t f
+  a/sub/g
+  a/x
+  b
+  c
+  d
+  $ ts find -t d
+  a
+  a/sub
+  $ ts find a/sub
+  g
+  $ cd a
+  $ ts find
+  sub
+  sub/g
+  x
+  $ ts find ..
+  a
+  a/sub
+  a/sub/g
+  a/x
+  b
+  c
+  d
+  $ cd ..
 
 ts find -0
 
