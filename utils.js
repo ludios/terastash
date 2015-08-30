@@ -274,17 +274,17 @@ function makeHttpsRequest(options, stream) {
 function streamToBuffer(stream) {
 	T(stream, T.shape({on: T.function, once: T.function, resume: T.function}));
 	return new Promise(function streamToBuffer$Promise(resolve, reject) {
-		let buf = new Buffer(0);
+		const bufs = [];
 		stream.on('data', function(data) {
-			buf = Buffer.concat([buf, data]);
+			bufs.push(data);
 		});
 		// 'end' for Readable
 		stream.once('end', function() {
-			resolve(buf);
+			resolve(Buffer.concat(bufs));
 		});
 		// 'finish' for Writable
 		stream.once('finish', function() {
-			resolve(buf);
+			resolve(Buffer.concat(bufs));
 		});
 		stream.once('error', function(err) {
 			reject(err);

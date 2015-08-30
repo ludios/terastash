@@ -14,11 +14,16 @@ const Promise = require('bluebird');
 const crypto = require('crypto');
 
 describe('CRCWriter+CRCReader', function() {
-	it("works for any block size", Promise.coroutine(function*() {
-		this.timeout(20000);
-		const size = 8 * 1024;
-		const inputBuf = crypto.pseudoRandomBytes(size);
-		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256]) {
+	it("works for all block sizes", Promise.coroutine(function*() {
+		this.timeout(60000);
+		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256, 8 * 1024]) {
+			// Need 8KB / 32MB test to catch lack-of-'this._buf = EMPTY_BUF;' bug
+			const size =
+				blockSize > 1024 ?
+					32 * 1024 * 1024 :
+					8 * 1024;
+			const inputBuf = crypto.pseudoRandomBytes(size);
+
 			//console.error(blockSize);
 			let inputStream = streamifier.createReadStream(inputBuf);
 			const tempfname = `${os.tmpdir()}/terastash_tests_hasher_crc`;
