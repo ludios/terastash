@@ -3,12 +3,12 @@
 
 const T = require('notmytype');
 const A = require('ayy');
+const utils = require('./utils');
 const Transform = require('stream').Transform;
 
 class Padder extends Transform {
 	constructor(padToLength) {
-		T(padToLength, T.number);
-		A(Number.isInteger(padToLength), padToLength);
+		utils.assertSafeNonNegativeInteger(padToLength);
 		super();
 		this.bytesRead = 0;
 		this._padToLength = padToLength;
@@ -29,8 +29,7 @@ class Padder extends Transform {
 
 class Unpadder extends Transform {
 	constructor(unpadToLength) {
-		T(unpadToLength, T.number);
-		A(Number.isInteger(unpadToLength), unpadToLength);
+		utils.assertSafeNonNegativeInteger(unpadToLength);
 		super();
 		this.bytesRead = 0;
 		this._unpadToLength = unpadToLength;
