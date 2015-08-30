@@ -123,8 +123,6 @@ class CRCReader extends Transform {
 	}
 
 	_transform(data, encoding, callback) {
-		// TODO: optimize: have a JoinedBuffer representation that doesn't need to copy
-		// Alternatively, since it will almost always be data, special-case in === MODE_DATA
 		data = Buffer.concat([this._buf, data]);
 		this._buf = EMPTY_BUF;
 		while(data.length) {
