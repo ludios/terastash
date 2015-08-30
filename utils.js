@@ -278,7 +278,12 @@ function streamToBuffer(stream) {
 		stream.on('data', function(data) {
 			buf = Buffer.concat([buf, data]);
 		});
+		// 'end' for Readable
 		stream.once('end', function() {
+			resolve(buf);
+		});
+		// 'finish' for Writable
+		stream.once('finish', function() {
 			resolve(buf);
 		});
 		stream.once('error', function(err) {
