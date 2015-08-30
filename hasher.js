@@ -123,11 +123,12 @@ class CRCReader extends Transform {
 	}
 
 	_transform(data, encoding, callback) {
-		let offset = 0;
 		// TODO: optimize: have a JoinedBuffer representation that doesn't need to copy
 		// Alternatively, since it will almost always be data, special-case in === MODE_DATA
 		data = Buffer.concat([this._buf, data]);
+		this._buf = EMPTY_BUF;
 		while(data.length) {
+			//console.error(this._counter, data.length, this._mode);
 			if(this._mode === MODE_CRC) {
 				if(data.length >= 4) {
 					this._crc = bufToCrc(data.slice(0, 4));
@@ -150,6 +151,7 @@ class CRCReader extends Transform {
 					this._mode = MODE_CRC;
 					data = data.slice(this._blockSize);
 				} else {
+					// TODO: copy to avoid leaving full data in memory?
 					this._buf = data;
 					data = EMPTY_BUF;
 				}
