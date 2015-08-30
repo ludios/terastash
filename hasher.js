@@ -149,6 +149,7 @@ class CRCReader extends Transform {
 				}
 			}
 		}
+		callback();
 	}
 
 	_flush(callback) {
