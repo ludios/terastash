@@ -16,7 +16,7 @@ const Transform = require('stream').Transform;
 
 const utils = require('./utils');
 const filename = require('./filename');
-const commaify = utils.numberWithCommas;
+const commaify = utils.commaify;
 const LazyModule = utils.LazyModule;
 const loadNow = utils.loadNow;
 const compile_require = require('./compile_require');

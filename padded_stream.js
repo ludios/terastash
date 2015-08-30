@@ -1,8 +1,6 @@
 "use strong";
 "use strict";
 
-const T = require('notmytype');
-const A = require('ayy');
 const utils = require('./utils');
 const Transform = require('stream').Transform;
 

@@ -4,6 +4,7 @@
 const T = require('notmytype');
 const A = require('ayy');
 const utils = require('./utils');
+const commaify = utils.commaify;
 const compile_require = require('./compile_require');
 const loadNow = utils.loadNow;
 const LazyModule = utils.LazyModule;
@@ -38,6 +39,7 @@ function bufToCrc(buf) {
 class CRCWriter extends Transform {
 	constructor(blockSize) {
 		utils.assertSafeNonNegativeInteger(blockSize);
+		A.gt(blockSize, 0);
 		super();
 		this._blockSize = blockSize;
 		this._buf = new Buffer(0);
@@ -98,20 +100,22 @@ const EMPTY_BUF = new Buffer(0);
 class CRCReader extends Transform {
 	constructor(blockSize) {
 		utils.assertSafeNonNegativeInteger(blockSize);
+		A.gt(blockSize, 0);
 		super();
 		this._blockSize = blockSize;
 		this._counter = 0;
 		this._buf = new Buffer(0);
 		this._crc = null;
 		this._mode = MODE_CRC;
+		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
 	_checkCRC(callback, actual, expect) {
 		if(actual !== expect) {
 			callback(new BadData(
-				`CRC32C is allegedly \n` +
-				`${expect.toString('hex')} but CRC32C of data is \n` +
-				`${actual.toString('hex')}`)
+				`CRC32C of block ${commaify(this._counter)} is allegedly \n` +
+				`${crcToBuf(expect).toString('hex')} but CRC32C of data is \n` +
+				`${crcToBuf(actual).toString('hex')}`)
 			);
 			return false;
 		}
@@ -121,6 +125,7 @@ class CRCReader extends Transform {
 	_transform(data, encoding, callback) {
 		let offset = 0;
 		// TODO: optimize: have a JoinedBuffer representation that doesn't need to copy
+		// Alternatively, since it will almost always be data, special-case in === MODE_DATA
 		data = Buffer.concat([this._buf, data]);
 		while(data.length) {
 			if(this._mode === MODE_CRC) {
@@ -141,6 +146,7 @@ class CRCReader extends Transform {
 						return;
 					}
 					this.push(block);
+					this._counter += 1;
 					this._mode = MODE_CRC;
 					data = data.slice(this._blockSize);
 				} else {

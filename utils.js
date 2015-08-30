@@ -100,7 +100,7 @@ function pad(s, wantLength) {
 }
 
 const StringOrNumber = T.union([T.string, T.number]);
-function numberWithCommas(stringOrNum) {
+function commaify(stringOrNum) {
 	T(stringOrNum, StringOrNumber);
 	// http://stackoverflow.com/questions/2901102/
 	return String(stringOrNum).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -482,7 +482,7 @@ module.exports = {
 	LazyModule, loadNow,
 
 	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
-	prop, shortISO, pad, numberWithCommas, getParentPath, getBaseName, ol,
+	prop, shortISO, pad, commaify, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
