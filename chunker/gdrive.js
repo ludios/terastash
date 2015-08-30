@@ -451,7 +451,7 @@ class BadChunk extends Error {
 }
 
 /**
- * Returns a readable stream by decrypting and concatenating the chunks.
+ * Returns a readable stream of concatenated chunks.
  */
 function readChunks(gdriver, chunks) {
 	T(gdriver, GDriver, chunks, utils.ChunksType);
