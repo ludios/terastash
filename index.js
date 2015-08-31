@@ -712,6 +712,7 @@ function dropFiles(stashName, paths) {
 	}));
 }
 
+// Does *not* include the length of the CRC32C itself
 const CRC_BLOCK_SIZE = (8 * 1024) - 4;
 
 function checkChunkSize(size) {
