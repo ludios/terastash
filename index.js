@@ -807,7 +807,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 	let content = null;
 	let chunkInfo;
 	let size;
-	// For file stored in chunk store, no whole-file crc32c is available.
+	// For file stored in chunk store, whole-file crc32c is not available.
 	let crc32c = null;
 	let key = null;
 
