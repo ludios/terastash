@@ -820,7 +820,6 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 
 		checkChunkSize(chunkStore.chunkSize);
 
-		// Need room for CRC32C's as well
 		const sizeOfHashes = 4 * Math.ceil(stat.size / CRC_BLOCK_SIZE);
 		const sizeWithHashes = stat.size + sizeOfHashes;
 		utils.assertSafeNonNegativeInteger(sizeWithHashes);
