@@ -162,6 +162,7 @@ class CRCReader extends Transform {
 		// Last block might not be full-size, and now that we know we've reached
 		// the end, we handle it here.
 		if(!this._buf.length) {
+			callback();
 			return;
 		}
 		if(this._mode === MODE_CRC) {
