@@ -850,9 +850,9 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 				startData += dataBytesPerChunk;
 				startChunk += chunkStore.chunkSize;
 			}
-
 			utils.assertSafeNonNegativeInteger(startData);
 			utils.assertSafeNonNegativeInteger(startChunk);
+
 			if(startChunk >= concealedSize) {
 				// No more chunk streams
 				return null;
