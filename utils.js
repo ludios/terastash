@@ -42,7 +42,6 @@ function loadNow(obj) {
 	return obj;
 }
 
-let blake2 = new LazyModule('blake2', compile_require);
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let https = new LazyModule('https');
 
@@ -323,10 +322,7 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	let hash;
 	if(typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
-		if(/^blake2/.test(algo)) {
-			blake2 = loadNow(blake2);
-			hash = blake2.createHash(algo);
-		} else if(algo === "crc32c") {
+		if(algo === "crc32c") {
 			sse4_crc32 = loadNow(sse4_crc32);
 			hash = new sse4_crc32.CRC32();
 			hash.digest = crc32$digest;

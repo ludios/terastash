@@ -26,26 +26,21 @@ const Table = require('cli-table');
 
 let CassandraClientType = T.object;
 
-let aes = new LazyModule('./aes.js');
+let aes = new LazyModule('./aes');
+let hasher = new LazyModule('./hasher');
 let cassandra;
 cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
 	CassandraClientType = realModule.Client;
 });
 let localfs = new LazyModule('./chunker/localfs');
 let gdrive = new LazyModule('./chunker/gdrive');
-let blake2 = new LazyModule('blake2', compile_require);
+let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
 let transit = new LazyModule('transit-js');
 
 const KEYSPACE_PREFIX = "ts_";
 
-// TODO: get rid of this, use streamifier
-function blake2b224Buffer(buf) {
-	T(buf, Buffer);
-	blake2 = loadNow(blake2);
-	return blake2.createHash('blake2b').update(buf).digest().slice(0, 224/8);
-}
 
 class CustomRetryPolicy extends RetryPolicy {
 	onReadTimeout(requestInfo, consistency, received, blockFor, isDataPresent) {
@@ -717,6 +712,8 @@ function dropFiles(stashName, paths) {
 	}));
 }
 
+const CRC_BLOCK_SIZE = (8 * 1024) - 4;
+
 /**
  * Put file `p` into the Cassandra database as path `dbPath`.
  *
@@ -793,25 +790,37 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 	}
 
 	const chunkStore = yield getChunkStore(stashInfo);
-	let blake2b224;
 	let content = null;
 	let chunkInfo;
 	let size;
+	// For file stored in chunk store, no whole-file crc32c is available.
+	let crc32c = null;
 	let key = null;
 
 	if(stat.size >= stashInfo.chunkThreshold) {
 		// TODO: validate storeName
 		key = makeKey();
 
-		const concealedSize = utils.concealSize(stat.size);
+		// Need room for CRC32C's as well
+		const sizeWithHashes = stat.size + (4 * Math.ceil(stat.size / CRC_BLOCK_SIZE));
+		utils.assertSafeNonNegativeInteger(sizeWithHashes);
 
-		blake2 = loadNow(blake2);
-		let hash = blake2.createHash("blake2b");
-		let hashBackup;
+		const concealedSize = utils.concealSize(sizeWithHashes);
+		utils.assertSafeNonNegativeInteger(concealedSize);
+		A.gte(concealedSize, sizeWithHashes);
 
-		let hasher;
-		let padder;
-		let start = -chunkStore.chunkSize;
+		const scaledConcealedSize = concealedSize * (CRC_BLOCK_SIZE / (CRC_BLOCK_SIZE + 4));
+		utils.assertSafeNonNegativeInteger(scaledConcealedSize);
+
+		// Note: a 1GB chunk stores less than 1GB of data because of the CRC32C's
+		// every 8188 bytes.
+		const dataBytesPerChunk = chunkStore.chunkSize * (CRC_BLOCK_SIZE / (CRC_BLOCK_SIZE + 4));
+		utils.assertSafeNonNegativeInteger(dataBytesPerChunk);
+		let startData = -dataBytesPerChunk;
+		let startChunk = -chunkStore.chunkSize;
+
+		//console.error(stat.size, sizeWithHashes, concealedSize, scaledConcealedSize, dataBytesPerChunk);
+
 		// getChunkStream is like a next() on an iterator, except caller can pass
 		// in `true` to get the last chunk again.  This "rewinding" is necessary
 		// because upload of a chunk may fail and need to be retried.   We don't
@@ -823,19 +832,23 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 			T(lastChunkAgain, T.boolean);
 
 			aes = loadNow(aes);
+			padded_stream = loadNow(padded_stream);
+
 			// Chunk size must be a multiple of an AES block, for implementation convenience.
 			A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
+			// (CRC block size + CRC length) must be a multiple of chunkSize, for
+			// implementation convenience.
+			A.eq(chunkStore.chunkSize % (CRC_BLOCK_SIZE + 4), 0);
 
 			if(!lastChunkAgain) {
-				hashBackup = hash.copy();
-				start += chunkStore.chunkSize;
-			} else {
-				hash = hashBackup.copy();
+				startData += dataBytesPerChunk;
+				startChunk += chunkStore.chunkSize;
 			}
+			//console.error(startData, startChunk);
 
-			utils.assertSafeNonNegativeInteger(start);
-			A.eq(start % aes.BLOCK_SIZE, 0);
-			if(start >= concealedSize) {
+			utils.assertSafeNonNegativeInteger(startData);
+			utils.assertSafeNonNegativeInteger(startChunk);
+			if(startChunk >= concealedSize) {
 				// No more chunk streams
 				return null;
 			}
@@ -859,20 +872,21 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 			// This may get us a stream with 0 bytes because we've already
 			// read everything.  We still need to continue because we may
 			// not have finished streaming the padding.
-			//console.log({start, end: (start + chunkStore.chunkSize - 1)});
 			const inputStream = fs.createReadStream(
-				p, {start, end: (start + chunkStore.chunkSize - 1)});
+				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
-			hasher = utils.streamHasher(inputStream, hash, start);
-			padded_stream = loadNow(padded_stream);
-			padder = new padded_stream.Padder(
-				Math.min(chunkStore.chunkSize, concealedSize - start));
-			utils.pipeWithErrors(hasher.stream, padder);
+			const paddedStream = new padded_stream.Padder(
+				Math.min(dataBytesPerChunk, scaledConcealedSize - startData));
+			utils.pipeWithErrors(inputStream, paddedStream);
+
+			const hashedStream = new hasher.CRCWriter(CRC_BLOCK_SIZE);
+			utils.pipeWithErrors(paddedStream, hashedStream);
 
 			selfTests.aes();
+			A.eq(startChunk % aes.BLOCK_SIZE, 0);
 			const cipherStream = crypto.createCipheriv(
-				'aes-128-ctr', key, aes.blockNumberToIv(start / aes.BLOCK_SIZE));
-			utils.pipeWithErrors(padder, cipherStream);
+				'aes-128-ctr', key, aes.blockNumberToIv(startChunk / aes.BLOCK_SIZE));
+			utils.pipeWithErrors(hashedStream, cipherStream);
 
 			return cipherStream;
 		});
@@ -892,17 +906,22 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 
 		const totalSize = _[0];
 		chunkInfo = _[1];
+		for(const info of chunkInfo) {
+			info.ver = 2;
+			info.block_size = CRC_BLOCK_SIZE;
+		}
 		A.eq(totalSize, concealedSize,
 			`For ${dbPath}, wrote to chunks\n` +
 			`${commaify(totalSize)} bytes instead of the expected\n` +
 			`${commaify(concealedSize)} (concealed) bytes`);
 		T(chunkInfo, Array);
 
-		blake2b224 = hasher.hash.digest().slice(0, 224/8);
 		size = stat.size;
 	} else {
 		content = yield fs.readFileAsync(p);
-		blake2b224 = blake2b224Buffer(content);
+		hasher = loadNow(hasher);
+		sse4_crc32 = loadNow(sse4_crc32);
+		crc32c = hasher.crcToBuf(sse4_crc32.calculate(content));
 		size = content.length;
 		A.eq(size, stat.size,
 			`For ${dbPath}, read\n` +
@@ -920,9 +939,9 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		return yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, blake2b224, mtime, executable)
+			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, crc32c, mtime, executable)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, blake2b224, mtime, executable]
+			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, crc32c, mtime, executable]
 		);
 	});
 
@@ -1089,7 +1108,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	let row;
 	try {
 		row = yield getRowByPath(client, stashInfo.name, dbPath,
-			["size", "type", "key", `chunks_in_${storeName}`, "blake2b224", "content", "mtime", "executable"]
+			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable"]
 		);
 	} catch(err) {
 		if(!isColumnMissingError(err)) {
@@ -1097,7 +1116,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
 		row = yield getRowByPath(client, stashInfo.name, dbPath,
-			["size", "type", "key", "blake2b224", "content", "mtime", "executable"]
+			["size", "type", "key", "crc32c", "content", "mtime", "executable"]
 		);
 	}
 	if(row.type !== 'f') {
@@ -1106,7 +1125,9 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = row[`chunks_in_${storeName}`];
-	let hasher;
+	let crc32c = null;
+	let bytesRead = 0;
+	let unpaddedStream;
 	if(chunks !== null) {
 		validateChunks(chunks);
 		A.eq(row.content, null);
@@ -1127,32 +1148,47 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		selfTests.aes();
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
 		utils.pipeWithErrors(cipherStream, clearStream);
+
+		hasher = loadNow(hasher);
+		const unhashedStream = new hasher.CRCReader(CRC_BLOCK_SIZE);
+		utils.pipeWithErrors(clearStream, unhashedStream);
+
 		padded_stream = loadNow(padded_stream);
-		const unpadder = new padded_stream.Unpadder(Number(row.size));
-		utils.pipeWithErrors(clearStream, unpadder);
-		hasher = utils.streamHasher(unpadder, 'blake2b');
+		unpaddedStream = new padded_stream.Unpadder(Number(row.size));
+		utils.pipeWithErrors(unhashedStream, unpaddedStream);
+
+		unpaddedStream.on('data', function(data) {
+			bytesRead += data.length;
+		});
+		// We attached a 'data' handler, but don't let that put us into
+		// flowing mode yet, because the user hasn't attached their own
+		// 'data' handler yet.
+		unpaddedStream.pause();
 	} else {
-		const streamWrapper = streamifier.createReadStream(row.content);
-		hasher = utils.streamHasher(streamWrapper, 'blake2b');
-	}
-	hasher.stream.once('end', function streamFile$hasher$end() {
-		if(hasher.length !== Number(row.size)) {
-			hasher.stream.emit('error', new Error(
-				`For dbPath=${dbPath}, expected length of content to be\n` +
-				`${commaify(row.size)} but was\n` +
-				`${commaify(hasher.length)}`
+		hasher = loadNow(hasher);
+		sse4_crc32 = loadNow(sse4_crc32);
+		unpaddedStream = streamifier.createReadStream(row.content);
+		bytesRead = row.content.length;
+		crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
+		// Note: only in-db content has a crc32c for entire file content
+		if(!crc32c.equals(row.crc32c)) {
+			unpaddedStream.emit('error', new Error(
+				`For dbPath=${dbPath}, CRC32C is allegedly\n` +
+				`${row.crc32c.toString('hex')} but CRC32C of data is\n` +
+				`${crc32c.toString('hex')}`
 			));
 		}
-		const digest = hasher.hash.digest().slice(0, 224/8);
-		if(!digest.equals(row.blake2b224)) {
-			hasher.stream.emit('error', new Error(
-				`For dbPath=${dbPath}, expected blake2b224 of content to be\n` +
-				`${row.blake2b224.toString('hex')} but was\n` +
-				`${digest.toString('hex')}`
+	}
+	unpaddedStream.once('end', function streamFile$end() {
+		if(bytesRead !== Number(row.size)) {
+			unpaddedStream.emit('error', new Error(
+				`For dbPath=${dbPath}, expected length of content to be\n` +
+				`${commaify(row.size)} but was\n` +
+				`${commaify(bytesRead)}`
 			));
 		}
 	});
-	return [row, hasher.stream];
+	return [row, unpaddedStream];
 });
 
 /**
@@ -1580,7 +1616,9 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			file_id text,
 			md5 blob,
 			crc32c blob,
-			size bigint
+			size bigint,
+			ver int,
+			block_size int
 		)`);
 
 		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
@@ -1590,7 +1628,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			uuid blob,
 			size bigint,
 			content blob,
-			blake2b224 blob,
+			crc32c blob,
 			key blob,
 			mtime timestamp,
 			executable boolean,
@@ -1677,5 +1715,6 @@ module.exports = {
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath, KEYSPACE_PREFIX, dumpDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
-	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError
+	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
+	CRC_BLOCK_SIZE
 };

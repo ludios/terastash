@@ -113,8 +113,8 @@ class CRCReader extends Transform {
 	_checkCRC(callback, actual, expect) {
 		if(actual !== expect) {
 			callback(new BadData(
-				`CRC32C of block ${commaify(this._counter)} is allegedly \n` +
-				`${crcToBuf(expect).toString('hex')} but CRC32C of data is \n` +
+				`CRC32C of block ${commaify(this._counter)} is allegedly\n` +
+				`${crcToBuf(expect).toString('hex')} but CRC32C of data is\n` +
 				`${crcToBuf(actual).toString('hex')}`)
 			);
 			return false;
@@ -182,4 +182,4 @@ class CRCReader extends Transform {
 }
 
 
-module.exports = {BadData, CRCWriter, CRCReader};
+module.exports = {BadData, CRCWriter, CRCReader, crcToBuf};
