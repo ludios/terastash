@@ -801,6 +801,16 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// TODO: validate storeName
 		key = makeKey();
 
+		aes = loadNow(aes);
+		hasher = loadNow(hasher);
+		padded_stream = loadNow(padded_stream);
+
+		// Chunk size must be a multiple of an AES block, for implementation convenience.
+		A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
+		// (CRC block size + CRC length) must be a multiple of chunkSize, for
+		// implementation convenience.
+		A.eq(chunkStore.chunkSize % (CRC_BLOCK_SIZE + 4), 0);
+
 		// Need room for CRC32C's as well
 		const sizeWithHashes = stat.size + (4 * Math.ceil(stat.size / CRC_BLOCK_SIZE));
 		utils.assertSafeNonNegativeInteger(sizeWithHashes);
@@ -830,15 +840,6 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		// If called with false, last chunk *must* have been fully read!
 		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(lastChunkAgain) {
 			T(lastChunkAgain, T.boolean);
-
-			aes = loadNow(aes);
-			padded_stream = loadNow(padded_stream);
-
-			// Chunk size must be a multiple of an AES block, for implementation convenience.
-			A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
-			// (CRC block size + CRC length) must be a multiple of chunkSize, for
-			// implementation convenience.
-			A.eq(chunkStore.chunkSize % (CRC_BLOCK_SIZE + 4), 0);
 
 			if(!lastChunkAgain) {
 				startData += dataBytesPerChunk;
