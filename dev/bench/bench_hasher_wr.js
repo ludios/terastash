@@ -1,8 +1,8 @@
 "use strong";
 "use strict";
 
-const hasher = require('./hasher');
-const utils = require('./utils');
+const hasher = require('../../hasher');
+const utils = require('../../utils');
 
 const crcWriter = new hasher.CRCWriter(Number(process.argv[2]));
 const crcReader = new hasher.CRCReader(Number(process.argv[2]));

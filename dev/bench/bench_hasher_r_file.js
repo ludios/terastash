@@ -1,8 +1,8 @@
 "use strong";
 "use strict";
 
-const hasher = require('./hasher');
-const utils = require('./utils');
+const hasher = require('../../hasher');
+const utils = require('../../utils');
 const fs = require('fs');
 
 let crcReader;
