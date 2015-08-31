@@ -714,6 +714,19 @@ function dropFiles(stashName, paths) {
 
 const CRC_BLOCK_SIZE = (8 * 1024) - 4;
 
+function checkChunkSize(size) {
+	T(size, T.number);
+	// (CRC block size + CRC length) must be a multiple of chunkSize, for
+	// implementation convenience.
+	if(size % (CRC_BLOCK_SIZE + 4) !== 0) {
+		throw new Error(`Chunk size must be a multiple of ` +
+			`${CRC_BLOCK_SIZE + 4}; got ${size}`);
+	}
+	aes = loadNow(aes);
+	// Chunk size must be a multiple of an AES block, for implementation convenience.
+	A.eq(size % aes.BLOCK_SIZE, 0);
+}
+
 /**
  * Put file `p` into the Cassandra database as path `dbPath`.
  *
@@ -805,22 +818,16 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		hasher = loadNow(hasher);
 		padded_stream = loadNow(padded_stream);
 
-		// Chunk size must be a multiple of an AES block, for implementation convenience.
-		A.eq(chunkStore.chunkSize % aes.BLOCK_SIZE, 0);
-		// (CRC block size + CRC length) must be a multiple of chunkSize, for
-		// implementation convenience.
-		A.eq(chunkStore.chunkSize % (CRC_BLOCK_SIZE + 4), 0);
+		checkChunkSize(chunkStore.chunkSize);
 
 		// Need room for CRC32C's as well
-		const sizeWithHashes = stat.size + (4 * Math.ceil(stat.size / CRC_BLOCK_SIZE));
+		const sizeOfHashes = 4 * Math.ceil(stat.size / CRC_BLOCK_SIZE);
+		const sizeWithHashes = stat.size + sizeOfHashes;
 		utils.assertSafeNonNegativeInteger(sizeWithHashes);
 
 		const concealedSize = utils.concealSize(sizeWithHashes);
 		utils.assertSafeNonNegativeInteger(concealedSize);
 		A.gte(concealedSize, sizeWithHashes);
-
-		const scaledConcealedSize = concealedSize * (CRC_BLOCK_SIZE / (CRC_BLOCK_SIZE + 4));
-		utils.assertSafeNonNegativeInteger(scaledConcealedSize);
 
 		// Note: a 1GB chunk stores less than 1GB of data because of the CRC32C's
 		// every 8188 bytes.
@@ -828,8 +835,6 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		utils.assertSafeNonNegativeInteger(dataBytesPerChunk);
 		let startData = -dataBytesPerChunk;
 		let startChunk = -chunkStore.chunkSize;
-
-		//console.error(stat.size, sizeWithHashes, concealedSize, scaledConcealedSize, dataBytesPerChunk);
 
 		// getChunkStream is like a next() on an iterator, except caller can pass
 		// in `true` to get the last chunk again.  This "rewinding" is necessary
@@ -877,7 +882,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
 			const paddedStream = new padded_stream.Padder(
-				Math.min(dataBytesPerChunk, scaledConcealedSize - startData));
+				Math.min(dataBytesPerChunk, concealedSize - sizeOfHashes - startData));
 			utils.pipeWithErrors(inputStream, paddedStream);
 
 			const hashedStream = new hasher.CRCWriter(CRC_BLOCK_SIZE);
@@ -1717,5 +1722,5 @@ module.exports = {
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	CRC_BLOCK_SIZE
+	CRC_BLOCK_SIZE, checkChunkSize
 };

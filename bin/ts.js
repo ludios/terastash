@@ -340,10 +340,7 @@ program
 		} else {
 			options.chunkSize = 1024*1024*1024;
 		}
-		if(options.chunkSize % (terastash.CRC_BLOCK_SIZE + 4) !== 0) {
-			throw new Error(`Chunk size must be a multiple of ` +
-				`${terastash.CRC_BLOCK_SIZE + 4}; got ${options.chunkSize}`);
-		}
+		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.defineChunkStore(storeName, options));
 	}));
 
@@ -361,9 +358,7 @@ program
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		}
-		if(options.chunkSize % 128/8 !== 0) {
-			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
-		}
+		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.configChunkStore(storeName, options));
 	}));
 
