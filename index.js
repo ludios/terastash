@@ -909,7 +909,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		const totalSize = _[0];
 		chunkInfo = _[1];
 		for(const info of chunkInfo) {
-			A.lte(info.size, chunkStore.chunkSize, "uploaded a too-big chunk");
+			A.lte(info.size, chunkStore.chunkSize, `uploaded a too-big chunk:\n${inspect(info)}`);
 			info.ver = 2;
 			info.block_size = CRC_BLOCK_SIZE;
 		}
