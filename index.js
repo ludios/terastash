@@ -812,7 +812,6 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 	let key = null;
 
 	if(stat.size >= stashInfo.chunkThreshold) {
-		// TODO: validate storeName
 		key = makeKey();
 
 		aes = loadNow(aes);
@@ -910,6 +909,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		const totalSize = _[0];
 		chunkInfo = _[1];
 		for(const info of chunkInfo) {
+			A.lte(info.size, chunkStore.chunkSize, "uploaded a too-big chunk");
 			info.ver = 2;
 			info.block_size = CRC_BLOCK_SIZE;
 		}
