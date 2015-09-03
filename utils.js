@@ -502,15 +502,6 @@ class JoinedBuffers {
 		this.length = 0;
 		return Buffer.concat(bufs);
 	}
-
-	*yieldPop() {
-		const bufs = this._bufs;
-		this._bufs = [];
-		this.length = 0;
-		for(const buf of bufs) {
-			yield buf;
-		}
-	}
 }
 
 module.exports = {
