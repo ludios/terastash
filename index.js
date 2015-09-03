@@ -1711,8 +1711,8 @@ function dumpDb(stashName) {
 	});
 }
 
-function restoreDb(stashName, filename) {
-	T(stashName, T.string, filename, T.string);
+function restoreDb(stashName, dumpFile) {
+	T(stashName, T.string, dumpFile, T.string);
 	return doWithClient(function dumpDb$doWithClient(client) {
 
 	});

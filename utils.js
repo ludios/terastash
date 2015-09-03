@@ -14,15 +14,15 @@ const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
 
 class LazyModule {
-	constructor(path, requireFunc, postRequireHook) {
-		T(path, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
-		this.path = path;
+	constructor(requirePath, requireFunc, postRequireHook) {
+		T(requirePath, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
+		this.requirePath = requirePath;
 		this.requireFunc = requireFunc || require;
 		this.postRequireHook = postRequireHook;
 	}
 
 	load() {
-		const realModule = this.requireFunc(this.path);
+		const realModule = this.requireFunc(this.requirePath);
 		if(this.postRequireHook) {
 			this.postRequireHook(realModule);
 		}
