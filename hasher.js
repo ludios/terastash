@@ -122,7 +122,8 @@ class CRCReader extends Transform {
 		this._joined.push(newData);
 		// Don't bother processing anything if we don't have enough to decode at
 		// least one block.
-		if(this._joined.length < (this._blockSize + 4)) {
+		if(this._mode === MODE_CRC && this._joined.length < 4 ||
+		this._mode === MODE_DATA && this._joined.length < this._blockSize) {
 			callback();
 			return;
 		}
