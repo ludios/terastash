@@ -1,0 +1,1 @@
+iojs --strong-mode --harmony --harmony-rest-parameters --harmony-arrow-functions --harmony-arrays --harmony-object "$@"
