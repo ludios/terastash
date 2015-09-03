@@ -12,12 +12,12 @@ const Promise = require('bluebird');
 
 const pow = Math.pow;
 
-function makeLines(lineLength) {
-	let n = 1000;
+function makeLines(lineLength, numLines) {
+	T(lineLength, T.number, numLines, T.number);
 	const bufs = [];
 	const buf = new Buffer("X".repeat(lineLength));
 	const LF = new Buffer("\n");
-	while(n--) {
+	while(numLines--) {
 		bufs.push(buf);
 		bufs.push(LF);
 	}
@@ -30,8 +30,12 @@ function makeLines(lineLength) {
 
 describe('DelimitedBufferDecoder', function() {
 	it("can split lines", Promise.coroutine(function*() {
-		for(const lineLength of [1, 2, 4, 10, 32, 63, 64, 65, 255, 256, 8 * 1024, pow(2, 16 - 1), pow(2, 16), pow(2, 16) + 1]) {
-			const inputBuf = makeLines(lineLength);
+		for(const lineLength of [1, 4, 32, 63, 65, 255, 256, 8 * 1024, pow(2, 16 - 1), pow(2, 16), pow(2, 16) + 1, 15*1000*1000]) {
+			const numLines =
+				lineLength < 100000 ?
+					1000 :
+					3;
+			const inputBuf = makeLines(lineLength, numLines);
 			const inputStream = streamifier.createReadStream(inputBuf);
 			const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 			utils.pipeWithErrors(inputStream, lineStream);
@@ -46,7 +50,7 @@ describe('DelimitedBufferDecoder', function() {
 					resolve();
 				});
 			});
-			A.eq(lines.length, 1000);
+			A.eq(lines.length, numLines);
 		}
 	}));
 });
