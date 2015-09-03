@@ -1,7 +1,6 @@
 "use strong";
 "use strict";
 
-const T = require('notmytype');
 const A = require('ayy');
 const utils = require('./utils');
 const commaify = utils.commaify;
@@ -56,8 +55,7 @@ class CRCWriter extends Transform {
 		this._joined.push(data);
 		// Can write out at least one new block?
 		if(this._joined.length >= this._blockSize) {
-			const buf = this._joined.joinPop();
-			const _ = splitBuffer(buf, this._blockSize);
+			const _ = splitBuffer(this._joined.joinPop(), this._blockSize);
 			const splitBufs = _[0];
 			const remainder = _[1];
 			this._joined.push(remainder);
