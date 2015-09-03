@@ -479,6 +479,9 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 	}
 });
 
+
+const EMPTY_BUF = new Buffer(0);
+
 /**
  * An object that holds multiple Buffers and knows the total
  * length, allowing you to delay the .concat() until you need
@@ -497,10 +500,17 @@ class JoinedBuffers {
 	}
 
 	joinPop() {
+		if(!this._bufs.length) {
+			return EMPTY_BUF;
+		}
 		const bufs = this._bufs;
 		this._bufs = [];
 		this.length = 0;
-		return Buffer.concat(bufs);
+		if(bufs.length === 1) {
+			return bufs[0];
+		} else {
+			return Buffer.concat(bufs);
+		}
 	}
 }
 
