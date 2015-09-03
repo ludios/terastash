@@ -31,7 +31,7 @@ describe('CRCWriter+CRCReader', function() {
 			utils.pipeWithErrors(inputStream, writer);
 			const outputStream = fs.createWriteStream(tempfname);
 			utils.pipeWithErrors(writer, outputStream);
-			yield new Promise(function(resolve, reject) {
+			yield new Promise(function(resolve) {
 				outputStream.on('finish', resolve);
 			});
 			A.eq(fs.statSync(tempfname).size, size + (4 * Math.ceil(size / blockSize)));

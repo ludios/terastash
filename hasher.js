@@ -104,7 +104,7 @@ class CRCReader extends Transform {
 		super();
 		this._blockSize = blockSize;
 		this._counter = 0;
-		this._buf = new Buffer(0);
+		this._buf = EMPTY_BUF;
 		this._crc = null;
 		this._mode = MODE_CRC;
 		sse4_crc32 = loadNow(sse4_crc32);
