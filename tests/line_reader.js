@@ -40,7 +40,7 @@ describe('DelimitedBufferDecoder', function() {
 			const inputBuf = makeLines(lineLength, numLines);
 			const inputStream = realistic_streamifier.createReadStream(inputBuf);
 			const passThroughStream = new PassThrough();
-			utils.pipeWithErrors(inputStream, passThroughStream)
+			utils.pipeWithErrors(inputStream, passThroughStream);
 			const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 			utils.pipeWithErrors(passThroughStream, lineStream);
 			const lines = [];

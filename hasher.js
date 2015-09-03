@@ -47,29 +47,24 @@ class CRCWriter extends Transform {
 		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
+	_pushCRCAndBuf(buf) {
+		this.push(crcToBuf(sse4_crc32.calculate(buf)));
+		this.push(buf);
+	}
+
 	_transform(data, encoding, callback) {
+		this._joined.push(data);
 		// Can write out at least one new block?
-		if(this._joined.length + data.length >= this._blockSize) {
-			const _buf = this._joined.joinPop();
-			// First block is special: need to include _buf in crc32
-			const firstBuf = data.slice(0, this._blockSize - _buf.length);
-			const firstCRC = sse4_crc32.calculate(
-				firstBuf,
-				sse4_crc32.calculate(_buf));
-			this.push(crcToBuf(firstCRC));
-			this.push(_buf);
-			this.push(firstBuf);
+		if(this._joined.length >= this._blockSize) {
+			const buf = this._joined.joinPop();
+			const _ = splitBuffer(buf, this._blockSize);
+			const splitBufs = _[0];
+			const remainder = _[1];
+			this._joined.push(remainder);
 
-			const _ = splitBuffer(data.slice(this._blockSize - _buf.length), this._blockSize);
-			const bufs = _[0];
-			this._joined.push(_[1]);
-
-			for(const buf of bufs) {
-				this.push(crcToBuf(sse4_crc32.calculate(buf)));
-				this.push(buf);
+			for(const buf of splitBufs) {
+				this._pushCRCAndBuf(buf);
 			}
-		} else {
-			this._joined.push(data);
 		}
 		callback();
 	}
@@ -77,11 +72,9 @@ class CRCWriter extends Transform {
 	_flush(callback) {
 		// Need to write out the last block, even if it's under-sized
 		if(this._joined.length > 0) {
-			const _buf = this._joined.joinPop();
-			this.push(crcToBuf(sse4_crc32.calculate(_buf)));
-			this.push(_buf);
-			// Blow up if an io.js bug causes _flush to be called twice
-			this._buf = null;
+			const buf = this._joined.joinPop();
+			this._pushCRCAndBuf(buf);
+			this._joined = null;
 		}
 		callback();
 	}

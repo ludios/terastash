@@ -6,7 +6,6 @@
 "use strong";
 "use strict";
 
-const util = require('util');
 const T = require('notmytype');
 const Readable = require('stream').Readable;
 
