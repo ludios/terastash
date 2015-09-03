@@ -45,6 +45,7 @@ class DelimitedBufferDecoder extends Transform {
 
 	_transform(data, encoding, callback) {
 		T(data, Buffer);
+		//console.log(data.length);
 		while(true) {
 			// Search only the new data for the delimiter, not all of this._joined
 			const idx = buffertools.indexOf(data, this._delimiter);

@@ -7,8 +7,9 @@ const A = require('ayy');
 const T = require('notmytype');
 const utils = require('../utils');
 const line_reader = require('../line_reader');
-const streamifier = require('streamifier');
+const realistic_streamifier = require('../realistic_streamifier');
 const Promise = require('bluebird');
+const PassThrough = require('stream').PassThrough;
 
 const pow = Math.pow;
 
@@ -31,14 +32,17 @@ function makeLines(lineLength, numLines) {
 describe('DelimitedBufferDecoder', function() {
 	it("can split lines", Promise.coroutine(function*() {
 		for(const lineLength of [1, 4, 32, 63, 65, 255, 256, 8 * 1024, pow(2, 16 - 1), pow(2, 16), pow(2, 16) + 1, 15*1000*1000]) {
+			//console.log({lineLength});
 			const numLines =
 				lineLength < 100000 ?
 					1000 :
 					3;
 			const inputBuf = makeLines(lineLength, numLines);
-			const inputStream = streamifier.createReadStream(inputBuf);
+			const inputStream = realistic_streamifier.createReadStream(inputBuf);
+			const passThroughStream = new PassThrough();
+			utils.pipeWithErrors(inputStream, passThroughStream)
 			const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
-			utils.pipeWithErrors(inputStream, lineStream);
+			utils.pipeWithErrors(passThroughStream, lineStream);
 			const lines = [];
 			lineStream.on('data', function(line) {
 				T(line, Buffer);
