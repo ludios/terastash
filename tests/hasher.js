@@ -9,7 +9,7 @@ const utils = require('../utils');
 const fs = require('fs');
 const os = require('os');
 const hasher = require('../hasher');
-const streamifier = require('streamifier');
+const realistic_streamifier = require('../realistic_streamifier');
 const Promise = require('bluebird');
 const crypto = require('crypto');
 
@@ -25,7 +25,7 @@ describe('CRCWriter+CRCReader', function() {
 			const inputBuf = crypto.pseudoRandomBytes(size);
 
 			//console.error(blockSize);
-			let inputStream = streamifier.createReadStream(inputBuf);
+			let inputStream = realistic_streamifier.createReadStream(inputBuf);
 			const tempfname = `${os.tmpdir()}/terastash_tests_hasher_crc`;
 			const writer = new hasher.CRCWriter(blockSize);
 			utils.pipeWithErrors(inputStream, writer);
