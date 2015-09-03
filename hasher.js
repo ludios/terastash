@@ -100,7 +100,7 @@ class CRCReader extends Transform {
 		super();
 		this._blockSize = blockSize;
 		this._counter = 0;
-		this._buf = EMPTY_BUF;
+		this._joined = new JoinedBuffers();
 		this._crc = null;
 		this._mode = MODE_CRC;
 		sse4_crc32 = loadNow(sse4_crc32);
@@ -118,9 +118,15 @@ class CRCReader extends Transform {
 		return true;
 	}
 
-	_transform(data, encoding, callback) {
-		data = Buffer.concat([this._buf, data]);
-		this._buf = EMPTY_BUF;
+	_transform(newData, encoding, callback) {
+		this._joined.push(newData);
+		// Don't bother processing anything if we don't have enough to decode at
+		// least one block.
+		if(this._joined.length < (this._blockSize + 4)) {
+			callback();
+			return;
+		}
+		let data = this._joined.joinPop();
 		while(data.length) {
 			//console.error(this._counter, data.length, this._mode);
 			if(this._mode === MODE_CRC) {
@@ -129,8 +135,7 @@ class CRCReader extends Transform {
 					this._mode = MODE_DATA;
 					data = data.slice(4);
 				} else {
-					// TODO: copy to avoid leaving full data in memory?
-					this._buf = data;
+					this._joined.push(data);
 					data = EMPTY_BUF;
 				}
 			} else if(this._mode === MODE_DATA) {
@@ -145,8 +150,7 @@ class CRCReader extends Transform {
 					this._mode = MODE_CRC;
 					data = data.slice(this._blockSize);
 				} else {
-					// TODO: copy to avoid leaving full data in memory?
-					this._buf = data;
+					this._joined.push(data);
 					data = EMPTY_BUF;
 				}
 			}
@@ -157,23 +161,23 @@ class CRCReader extends Transform {
 	_flush(callback) {
 		// Last block might not be full-size, and now that we know we've reached
 		// the end, we handle it here.
-		if(!this._buf.length) {
+		if(!this._joined.length) {
 			callback();
 			return;
 		}
+		let buf = this._joined.joinPop();
 		if(this._mode === MODE_CRC) {
-			callback(new BadData(`Stream ended in the middle of a CRC32C: ${this._buf.toString('hex')}`));
+			callback(new BadData(`Stream ended in the middle of a CRC32C: ${buf.toString('hex')}`));
 			return;
 		}
 		// It should be smaller than the block size, else it would have been handled in _transform
-		A(this._buf.length < this._blockSize, this._buf.length);
-		const crc = sse4_crc32.calculate(this._buf);
+		A(buf.length < this._blockSize, buf.length);
+		const crc = sse4_crc32.calculate(buf);
 		if(!this._checkCRC(callback, crc, this._crc)) {
 			return;
 		}
-		this.push(this._buf);
-		// Blow up if an io.js bug causes _flush to be called twice
-		this._buf = null;
+		this.push(buf);
+		this._joined = null;
 		callback();
 	}
 }
