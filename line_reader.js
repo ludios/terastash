@@ -43,7 +43,6 @@ class DelimitedBufferDecoder extends Transform {
 	}
 
 	_flush(callback) {
-		T(this._joined, JoinedBuffers);
 		if(this._joined.length) {
 			// Need to write out the last line, even if didn't end with delimiter
 			this.push(this._joined.joinPop());
