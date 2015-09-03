@@ -144,6 +144,23 @@ program
 	}));
 
 program
+	.command('restore-db <filename>')
+	.option('-n, --name <name>', 'Restore into this stash name')
+	.description(d(`
+		Load a database dump produced by 'ts dump-db' into a stash, overwriting the database for the stash
+
+		To load from stdin, use '-' for filename.`))
+	.action(a(function(filename, options) {
+		T(filename, T.string, options, T.object);
+		const name = stringOrNull(options.name);
+		if(name === null) {
+			console.error("-n/--name is required");
+			process.exit(1);
+		}
+		catchAndLog(terastash.restoreDb(name, filename));
+	}));
+
+program
 	.command('destroy <name>')
 	.description(d(`
 		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
@@ -378,8 +395,8 @@ program
 		Requires a C++ compiler.`))
 	.action(a(function() {
 		const compile_require = require('../compile_require');
-		compile_require('blake2');
 		compile_require('sse4_crc32');
+		compile_require('buffertools');
 	}));
 
 program

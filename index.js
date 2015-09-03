@@ -1711,11 +1711,19 @@ function dumpDb(stashName) {
 	});
 }
 
+function restoreDb(stashName, filename) {
+	T(stashName, T.string, filename, T.string);
+	return doWithClient(function dumpDb$doWithClient(client) {
+
+	});
+}
+
 module.exports = {
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
-	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath, KEYSPACE_PREFIX, dumpDb,
+	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath,
+	KEYSPACE_PREFIX, dumpDb, restoreDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
