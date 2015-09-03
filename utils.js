@@ -479,6 +479,31 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 	}
 });
 
+/**
+ * An object that holds multiple Buffers and knows the total
+ * length, allowing you to delay the .concat() until you need
+ * the whole thing.
+ */
+class JoinedBuffers {
+	constructor() {
+		this._bufs = [];
+		this.length = 0;
+	}
+
+	push(buf) {
+		T(buf, Buffer);
+		this.length += buf.length;
+		this._bufs.push(buf);
+	}
+
+	joinPop() {
+		const bufs = this._bufs;
+		this._bufs = [];
+		this.length = 0;
+		return Buffer.concat(bufs);
+	}
+}
+
 module.exports = {
 	LazyModule, loadNow,
 
@@ -490,5 +515,6 @@ module.exports = {
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	WILDCARD, colsAsString, ColsType, utimesMilliseconds, tryUnlink
+	WILDCARD, colsAsString, ColsType, utimesMilliseconds, tryUnlink,
+	JoinedBuffers
 };

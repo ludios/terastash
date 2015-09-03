@@ -5,27 +5,7 @@ const T = require('notmytype');
 const A = require('ayy');
 const buffertools = require('buffertools');
 const Transform = require('stream').Transform;
-
-
-class JoinedBuffers {
-	constructor() {
-		this._bufs = [];
-		this.length = 0;
-	}
-
-	push(buf) {
-		T(buf, Buffer);
-		this.length += buf.length;
-		this._bufs.push(buf);
-	}
-
-	joinPop() {
-		const bufs = this._bufs;
-		this._bufs = [];
-		this.length = 0;
-		return Buffer.concat(bufs);
-	}
-}
+const JoinedBuffers = require('./utils').JoinedBuffers;
 
 
 class DelimitedBufferDecoder extends Transform {

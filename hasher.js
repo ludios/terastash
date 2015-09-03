@@ -8,6 +8,7 @@ const commaify = utils.commaify;
 const compile_require = require('./compile_require');
 const loadNow = utils.loadNow;
 const LazyModule = utils.LazyModule;
+const JoinedBuffers = utils.JoinedBuffers;
 const Transform = require('stream').Transform;
 
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
@@ -42,41 +43,43 @@ class CRCWriter extends Transform {
 		A.gt(blockSize, 0);
 		super();
 		this._blockSize = blockSize;
-		this._buf = new Buffer(0);
+		this._joined = new JoinedBuffers();
 		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
 	_transform(data, encoding, callback) {
 		// Can write out at least one new block?
-		if(this._buf.length + data.length >= this._blockSize) {
-			// First block is special: need to include this._buf in crc32
-			const firstBuf = data.slice(0, this._blockSize - this._buf.length);
+		if(this._joined.length + data.length >= this._blockSize) {
+			const _buf = this._joined.joinPop();
+			// First block is special: need to include _buf in crc32
+			const firstBuf = data.slice(0, this._blockSize - _buf.length);
 			const firstCRC = sse4_crc32.calculate(
 				firstBuf,
-				sse4_crc32.calculate(this._buf));
+				sse4_crc32.calculate(_buf));
 			this.push(crcToBuf(firstCRC));
-			this.push(this._buf);
+			this.push(_buf);
 			this.push(firstBuf);
 
-			const _ = splitBuffer(data.slice(this._blockSize - this._buf.length), this._blockSize);
+			const _ = splitBuffer(data.slice(this._blockSize - _buf.length), this._blockSize);
 			const bufs = _[0];
-			this._buf = _[1];
+			this._joined.push(_[1]);
 
 			for(const buf of bufs) {
 				this.push(crcToBuf(sse4_crc32.calculate(buf)));
 				this.push(buf);
 			}
 		} else {
-			this._buf = Buffer.concat([this._buf, data]);
+			this._joined.push(data);
 		}
 		callback();
 	}
 
 	_flush(callback) {
 		// Need to write out the last block, even if it's under-sized
-		if(this._buf.length > 0) {
-			this.push(crcToBuf(sse4_crc32.calculate(this._buf)));
-			this.push(this._buf);
+		if(this._joined.length > 0) {
+			const _buf = this._joined.joinPop();
+			this.push(crcToBuf(sse4_crc32.calculate(_buf)));
+			this.push(_buf);
 			// Blow up if an io.js bug causes _flush to be called twice
 			this._buf = null;
 		}
