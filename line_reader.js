@@ -3,7 +3,8 @@
 
 const T = require('notmytype');
 const A = require('ayy');
-const buffertools = require('buffertools');
+const compile_require = require('./compile_require');
+const buffertools = compile_require('buffertools');
 const Transform = require('stream').Transform;
 const JoinedBuffers = require('./utils').JoinedBuffers;
 
