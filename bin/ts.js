@@ -144,20 +144,20 @@ program
 	}));
 
 program
-	.command('restore-db <filename>')
+	.command('restore-db <dump-file>')
 	.option('-n, --name <name>', 'Restore into this stash name')
 	.description(d(`
 		Load a database dump produced by 'ts dump-db' into a stash, overwriting the database for the stash
 
-		To load from stdin, use '-' for filename.`))
-	.action(a(function(filename, options) {
-		T(filename, T.string, options, T.object);
+		To load from stdin, use '-' for dump-file.`))
+	.action(a(function(dumpFile, options) {
+		T(dumpFile, T.string, options, T.object);
 		const name = stringOrNull(options.name);
 		if(name === null) {
 			console.error("-n/--name is required");
 			process.exit(1);
 		}
-		catchAndLog(terastash.restoreDb(name, filename));
+		catchAndLog(terastash.restoreDb(name, dumpFile));
 	}));
 
 program
