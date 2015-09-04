@@ -1836,7 +1836,7 @@ TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.pr
 
 function restoreDb(stashName, dumpFile) {
 	T(stashName, T.string, dumpFile, T.string);
-	console.log(`Restoring from ${inspect(dumpFile)} into stash ${inspect(stashName)}.`);
+	console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
 	console.log('Note that files may be restored before directories, so you might ' +
 		'not see anything in the stash until the restore process is complete.');
 	return doWithClient(function dumpDb$doWithClient(client) {
