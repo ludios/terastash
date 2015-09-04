@@ -1753,14 +1753,40 @@ class TransitToInsert extends Transform {
 		const line = lineBuf.toString('utf-8');
 		const obj = this._transitReader.read(line);
 
-		if(obj.type === 'f' &&
-		!(obj.content === null || obj.content === undefined) &&
-		(obj.crc32c === null || obj.crc32c === undefined)) {
-			obj.crc32c = hasher.crcToBuf(sse4_crc32.calculate(obj.content));
+		T(obj.basename, T.string);
+		T(obj.type, T.string);
+		T(obj.mtime, Date);
+		T(obj.parent, Buffer);
+		A.eq(obj.parent.length, 128/8);
+		if(obj.type === 'f') {
+			if(obj.crc32c === null || obj.crc32c === undefined) {
+				if(!(obj.content === null || obj.content === undefined)) {
+					// Generate crc32c for version 1 dumps, which have blake2b224
+					// instead of crc32c.
+					T(obj.content, Buffer);
+					obj.crc32c = hasher.crcToBuf(sse4_crc32.calculate(obj.content));
+				}
+			} else {
+				T(obj.crc32c, Buffer);
+			}
+			if(obj.content === null || obj.content === undefined) {
+				T(obj.key, Buffer);
+				A.eq(obj.key.length, 128/8);
+			}
+			T(obj.size, cassandra.types.Long);
+			A.eq(obj.uuid, null);
+			T(obj.executable, T.boolean);
+		} else if(obj.type === 'd') {
+			T(obj.uuid, Buffer);
+			A.eq(obj.uuid.length, 128/8);
+			A.eq(obj.content, null);
+			A.eq(obj.executable, null);
+			A.eq(obj.crc32c, null);
+			A.eq(obj.size, null);
 		}
 
-		const cols = ['basename', 'parent', 'type', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable'];
-		const vals = [obj.basename, obj.parent, obj.type, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
+		const cols = ['basename', 'parent', 'type', 'uuid', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable'];
+		const vals = [obj.basename, obj.parent, obj.type, obj.uuid, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
 		for(const k of Object.keys(obj)) {
 			if(k.startsWith("chunks_in_")) {
 				if(!this._columnsCreated[k]) {

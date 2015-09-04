@@ -163,7 +163,8 @@ program
 program
 	.command('destroy <name>')
 	.description(d(`
-		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
+		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name>
+		and removes stash from stashes.json.  Does *not* affect the chunk store.`))
 	.action(a(function(name) {
 		T(name, T.string);
 		catchAndLog(terastash.destroyStash(name));
