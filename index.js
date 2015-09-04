@@ -911,7 +911,7 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		chunkInfo = _[1];
 		for(const info of chunkInfo) {
 			A.lte(info.size, chunkStore.chunkSize, `uploaded a too-big chunk:\n${inspect(info)}`);
-			info.ver = 2;
+			info.version = 2;
 			info.block_size = CRC_BLOCK_SIZE;
 		}
 		A.eq(totalSize, concealedSize,
@@ -1621,7 +1621,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			md5 blob,
 			crc32c blob,
 			size bigint,
-			ver int,
+			version int,
 			block_size int
 		)`);
 
@@ -1753,14 +1753,14 @@ class TransitToInsert extends Transform {
 		const line = lineBuf.toString('utf-8');
 		const obj = this._transitReader.read(line);
 
-		console.log(obj);
-
-		if(obj.type === 'f' && obj.content !== null) {
+		if(obj.type === 'f' &&
+		!(obj.content === null || obj.content === undefined) &&
+		(obj.crc32c === null || obj.crc32c === undefined)) {
 			obj.crc32c = hasher.crcToBuf(sse4_crc32.calculate(obj.content));
 		}
 
 		const cols = ['basename', 'parent', 'type', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable'];
-		const vals = [obj.basename, obj.parentUuid, obj.type, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
+		const vals = [obj.basename, obj.parent, obj.type, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
 		for(const k of Object.keys(obj)) {
 			if(k.startsWith("chunks_in_")) {
 				if(!this._columnsCreated[k]) {
@@ -1785,14 +1785,11 @@ class TransitToInsert extends Transform {
 		}
 		const qMarks = utils.filledArray(cols.length, "?");
 
-		yield runQuery(
-			this._client,
-			`INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
+		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols)})
-			VALUES (${qMarks.join(", ")});`,
-			vals
-		);
-
+			VALUES (${qMarks.join(", ")});`;
+		//console.log({query, cols, vals});
+		yield runQuery(this._client, query, vals);
 		return obj;
 	}
 
@@ -1813,6 +1810,9 @@ TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.pr
 
 function restoreDb(stashName, dumpFile) {
 	T(stashName, T.string, dumpFile, T.string);
+	console.log(`Restoring from ${inspect(dumpFile)} into stash ${inspect(stashName)}.`);
+	console.log('Note that files may be restored before directories, so you might ' +
+		'not see anything in the stash until the restore process is complete.');
 	return doWithClient(function dumpDb$doWithClient(client) {
 		let inputStream;
 		if(dumpFile === '-') {
@@ -1833,7 +1833,10 @@ function restoreDb(stashName, dumpFile) {
 			process.stdout.write(`${count}...`);
 		});
 		return new Promise(function(resolve, reject) {
-			inserter.once('end', resolve);
+			inserter.once('end', function() {
+				console.log('Done.');
+				resolve();
+			});
 			inserter.once('error', reject);
 		});
 	});
