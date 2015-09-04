@@ -1747,7 +1747,7 @@ function dumpDb(stashName) {
  */
 class TransitToInsert extends EventEmitter {
 	constructor(lineBufStream, client, stashName) {
-		T(lineBufStream, T.object, client, CassandraClientType, stashName, T.string)
+		T(lineBufStream, T.object, client, CassandraClientType, stashName, T.string);
 		super();
 		this._lineBufStream = lineBufStream;
 		this._client = client;
