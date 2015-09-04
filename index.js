@@ -1730,12 +1730,86 @@ function dumpDb(stashName) {
 				const transitStream = new RowToTransit({objectMode: true});
 				utils.pipeWithErrors(rowStream, transitStream);
 				utils.pipeWithErrors(transitStream, process.stdout);
-				transitStream.on('end', resolve);
+				transitStream.once('end', resolve);
 				transitStream.once('error', reject);
 			});
 		}));
 	});
 }
+
+class TransitToInsert extends Transform {
+	constructor(client, stashName) {
+		T(client, CassandraClientType, stashName, T.string)
+		super({readableObjectMode: true});
+		this._client = client;
+		this._stashName = stashName;
+		this._transitReader = getTransitReader();
+		this._columnsCreated = {};
+		sse4_crc32 = loadNow(sse4_crc32);
+		hasher = loadNow(hasher);
+	}
+
+	*_insertFromLine(lineBuf) {
+		const line = lineBuf.toString('utf-8');
+		const obj = this._transitReader.read(line);
+
+		console.log(obj);
+
+		if(obj.type === 'f' && obj.content !== null) {
+			obj.crc32c = hasher.crcToBuf(sse4_crc32.calculate(obj.content));
+		}
+
+		const cols = ['basename', 'parent', 'type', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable'];
+		const vals = [obj.basename, obj.parentUuid, obj.type, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
+		for(const k of Object.keys(obj)) {
+			if(k.startsWith("chunks_in_")) {
+				if(!this._columnsCreated[k]) {
+					yield tryCreateColumnOnStashTable(
+						this._client, this._stashName, k, 'list<frozen<chunk>>');
+					this._columnsCreated[k] = true;
+				}
+
+				if(obj[k] !== null) {
+					obj[k].map(function(chunkInfo) {
+						if(chunkInfo.version === undefined) {
+							chunkInfo.version = 2;
+							chunkInfo.block_size = 0;
+						}
+						// Mutated, no need to return
+					});
+				}
+
+				cols.push(k);
+				vals.push(obj[k]);
+			}
+		}
+		const qMarks = utils.filledArray(cols.length, "?");
+
+		yield runQuery(
+			this._client,
+			`INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
+			(${utils.colsAsString(cols)})
+			VALUES (${qMarks.join(", ")});`,
+			vals
+		);
+
+		return obj;
+	}
+
+	_transform(lineBuf, encoding, callback) {
+		try {
+			const p = this._insertFromLine(lineBuf);
+			p.then(function(obj) {
+				callback(null, obj);
+			}, function(err) {
+				callback(err);
+			});
+		} catch(err) {
+			callback(err);
+		}
+	}
+}
+TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
 
 function restoreDb(stashName, dumpFile) {
 	T(stashName, T.string, dumpFile, T.string);
@@ -1749,14 +1823,18 @@ function restoreDb(stashName, dumpFile) {
 		line_reader = loadNow(line_reader);
 		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
-		const reader = getTransitReader();
-		lineStream.on('data', function(lineBuf) {
-			const line = lineBuf.toString('utf-8');
-			const obj = reader.read(line);
-			console.log(obj);
+		const inserter = new TransitToInsert(client, stashName);
+		utils.pipeWithErrors(lineStream, inserter);
+		let count = 0;
+		inserter.on('data', function() {
+			count += 1;
+			process.stdout.clearLine();
+			process.stdout.cursorTo(0);
+			process.stdout.write(`${count}...`);
 		});
-		return new Promise(function(resolve) {
-			lineStream.on('end', resolve);
+		return new Promise(function(resolve, reject) {
+			inserter.once('end', resolve);
+			inserter.once('error', reject);
 		});
 	});
 }
