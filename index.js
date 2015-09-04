@@ -37,6 +37,7 @@ let gdrive = new LazyModule('./chunker/gdrive');
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
+let line_reader = new LazyModule('./line_reader');
 let transit = new LazyModule('transit-js');
 
 const KEYSPACE_PREFIX = "ts_";
@@ -1675,6 +1676,31 @@ function getTransitWriter() {
 	return transitWriter;
 }
 
+let transitReader;
+function getTransitReader() {
+	cassandra = loadNow(cassandra);
+	transit = loadNow(transit);
+	if(!transitReader) {
+		transitReader = transit.reader("json-verbose", {handlers: {
+			"Long": function(v) { return new cassandra.types.Long(v); },
+			"Row": function(v) {
+				const obj = transit.mapToObject(v);
+				// We also need to fix the TransitMap objects inside
+				// chunks_in_* -> [TransitMap, ...]
+				for(const k of Object.keys(obj)) {
+					if(k.startsWith("chunks_in_") && obj[k] !== null) {
+						obj[k] = obj[k].map(function(v) {
+							return transit.mapToObject(v);
+						});
+					}
+				}
+				return obj;
+			}
+		}});
+	}
+	return transitReader;
+}
+
 class RowToTransit extends Transform {
 	constructor(options) {
 		super(options);
@@ -1714,7 +1740,24 @@ function dumpDb(stashName) {
 function restoreDb(stashName, dumpFile) {
 	T(stashName, T.string, dumpFile, T.string);
 	return doWithClient(function dumpDb$doWithClient(client) {
-
+		let inputStream;
+		if(dumpFile === '-') {
+			inputStream = process.stdin;
+		} else {
+			inputStream = fs.createReadStream(dumpFile);
+		}
+		line_reader = loadNow(line_reader);
+		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
+		utils.pipeWithErrors(inputStream, lineStream);
+		const reader = getTransitReader();
+		lineStream.on('data', function(lineBuf) {
+			const line = lineBuf.toString('utf-8');
+			const obj = reader.read(line);
+			console.log(obj);
+		});
+		return new Promise(function(resolve) {
+			lineStream.on('end', resolve);
+		});
 	});
 }
 
