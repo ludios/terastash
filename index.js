@@ -13,6 +13,7 @@ const inspect = require('util').inspect;
 const streamifier = require('streamifier');
 const noop = require('lodash.noop');
 const Transform = require('stream').Transform;
+const EventEmitter = require('events').EventEmitter;
 
 const utils = require('./utils');
 const filename = require('./filename');
@@ -224,9 +225,8 @@ function runQuery(client, statement, args) {
  * Call function `f` with a Cassandra client and shut down the client
  * after `f` is done.
  */
-function doWithClient(f) {
-	T(f, T.function);
-	const client = getNewClient();
+function doWithClient(client, f) {
+	T(client, CassandraClientType, f, T.function);
 	const p = f(client);
 	function shutdown(ret) {
 		try {
@@ -386,7 +386,7 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 });
 
 function lsPath(stashName, options, p) {
-	return doWithClient(function lsPath$doWithClient(client) {
+	return doWithClient(getNewClient(), function lsPath$doWithClient(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function* lsPath$coro(stashInfo, dbPath, parentPath) {
 			const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 			const rows = yield getChildrenForParent(
@@ -447,7 +447,7 @@ listRecursively = Promise.coroutine(function* listRecursively$coro(client, stash
 // Like "find" utility
 function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
-	return doWithClient(function lsPath$doWithClient(client) {
+	return doWithClient(getNewClient(), function lsPath$doWithClient(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
 			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
 		}));
@@ -704,7 +704,7 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
  */
 function dropFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(Promise.coroutine(function* dropFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* dropFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
@@ -974,7 +974,7 @@ function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
 		dropOldIfDifferent, T.optional(T.boolean),
 		progress, T.optional(T.boolean)
 	);
-	return doWithClient(Promise.coroutine(function* addFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
@@ -1080,7 +1080,7 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 
 function shooFiles(paths, continueOnError) {
 	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
-	return doWithClient(Promise.coroutine(function* shooFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
 			try {
@@ -1239,7 +1239,7 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 
 function getFiles(stashName, paths, fake) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean);
-	return doWithClient(Promise.coroutine(function* getFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* getFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			let dbPath;
@@ -1272,7 +1272,7 @@ const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPa
 
 function catFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(Promise.coroutine(function* catFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* catFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
@@ -1283,7 +1283,7 @@ function catFiles(stashName, paths) {
 
 function makeDirectories(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(Promise.coroutine(function* makeDirectories$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* makeDirectories$coro(client) {
 		let dbPaths;
 		let stashInfo;
 		if(stashName) { // Explicit stash name provided
@@ -1317,7 +1317,7 @@ function makeDirectories(stashName, paths) {
 
 function moveFiles(stashName, sources, dest) {
 	T(stashName, T.maybe(T.string), sources, T.list(T.string), dest, T.string);
-	return doWithClient(Promise.coroutine(function* moveFiles$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* moveFiles$coro(client) {
 		let stashInfo;
 		let dbPathSources;
 		let dbPathDest;
@@ -1432,7 +1432,7 @@ function moveFiles(stashName, sources, dest) {
  * List all terastash keyspaces in Cassandra
  */
 function listTerastashKeyspaces() {
-	return doWithClient(function listTerastashKeyspaces$doWithClient(client) {
+	return doWithClient(getNewClient(), function listTerastashKeyspaces$doWithClient(client) {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 		return runQuery(
 			client,
@@ -1610,7 +1610,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	return doWithClient(Promise.coroutine(function* initStash$coro$coro(client) {
+	return doWithClient(getNewClient(), Promise.coroutine(function* initStash$coro$coro(client) {
 		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`);
 
@@ -1721,7 +1721,7 @@ class RowToTransit extends Transform {
 
 function dumpDb(stashName) {
 	T(stashName, T.maybe(T.string));
-	return doWithClient(function dumpDb$doWithClient(client) {
+	return doWithClient(getNewClient(), function dumpDb$doWithClient(client) {
 		return doWithPath(stashName, ".", Promise.coroutine(function* dumpDb$coro(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
 			yield new Promise(function(resolve, reject) {
@@ -1737,14 +1737,25 @@ function dumpDb(stashName) {
 	});
 }
 
-class TransitToInsert extends Transform {
-	constructor(client, stashName) {
-		T(client, CassandraClientType, stashName, T.string)
-		super({readableObjectMode: true});
+/**
+ * TransitToInsert can't be a stream.Transform because an object stream can't
+ * signal in _transform that it wants more data if it hasn't finished processing the
+ * current data yet.  TransitToInsert wants to process multiple rows at the same
+ * time, and because of that limitation, we can't do it with streams.  Instead, we
+ * read from the input stream and pause()/resume() when we reach our watermark
+ * line, and emit our own 'row'/'end'/'error' events.
+ */
+class TransitToInsert extends EventEmitter {
+	constructor(lineBufStream, client, stashName) {
+		T(lineBufStream, T.object, client, CassandraClientType, stashName, T.string)
+		super();
+		this._lineBufStream = lineBufStream;
 		this._client = client;
 		this._stashName = stashName;
 		this._transitReader = getTransitReader();
 		this._columnsCreated = {};
+		this._inFlight = 0;
+		this._wantEnd = false;
 		sse4_crc32 = loadNow(sse4_crc32);
 		hasher = loadNow(hasher);
 	}
@@ -1753,14 +1764,21 @@ class TransitToInsert extends Transform {
 		const line = lineBuf.toString('utf-8');
 		const obj = this._transitReader.read(line);
 
+		if(obj.crc32c === undefined) {
+			obj.crc32c = null;
+		}
+		if(obj.content === undefined) {
+			obj.content = null;
+		}
+
 		T(obj.basename, T.string);
 		T(obj.type, T.string);
 		T(obj.mtime, Date);
 		T(obj.parent, Buffer);
 		A.eq(obj.parent.length, 128/8);
 		if(obj.type === 'f') {
-			if(obj.crc32c === null || obj.crc32c === undefined) {
-				if(!(obj.content === null || obj.content === undefined)) {
+			if(obj.crc32c === null) {
+				if(obj.content !== null) {
 					// Generate crc32c for version 1 dumps, which have blake2b224
 					// instead of crc32c.
 					T(obj.content, Buffer);
@@ -1769,7 +1787,7 @@ class TransitToInsert extends Transform {
 			} else {
 				T(obj.crc32c, Buffer);
 			}
-			if(obj.content === null || obj.content === undefined) {
+			if(obj.content === null) {
 				T(obj.key, Buffer);
 				A.eq(obj.key.length, 128/8);
 			}
@@ -1819,17 +1837,58 @@ class TransitToInsert extends Transform {
 		return obj;
 	}
 
-	_transform(lineBuf, encoding, callback) {
+	_process(lineBuf) {
+		const that = this;
+
+		function pauseOrResume() {
+			if(that._inFlight === 0 && that._wantEnd === true) {
+				that.emit('end');
+				return;
+			}
+			// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
+			if(that._inFlight < 6) {
+				that._lineBufStream.resume();
+			} else {
+				that._lineBufStream.pause();
+			}
+		}
+
 		try {
 			const p = this._insertFromLine(lineBuf);
-			p.then(function(obj) {
-				callback(null, obj);
-			}, function(err) {
-				callback(err);
+			p.then(function _insertFromLine$callback(obj) {
+				that._inFlight--;
+				that.emit('row', obj);
+				pauseOrResume();
+			}, function _insertFromLine$errback(err) {
+				that._inFlight--;
+				that.emit('error', err);
+				that._lineBufStream.pause();
+				that._lineBufStream = null;
 			});
+			this._inFlight++;
 		} catch(err) {
-			callback(err);
+			this.emit('error', err);
+			that._lineBufStream.pause();
+			that._lineBufStream = null;
+			return;
 		}
+		//console.log("in flight:", this._inFlight);
+		pauseOrResume();
+	}
+
+	start() {
+		const that = this;
+		this._lineBufStream.on('data', this._process.bind(this));
+		this._lineBufStream.once('error', function(err) {
+			that.emit('error', err);
+		});
+		this._lineBufStream.once('end', function() {
+			//console.log('got end from lineBufStream');
+			that._wantEnd = true;
+			if(that._inFlight === 0) {
+				that.emit('end');
+			} // else have pauseOrResume do it
+		});
 	}
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
@@ -1839,7 +1898,7 @@ function restoreDb(stashName, dumpFile) {
 	console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
 	console.log('Note that files may be restored before directories, so you might ' +
 		'not see anything in the stash until the restore process is complete.');
-	return doWithClient(function dumpDb$doWithClient(client) {
+	return doWithClient(getNewClient(), function dumpDb$doWithClient(client) {
 		let inputStream;
 		if(dumpFile === '-') {
 			inputStream = process.stdin;
@@ -1849,15 +1908,17 @@ function restoreDb(stashName, dumpFile) {
 		line_reader = loadNow(line_reader);
 		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
-		const inserter = new TransitToInsert(client, stashName);
-		utils.pipeWithErrors(lineStream, inserter);
+		const inserter = new TransitToInsert(lineStream, client, stashName);
 		let count = 0;
-		inserter.on('data', function() {
+		const start = Date.now();
+		inserter.on('row', function(obj) {
 			count += 1;
 			process.stdout.clearLine();
 			process.stdout.cursorTo(0);
-			process.stdout.write(`${count}...`);
+			process.stdout.write(`${commaify(count)}/? done at ` +
+				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...`);
 		});
+		inserter.start();
 		return new Promise(function(resolve, reject) {
 			inserter.once('end', function() {
 				console.log('Done.');
