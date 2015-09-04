@@ -1571,7 +1571,7 @@ function assertName(name) {
 
 const destroyStash = Promise.coroutine(function* destroyStash$coro(stashName) {
 	assertName(stashName);
-	yield doWithClient(function destroyStash$doWithClient(client) {
+	yield doWithClient(getNewClient(), function destroyStash$doWithClient(client) {
 		return runQuery(
 			client,
 			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
