@@ -1837,28 +1837,28 @@ class TransitToInsert extends EventEmitter {
 		return obj;
 	}
 
-	_process(lineBuf) {
-		const that = this;
-
-		function pauseOrResume() {
-			if(that._inFlight === 0 && that._wantEnd === true) {
-				that.emit('end');
-				return;
-			}
-			// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
-			if(that._inFlight < 6) {
-				that._lineBufStream.resume();
-			} else {
-				that._lineBufStream.pause();
+	_maybeDoMore() {
+		if(this._inFlight === 0 && this._wantEnd === true) {
+			this.emit('end');
+		// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
+		} else if(this._inFlight < 6) {
+			const buf = this._lineBufStream.read();
+			if(buf !== null) {
+				this._process(buf);
 			}
 		}
+	}
 
+	_process(lineBuf) {
+		T(lineBuf, Buffer);
+
+		const that = this;
 		try {
 			const p = this._insertFromLine(lineBuf);
 			p.then(function _insertFromLine$callback(obj) {
 				that._inFlight--;
 				that.emit('row', obj);
-				pauseOrResume();
+				that._maybeDoMore();
 			}, function _insertFromLine$errback(err) {
 				that._inFlight--;
 				that.emit('error', err);
@@ -1872,23 +1872,20 @@ class TransitToInsert extends EventEmitter {
 			that._lineBufStream = null;
 			return;
 		}
+		that._maybeDoMore();
 		//console.log("in flight:", this._inFlight);
-		pauseOrResume();
 	}
 
 	start() {
-		const that = this;
-		this._lineBufStream.on('data', this._process.bind(this));
+		this._lineBufStream.on('readable', this._maybeDoMore.bind(this));
 		this._lineBufStream.once('error', function(err) {
-			that.emit('error', err);
-		});
+			this.emit('error', err);
+		}.bind(this));
 		this._lineBufStream.once('end', function() {
 			//console.log('got end from lineBufStream');
-			that._wantEnd = true;
-			if(that._inFlight === 0) {
-				that.emit('end');
-			} // else have pauseOrResume do it
-		});
+			this._wantEnd = true;
+			this._maybeDoMore();
+		}.bind(this));
 	}
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
