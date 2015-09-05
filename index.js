@@ -1843,12 +1843,16 @@ class TransitToInsert extends Transform {
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
 
-function importDb(stashName, dumpFile) {
-	T(stashName, T.string, dumpFile, T.string);
-	console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
-	console.log('Note that files may be restored before directories, so you might ' +
-		'not see anything in the stash until the restore process is complete.');
-	return doWithClient(getNewClient(), function importDb$doWithClient(client) {
+const outCtxType = T.shape({mode: T.string});
+
+function importDb(outCtx, stashName, dumpFile) {
+	T(outCtx, outCtxType, stashName, T.string, dumpFile, T.string);
+	if(outCtx.mode !== 'quiet') {
+		console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
+		console.log('Note that files may be restored before directories, so you might ' +
+			'not see anything in the stash until the restore process is complete.');
+	}
+	return doWithClient(getNewClient(), Promise.coroutine(function* importDb$coro(client) {
 		let inputStream;
 		if(dumpFile === '-') {
 			inputStream = process.stdin;
@@ -1862,27 +1866,42 @@ function importDb(stashName, dumpFile) {
 		// 4 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
 		const workStealers = work_stealer.makeWorkStealers(lineStream, 4);
 		let count = 0;
+
+		const start = Date.now();
+		function printProgress(LF) {
+			if(outCtx.mode === 'terminal') {
+				utils.tryClearLine(process.stdout);
+			}
+			process.stdout.write(`${commaify(count)}/? done at ` +
+				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...` +
+				`${LF ? '\n' : ''}`);
+		}
+
 		const inserters = workStealers.map(function(stealer) {
 			const inserter = new TransitToInsert(client, stashName);
 			stealer.pipe(inserter);
-			const start = Date.now();
+
 			inserter.on('data', function(obj) {
 				count += 1;
-				process.stdout.clearLine();
-				process.stdout.cursorTo(0);
-				process.stdout.write(`${commaify(count)}/? done at ` +
-					`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...`);
+				// Print every 100th to avoid getting 30% slowdown by just terminal output
+				if(outCtx.mode === 'terminal' && count % 100 === 0) {
+					printProgress();
+				} else if(outCtx.mode === 'log' && count % 1000 === 0) {
+					printProgress(true);
+				}
 			});
+
 			return new Promise(function(resolve, reject) {
-				inserter.once('end', function() {
-					console.log('Done.');
-					resolve();
-				});
+				inserter.once('end', resolve);
 				inserter.once('error', reject);
 			});
 		});
-		return Promise.all(inserters);
-	});
+		yield Promise.all(inserters);
+		if(outCtx.mode !== 'quiet') {
+			printProgress(true);
+			console.log('Done importing.');
+		}
+	}));
 }
 
 module.exports = {

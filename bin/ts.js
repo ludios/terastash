@@ -146,6 +146,18 @@ program
 		catchAndLog(terastash.exportDb(name));
 	}));
 
+function getOutputContext() {
+	let mode;
+	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
+		mode = process.env.TERASTASH_OUTPUT_MODE;
+	} else if(process.stdout.clearLine) {
+		mode = 'terminal';
+	} else {
+		mode = 'log';
+	}
+	return {mode};
+}
+
 program
 	.command('import-db <dump-file>')
 	.option('-n, --name <name>', 'Restore into this stash name')
@@ -161,7 +173,7 @@ program
 			console.error("-n/--name is required");
 			process.exit(1);
 		}
-		catchAndLog(terastash.importDb(name, dumpFile));
+		catchAndLog(terastash.importDb(getOutputContext(), name, dumpFile));
 	}));
 
 program

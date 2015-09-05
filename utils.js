@@ -523,6 +523,13 @@ class JoinedBuffers {
 	}
 }
 
+function tryClearLine(stdStream) {
+	if(stdStream.clearLine && stdStream.cursorTo) {
+		stdStream.clearLine();
+		stdStream.cursorTo(0);
+	}
+}
+
 module.exports = {
 	LazyModule, loadNow,
 
@@ -535,5 +542,5 @@ module.exports = {
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers
+	tryUnlink, JoinedBuffers, tryClearLine
 };
