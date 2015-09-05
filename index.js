@@ -991,8 +991,7 @@ function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
 			let count = 1;
 			for(const p of paths) {
 				if(progress) {
-					process.stdout.clearLine();
-					process.stdout.cursorTo(0);
+					utils.tryClearLine(process.stdout);
 					process.stdout.write(`${count}/${paths.length}...`);
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
