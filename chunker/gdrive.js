@@ -199,7 +199,14 @@ class GDriver {
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
-					reject(err);
+					if(err.code === 404 && err.errors[0].reason === 'notFound') {
+						reject(new UploadError(`googleapis.com returned:\n${err.message}\n\n` +
+							`Make sure that the Google Drive folder you are uploading into exists ` +
+							`("parents" in config), and that you are using credentials for ` +
+							`the correct Google account.`));
+					} else {
+						reject(err);
+					}
 				} else {
 					resolve(obj);
 				}
