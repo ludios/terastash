@@ -252,8 +252,17 @@ function pipeWithErrors(src, dest) {
 	});
 }
 
+const StreamType = T.shape({
+	read: T.function,
+	pipe: T.function,
+	on: T.function,
+	once: T.function,
+	pause: T.function,
+	resume: T.function
+});
+
 function makeHttpsRequest(options, stream) {
-	T(options, T.object, stream, T.optional(T.shape({pipe: T.function})));
+	T(options, T.object, stream, T.optional(StreamType));
 	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
 		const req = https.request(options, resolve).once('error', function(err) {
@@ -271,7 +280,7 @@ function makeHttpsRequest(options, stream) {
 }
 
 function streamToBuffer(stream) {
-	T(stream, T.shape({on: T.function, once: T.function, resume: T.function}));
+	T(stream, StreamType);
 	return new Promise(function streamToBuffer$Promise(resolve, reject) {
 		const bufs = [];
 		stream.on('data', function(data) {
@@ -311,7 +320,7 @@ function crc32$digest(encoding) {
  */
 function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	T(
-		inputStream, T.shape({pipe: T.function}),
+		inputStream, StreamType,
 		algoOrExistingHash, T.union([T.string, T.object]),
 		existingLength, T.optional(T.number)
 	);
@@ -524,7 +533,7 @@ module.exports = {
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
-	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	WILDCARD, colsAsString, ColsType, utimesMilliseconds, tryUnlink,
-	JoinedBuffers
+	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
+	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
+	tryUnlink, JoinedBuffers
 };

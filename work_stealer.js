@@ -9,11 +9,12 @@
 "use strict";
 
 const T = require('notmytype');
+const utils = require('./utils');
 const Readable = require('stream').Readable;
 
 class WorkStealer extends Readable {
 	constructor(inputStream) {
-		T(inputStream, T.object);
+		T(inputStream, utils.StreamType);
 		super({readableObjectMode: true});
 		this._inputStream = inputStream;
 		this._stopped = false;
@@ -62,6 +63,8 @@ class WorkStealer extends Readable {
 }
 
 function makeWorkStealers(inputStream, quantity) {
+	T(inputStream, utils.StreamType, quantity, T.number);
+	utils.assertSafeNonNegativeInteger(quantity);
 	const instances = [];
 	while(quantity--) {
 		instances.push(new WorkStealer(inputStream));
