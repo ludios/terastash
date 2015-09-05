@@ -119,6 +119,7 @@ class KeyspaceMissingError extends Error {
 }
 
 const StashInfoType = T.shape({path: T.string});
+const OutputContextType = T.shape({mode: T.string});
 
 /**
  * For a given pathname, return a stash that contains the file,
@@ -967,12 +968,12 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 /**
  * Put files or directories into the Cassandra database.
  */
-function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
+function addFiles(outCtx, paths, continueOnExists, dropOldIfDifferent) {
 	T(
+		outCtx, OutputContextType,
 		paths, T.list(T.string),
 		continueOnExists, T.optional(T.boolean),
-		dropOldIfDifferent, T.optional(T.boolean),
-		progress, T.optional(T.boolean)
+		dropOldIfDifferent, T.optional(T.boolean)
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -990,7 +991,7 @@ function addFiles(paths, continueOnExists, dropOldIfDifferent, progress) {
 		try {
 			let count = 1;
 			for(const p of paths) {
-				if(progress) {
+				if(outCtx.mode === 'terminal') {
 					utils.tryClearLine(process.stdout);
 					process.stdout.write(`${count}/${paths.length}...`);
 				}
@@ -1826,8 +1827,6 @@ class TransitToInsert extends Transform {
 
 	_transform(lineBuf, encoding, callback) {
 		T(lineBuf, Buffer);
-
-		const that = this;
 		try {
 			const p = this._insertFromLine(lineBuf);
 			p.then(function _insertFromLine$callback(obj) {
@@ -1842,10 +1841,8 @@ class TransitToInsert extends Transform {
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
 
-const outCtxType = T.shape({mode: T.string});
-
 function importDb(outCtx, stashName, dumpFile) {
-	T(outCtx, outCtxType, stashName, T.string, dumpFile, T.string);
+	T(outCtx, OutputContextType, stashName, T.string, dumpFile, T.string);
 	if(outCtx.mode !== 'quiet') {
 		console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
 		console.log('Note that files may be restored before directories, so you might ' +

@@ -102,6 +102,18 @@ function a(f) {
 	};
 }
 
+function getOutputContext() {
+	let mode;
+	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
+		mode = process.env.TERASTASH_OUTPUT_MODE;
+	} else if(process.stdout.clearLine) {
+		mode = 'terminal';
+	} else {
+		mode = 'log';
+	}
+	return {mode};
+}
+
 program
 	.version(require('../package.json').version);
 
@@ -146,18 +158,6 @@ program
 		catchAndLog(terastash.exportDb(name));
 	}));
 
-function getOutputContext() {
-	let mode;
-	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
-		mode = process.env.TERASTASH_OUTPUT_MODE;
-	} else if(process.stdout.clearLine) {
-		mode = 'terminal';
-	} else {
-		mode = 'log';
-	}
-	return {mode};
-}
-
 program
 	.command('import-db <dump-file>')
 	.option('-n, --name <name>', 'Restore into this stash name')
@@ -197,8 +197,7 @@ program
 		Add a file to the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.addFiles(files, options.continueOnExists, options.dropOldIfDifferent, progress));
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent));
 	}));
 
 program
