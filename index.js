@@ -13,7 +13,6 @@ const inspect = require('util').inspect;
 const streamifier = require('streamifier');
 const noop = require('lodash.noop');
 const Transform = require('stream').Transform;
-const EventEmitter = require('events').EventEmitter;
 
 const utils = require('./utils');
 const filename = require('./filename');
@@ -39,6 +38,7 @@ let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
 let line_reader = new LazyModule('./line_reader');
+let work_stealer = new LazyModule('./work_stealer');
 let transit = new LazyModule('transit-js');
 
 const KEYSPACE_PREFIX = "ts_";
@@ -1737,25 +1737,14 @@ function exportDb(stashName) {
 	});
 }
 
-/**
- * TransitToInsert can't be a stream.Transform because an object stream can't
- * signal in _transform that it wants more data if it hasn't finished processing the
- * current data yet.  TransitToInsert wants to process multiple rows at the same
- * time, and because of that limitation, we can't do it with streams.  Instead, we
- * read from the input stream and pause()/resume() when we reach our watermark
- * line, and emit our own 'row'/'end'/'error' events.
- */
-class TransitToInsert extends EventEmitter {
-	constructor(lineBufStream, client, stashName) {
-		T(lineBufStream, T.object, client, CassandraClientType, stashName, T.string);
-		super();
-		this._lineBufStream = lineBufStream;
+class TransitToInsert extends Transform {
+	constructor(client, stashName) {
+		T(client, CassandraClientType, stashName, T.string);
+		super({readableObjectMode: true});
 		this._client = client;
 		this._stashName = stashName;
 		this._transitReader = getTransitReader();
 		this._columnsCreated = {};
-		this._inFlight = 0;
-		this._wantEnd = false;
 		sse4_crc32 = loadNow(sse4_crc32);
 		hasher = loadNow(hasher);
 	}
@@ -1836,55 +1825,20 @@ class TransitToInsert extends EventEmitter {
 		return obj;
 	}
 
-	_maybeDoMore() {
-		if(this._inFlight === 0 && this._wantEnd === true) {
-			this.emit('end');
-		// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
-		} else if(this._inFlight < 6) {
-			const buf = this._lineBufStream.read();
-			if(buf !== null) {
-				this._process(buf);
-			}
-		}
-	}
-
-	_process(lineBuf) {
+	_transform(lineBuf, encoding, callback) {
 		T(lineBuf, Buffer);
 
 		const that = this;
 		try {
 			const p = this._insertFromLine(lineBuf);
 			p.then(function _insertFromLine$callback(obj) {
-				that._inFlight--;
-				that.emit('row', obj);
-				that._maybeDoMore();
+				callback(null, obj);
 			}, function _insertFromLine$errback(err) {
-				that._inFlight--;
-				that.emit('error', err);
-				that._lineBufStream.pause();
-				that._lineBufStream = null;
+				callback(err);
 			});
-			this._inFlight++;
 		} catch(err) {
-			this.emit('error', err);
-			that._lineBufStream.pause();
-			that._lineBufStream = null;
-			return;
+			callback(err);
 		}
-		that._maybeDoMore();
-		//console.log("in flight:", this._inFlight);
-	}
-
-	start() {
-		this._lineBufStream.on('readable', this._maybeDoMore.bind(this));
-		this._lineBufStream.once('error', function(err) {
-			this.emit('error', err);
-		}.bind(this));
-		this._lineBufStream.once('end', function() {
-			//console.log('got end from lineBufStream');
-			this._wantEnd = true;
-			this._maybeDoMore();
-		}.bind(this));
 	}
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
@@ -1902,26 +1856,32 @@ function importDb(stashName, dumpFile) {
 			inputStream = fs.createReadStream(dumpFile);
 		}
 		line_reader = loadNow(line_reader);
+		work_stealer = loadNow(work_stealer);
 		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
-		const inserter = new TransitToInsert(lineStream, client, stashName);
+		// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
+		const workStealers = work_stealer.makeWorkStealers(lineStream, 6);
 		let count = 0;
-		const start = Date.now();
-		inserter.on('row', function(obj) {
-			count += 1;
-			process.stdout.clearLine();
-			process.stdout.cursorTo(0);
-			process.stdout.write(`${commaify(count)}/? done at ` +
-				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...`);
-		});
-		inserter.start();
-		return new Promise(function(resolve, reject) {
-			inserter.once('end', function() {
-				console.log('Done.');
-				resolve();
+		const inserters = workStealers.map(function(stealer) {
+			const inserter = new TransitToInsert(client, stashName);
+			stealer.pipe(inserter);
+			const start = Date.now();
+			inserter.on('data', function(obj) {
+				count += 1;
+				process.stdout.clearLine();
+				process.stdout.cursorTo(0);
+				process.stdout.write(`${commaify(count)}/? done at ` +
+					`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...`);
 			});
-			inserter.once('error', reject);
+			return new Promise(function(resolve, reject) {
+				inserter.once('end', function() {
+					console.log('Done.');
+					resolve();
+				});
+				inserter.once('error', reject);
+			});
 		});
+		return Promise.all(inserters);
 	});
 }
 
