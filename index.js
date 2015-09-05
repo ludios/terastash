@@ -1859,8 +1859,8 @@ function importDb(stashName, dumpFile) {
 		work_stealer = loadNow(work_stealer);
 		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
-		// 6 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
-		const workStealers = work_stealer.makeWorkStealers(lineStream, 6);
+		// 4 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
+		const workStealers = work_stealer.makeWorkStealers(lineStream, 4);
 		let count = 0;
 		const inserters = workStealers.map(function(stealer) {
 			const inserter = new TransitToInsert(client, stashName);
