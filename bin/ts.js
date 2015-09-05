@@ -133,21 +133,25 @@ program
 	}));
 
 program
-	.command('dump-db')
+	.command('export-db')
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from current directory')
 	.description(d(`
-		Dump a backup of the database to stdout`))
+		Dump the database for this stash to stdout.  This includes content for small files stored
+		in the database, but it does not retrieve content from chunk stores, merely referencing
+		the chunks with pointers instead.  The dump includes all entries, even mis-parented files
+		or otherwise corrupt rows.`))
 	.action(a(function(options) {
 		T(options, T.object);
 		const name = stringOrNull(options.name);
-		catchAndLog(terastash.dumpDb(name));
+		catchAndLog(terastash.exportDb(name));
 	}));
 
 program
-	.command('restore-db <dump-file>')
+	.command('import-db <dump-file>')
 	.option('-n, --name <name>', 'Restore into this stash name')
 	.description(d(`
-		Load a database dump produced by 'ts dump-db' into a stash, overwriting the database for the stash
+		Import a database dump produced by 'ts export-db' into an already-initialized
+		(but hopefully empty) stash.
 
 		To load from stdin, use '-' for dump-file.`))
 	.action(a(function(dumpFile, options) {
@@ -157,7 +161,7 @@ program
 			console.error("-n/--name is required");
 			process.exit(1);
 		}
-		catchAndLog(terastash.restoreDb(name, dumpFile));
+		catchAndLog(terastash.importDb(name, dumpFile));
 	}));
 
 program

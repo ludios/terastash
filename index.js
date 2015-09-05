@@ -1719,10 +1719,10 @@ class RowToTransit extends Transform {
 	}
 }
 
-function dumpDb(stashName) {
+function exportDb(stashName) {
 	T(stashName, T.maybe(T.string));
-	return doWithClient(getNewClient(), function dumpDb$doWithClient(client) {
-		return doWithPath(stashName, ".", Promise.coroutine(function* dumpDb$coro(stashInfo, dbPath, parentPath) {
+	return doWithClient(getNewClient(), function exportDb$doWithClient(client) {
+		return doWithPath(stashName, ".", Promise.coroutine(function* exportDb$coro(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
 			yield new Promise(function(resolve, reject) {
 				const rowStream = client.stream(
@@ -1814,13 +1814,12 @@ class TransitToInsert extends EventEmitter {
 				}
 
 				if(obj[k] !== null) {
-					obj[k].map(function(chunkInfo) {
+					for(const chunkInfo of obj[k]) {
 						if(chunkInfo.version === undefined) {
 							chunkInfo.version = 2;
 							chunkInfo.block_size = 0;
 						}
-						// Mutated, no need to return
-					});
+					}
 				}
 
 				cols.push(k);
@@ -1890,12 +1889,12 @@ class TransitToInsert extends EventEmitter {
 }
 TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
 
-function restoreDb(stashName, dumpFile) {
+function importDb(stashName, dumpFile) {
 	T(stashName, T.string, dumpFile, T.string);
 	console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
 	console.log('Note that files may be restored before directories, so you might ' +
 		'not see anything in the stash until the restore process is complete.');
-	return doWithClient(getNewClient(), function dumpDb$doWithClient(client) {
+	return doWithClient(getNewClient(), function importDb$doWithClient(client) {
 		let inputStream;
 		if(dumpFile === '-') {
 			inputStream = process.stdin;
@@ -1931,7 +1930,7 @@ module.exports = {
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath,
-	KEYSPACE_PREFIX, dumpDb, restoreDb,
+	KEYSPACE_PREFIX, exportDb, importDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
