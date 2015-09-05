@@ -21,6 +21,14 @@ class WorkStealer extends Readable {
 		this._waiting = false;
 	}
 
+	// Initialization needs to be finished outside constructor because of strong mode
+	init() {
+		this._inputStream.once('end', this._stop.bind(this));
+		this._inputStream.once('error', this._inputError.bind(this));
+		this._inputStream.on('readable', this._inputReadable.bind(this));
+		return this;
+	}
+
 	_inputReadable() {
 		if(this._stopped || !this._waiting) {
 			return;
@@ -48,17 +56,12 @@ class WorkStealer extends Readable {
 
 	_read() {
 		const obj = this._inputStream.read();
+		//console.log("WorkStealer._read got", obj);
 		if(obj === null) {
 			this._waiting = true;
 		} else {
 			this.push(obj);
 		}
-	}
-
-	start() {
-		this._inputStream.once('end', this._stop.bind(this));
-		this._inputStream.once('error', this._inputError.bind(this));
-		this._inputStream.on('readable', this._inputReadable.bind(this));
 	}
 }
 
@@ -67,7 +70,7 @@ function makeWorkStealers(inputStream, quantity) {
 	utils.assertSafeNonNegativeInteger(quantity);
 	const instances = [];
 	while(quantity--) {
-		instances.push(new WorkStealer(inputStream));
+		instances.push(new WorkStealer(inputStream).init());
 	}
 	return instances;
 }
