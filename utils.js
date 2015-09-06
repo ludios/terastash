@@ -48,6 +48,8 @@ let https = new LazyModule('https');
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
 
+const OutputContextType = T.shape({mode: T.string});
+
 function assertSafeNonNegativeInteger(num) {
 	T(num, T.number);
 	A(Number.isInteger(num), num);
@@ -531,7 +533,7 @@ function tryClearLine(stdStream) {
 }
 
 module.exports = {
-	LazyModule, loadNow,
+	LazyModule, loadNow, OutputContextType,
 
 	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
 	prop, shortISO, pad, commaify, getParentPath, getBaseName, ol,

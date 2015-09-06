@@ -9,11 +9,12 @@ const crypto = require('crypto');
 const Promise = require('bluebird');
 const Combine = require('combine-streams');
 const utils = require('../utils');
+const OutputContextType = utils.OutputContextType;
 const inspect = require('util').inspect;
 const chalk = require('chalk');
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(directory, getChunkStream) {
-	T(directory, T.string, getChunkStream, T.function);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, directory, getChunkStream) {
+	T(outCtx, OutputContextType, directory, T.string, getChunkStream, T.function);
 
 	let totalSize = 0;
 	let idx = 0;

@@ -8,6 +8,7 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
@@ -402,8 +403,8 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getChunkStream) {
-	T(gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver, parents, getChunkStream) {
+	T(outCtx, OutputContextType, gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
 
 	let totalSize = 0;
 	let idx = 0;
@@ -428,9 +429,10 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}), function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
-			if(Number(process.env.TERASTASH_LOG_LEVEL) > 0) {
-				console.error(`Error while uploading chunk ${idx}; ${triesLeft} tries left:`);
+			if(outCtx.mode !== 'quiet') {
+				console.error(`Error while uploading chunk ${idx}:\n`);
 				console.error(e.stack);
+				console.error(`\n${triesLeft} tries left; trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
 		}, 10, decayer);
 		if(response === null) {

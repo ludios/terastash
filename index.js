@@ -19,6 +19,7 @@ const filename = require('./filename');
 const commaify = utils.commaify;
 const LazyModule = utils.LazyModule;
 const loadNow = utils.loadNow;
+const OutputContextType = utils.OutputContextType;
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const deepEqual = require('deep-equal');
@@ -119,7 +120,6 @@ class KeyspaceMissingError extends Error {
 }
 
 const StashInfoType = T.shape({path: T.string});
-const OutputContextType = T.shape({mode: T.string});
 
 /**
  * For a given pathname, return a stash that contains the file,
@@ -736,7 +736,7 @@ function checkChunkSize(size) {
  * If `dropOldIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, dbPath, dropOldIfDifferent) {
+const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent) {
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
@@ -898,12 +898,12 @@ const addFile = Promise.coroutine(function* addFile$coro(client, stashInfo, p, d
 		let _;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
-			_ = yield localfs.writeChunks(chunkStore.directory, getChunkStream);
+			_ = yield localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
-			_ = yield gdrive.writeChunks(gdriver, chunkStore.parents, getChunkStream);
+			_ = yield gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
@@ -997,7 +997,7 @@ function addFiles(outCtx, paths, continueOnExists, dropOldIfDifferent) {
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
 				try {
-					yield addFile(client, stashInfo, p, dbPath, dropOldIfDifferent);
+					yield addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent);
 				} catch(err) {
 					if(!(err instanceof PathAlreadyExistsError ||
 						err instanceof UnexpectedFileError /* was sticky */)
