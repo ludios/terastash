@@ -525,10 +525,12 @@ class JoinedBuffers {
 	}
 }
 
-function tryClearLine(stdStream) {
+function clearOrLF(stdStream) {
 	if(stdStream.clearLine && stdStream.cursorTo) {
 		stdStream.clearLine();
 		stdStream.cursorTo(0);
+	} else {
+		stdStream.write('\n');
 	}
 }
 
@@ -549,5 +551,5 @@ module.exports = {
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, tryClearLine, pluralize
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize
 };

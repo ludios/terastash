@@ -992,7 +992,7 @@ function addFiles(outCtx, paths, continueOnExists, dropOldIfDifferent) {
 			let count = 1;
 			for(const p of paths) {
 				if(outCtx.mode === 'terminal') {
-					utils.tryClearLine(process.stdout);
+					utils.clearOrLF(process.stdout);
 					process.stdout.write(`${count}/${paths.length}...`);
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
@@ -1866,7 +1866,7 @@ function importDb(outCtx, stashName, dumpFile) {
 		const start = Date.now();
 		function printProgress(LF) {
 			if(outCtx.mode === 'terminal') {
-				utils.tryClearLine(process.stdout);
+				utils.clearOrLF(process.stdout);
 			}
 			process.stdout.write(`${commaify(count)}/? done at ` +
 				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...` +
