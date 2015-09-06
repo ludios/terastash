@@ -1864,13 +1864,10 @@ function importDb(outCtx, stashName, dumpFile) {
 		let count = 0;
 
 		const start = Date.now();
-		function printProgress(LF) {
-			if(outCtx.mode === 'terminal') {
-				utils.clearOrLF(process.stdout);
-			}
+		function printProgress() {
+			utils.clearOrLF(process.stdout);
 			process.stdout.write(`${commaify(count)}/? done at ` +
-				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...` +
-				`${LF ? '\n' : ''}`);
+				`${commaify(Math.round(count/((Date.now() - start) / 1000)))}/sec...`);
 		}
 
 		const inserters = workStealers.map(function(stealer) {
@@ -1883,7 +1880,7 @@ function importDb(outCtx, stashName, dumpFile) {
 				if(outCtx.mode === 'terminal' && count % 100 === 0) {
 					printProgress();
 				} else if(outCtx.mode === 'log' && count % 1000 === 0) {
-					printProgress(true);
+					printProgress();
 				}
 			});
 
@@ -1894,8 +1891,8 @@ function importDb(outCtx, stashName, dumpFile) {
 		});
 		yield Promise.all(inserters);
 		if(outCtx.mode !== 'quiet') {
-			printProgress(true);
-			console.log('Done importing.');
+			printProgress();
+			console.log('\nDone importing.');
 		}
 	}));
 }
