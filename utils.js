@@ -532,6 +532,11 @@ function tryClearLine(stdStream) {
 	}
 }
 
+function pluralize(count, singular, plural) {
+	T(count, T.number, singular, T.string, plural, T.string);
+	return `${commaify(count)} ${count === 1 ? singular : plural}`;
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -544,5 +549,5 @@ module.exports = {
 	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, tryClearLine
+	tryUnlink, JoinedBuffers, tryClearLine, pluralize
 };

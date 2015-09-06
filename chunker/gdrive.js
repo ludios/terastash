@@ -432,7 +432,8 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 			if(outCtx.mode !== 'quiet') {
 				console.error(`Error while uploading chunk ${idx}:\n`);
 				console.error(e.stack);
-				console.error(`\n${triesLeft} tries left; trying again in ${decayer.getNextDelay()/1000} seconds...`);
+				console.error(`\n${utils.pluralize(triesLeft, 'try', 'tries')} left; ` +
+					`trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
 		}, 10, decayer);
 		if(response === null) {
