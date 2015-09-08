@@ -23,7 +23,7 @@ Can add and drop a file
   $ cat x
   hi
   $ ts export-db -n unit_tests_d
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","chunks_in_mychunks":null,"content":"~baGkK","crc32c":"~bG9ywgw==","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","block_size":null,"chunks_in_mychunks":null,"content":"~baGkK","crc32c":"~bG9ywgw==","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null,"version":2}}
   $ ts drop -n unit_tests_d x
   $ ts export-db -n unit_tests_d
   $ ts mkdir -n unit_tests_d sub dir

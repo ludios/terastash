@@ -809,9 +809,11 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	let content = null;
 	let chunkInfo;
 	let size;
+	const version = 2;
 	// For file stored in chunk store, whole-file crc32c is not available.
 	let crc32c = null;
 	let key = null;
+	let block_size = null;
 
 	if(stat.size >= stashInfo.chunkThreshold) {
 		key = makeKey();
@@ -912,8 +914,6 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		chunkInfo = _[1];
 		for(const info of chunkInfo) {
 			A.lte(info.size, chunkStore.chunkSize, `uploaded a too-big chunk:\n${inspect(info)}`);
-			info.version = 2;
-			info.block_size = CRC_BLOCK_SIZE;
 		}
 		A.eq(totalSize, concealedSize,
 			`For ${dbPath}, wrote to chunks\n` +
@@ -922,6 +922,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		T(chunkInfo, Array);
 
 		size = stat.size;
+		block_size = CRC_BLOCK_SIZE;
 	} else {
 		content = yield fs.readFileAsync(p);
 		hasher = loadNow(hasher);
@@ -944,9 +945,9 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		return yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, crc32c, mtime, executable)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, crc32c, mtime, executable]
+			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, crc32c, mtime, executable, version, block_size)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, crc32c, mtime, executable, version, block_size]
 		);
 	});
 
@@ -1619,9 +1620,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			file_id text,
 			md5 blob,
 			crc32c blob,
-			size bigint,
-			version int,
-			block_size int
+			size bigint
 		)`);
 
 		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
@@ -1635,6 +1634,8 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			key blob,
 			mtime timestamp,
 			executable boolean,
+			version int,
+			block_size int,
 			PRIMARY KEY (parent, basename)
 		);`);
 		// The above PRIMARY KEY lets us select on both parent and (parent, basename)
@@ -1791,8 +1792,16 @@ class TransitToInsert extends Transform {
 			A.eq(obj.size, null);
 		}
 
-		const cols = ['basename', 'parent', 'type', 'uuid', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable'];
-		const vals = [obj.basename, obj.parent, obj.type, obj.uuid, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable];
+		if(obj.version === undefined) {
+			A.eq(obj.block_size, undefined);
+			// version 1 had no CRC32C inside the chunks, upgrade to version 2
+			// with block_size = 0 (no CRC32C)
+			obj.version = 2;
+			obj.block_size = 0;
+		}
+
+		const cols = ['basename', 'parent', 'type', 'uuid', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable', 'version', 'block_size'];
+		const vals = [obj.basename, obj.parent, obj.type, obj.uuid, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable, obj.version, obj.block_size];
 		for(const k of Object.keys(obj)) {
 			if(k.startsWith("chunks_in_")) {
 				if(!this._columnsCreated[k]) {
@@ -1800,16 +1809,6 @@ class TransitToInsert extends Transform {
 						this._client, this._stashName, k, 'list<frozen<chunk>>');
 					this._columnsCreated[k] = true;
 				}
-
-				if(obj[k] !== null) {
-					for(const chunkInfo of obj[k]) {
-						if(chunkInfo.version === undefined) {
-							chunkInfo.version = 2;
-							chunkInfo.block_size = 0;
-						}
-					}
-				}
-
 				cols.push(k);
 				vals.push(obj[k]);
 			}
