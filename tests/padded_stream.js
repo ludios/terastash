@@ -14,7 +14,7 @@ describe('Padder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi'));
 		const padder = new padded_stream.Padder(4);
 		inputStream.pipe(padder);
-		const buf = yield utils.streamToBuffer(padder);
+		const buf = yield utils.readableToBuffer(padder);
 		assert.deepStrictEqual(buf, new Buffer("hi\x00\x00"));
 	}));
 
@@ -22,7 +22,7 @@ describe('Padder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi'));
 		const padder = new padded_stream.Padder(1);
 		inputStream.pipe(padder);
-		const buf = yield utils.streamToBuffer(padder);
+		const buf = yield utils.readableToBuffer(padder);
 		assert.deepStrictEqual(buf, new Buffer("hi"));
 	}));
 
@@ -30,7 +30,7 @@ describe('Padder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi'));
 		const padder = new padded_stream.Padder(2);
 		inputStream.pipe(padder);
-		const buf = yield utils.streamToBuffer(padder);
+		const buf = yield utils.readableToBuffer(padder);
 		assert.deepStrictEqual(buf, new Buffer("hi"));
 	}));
 });
@@ -40,7 +40,7 @@ describe('Unpadder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi\x00\x00'));
 		const unpadder = new padded_stream.Unpadder(2);
 		inputStream.pipe(unpadder);
-		const buf = yield utils.streamToBuffer(unpadder);
+		const buf = yield utils.readableToBuffer(unpadder);
 		assert.deepStrictEqual(buf, new Buffer("hi"));
 	}));
 
@@ -48,7 +48,7 @@ describe('Unpadder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi\x00\x00'));
 		const unpadder = new padded_stream.Unpadder(10);
 		inputStream.pipe(unpadder);
-		const buf = yield utils.streamToBuffer(unpadder);
+		const buf = yield utils.readableToBuffer(unpadder);
 		assert.deepStrictEqual(buf, new Buffer("hi\x00\x00"));
 	}));
 
@@ -56,7 +56,7 @@ describe('Unpadder', function() {
 		const inputStream = streamifier.createReadStream(new Buffer('hi\x00\x00'));
 		const unpadder = new padded_stream.Unpadder(4);
 		inputStream.pipe(unpadder);
-		const buf = yield utils.streamToBuffer(unpadder);
+		const buf = yield utils.readableToBuffer(unpadder);
 		assert.deepStrictEqual(buf, new Buffer("hi\x00\x00"));
 	}));
 });

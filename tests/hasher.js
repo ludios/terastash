@@ -40,7 +40,7 @@ describe('CRCWriter+CRCReader', function() {
 			const reader = new hasher.CRCReader(blockSize);
 			inputStream = fs.createReadStream(tempfname);
 			utils.pipeWithErrors(inputStream, reader);
-			const outputBuf = yield utils.streamToBuffer(reader);
+			const outputBuf = yield utils.readableToBuffer(reader);
 			assert.deepStrictEqual(outputBuf, inputBuf);
 		}
 	}));

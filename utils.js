@@ -281,19 +281,14 @@ function makeHttpsRequest(options, stream) {
 	});
 }
 
-function streamToBuffer(stream) {
+function readableToBuffer(stream) {
 	T(stream, StreamType);
-	return new Promise(function streamToBuffer$Promise(resolve, reject) {
+	return new Promise(function readableToBuffer$Promise(resolve, reject) {
 		const bufs = [];
 		stream.on('data', function(data) {
 			bufs.push(data);
 		});
-		// 'end' for Readable
 		stream.once('end', function() {
-			resolve(Buffer.concat(bufs));
-		});
-		// 'finish' for Writable
-		stream.once('finish', function() {
 			resolve(Buffer.concat(bufs));
 		});
 		stream.once('error', function(err) {
@@ -548,7 +543,7 @@ module.exports = {
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
-	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
+	makeHttpsRequest, readableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
 	tryUnlink, JoinedBuffers, clearOrLF, pluralize
