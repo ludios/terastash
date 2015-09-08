@@ -327,12 +327,15 @@ class GDriver {
 	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
-	*getData(fileId, range) {
-		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])));
+	*getData(fileId, range, checkCRC32CifReceived) {
+		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])), checkCRC32CifReceived, T.optional(T.boolean));
 		if(range) {
 			utils.assertSafeNonNegativeInteger(range[0]);
 			utils.assertSafeNonNegativeInteger(range[1]);
 			A.gte(range[1], range[0], "end must be >= start in range [start, end]");
+		}
+		if(checkCRC32CifReceived === undefined) {
+			checkCRC32CifReceived = true;
 		}
 		yield this._maybeRefreshAndSaveToken();
 		const reqHeaders = this._getHeaders();
@@ -355,29 +358,29 @@ class GDriver {
 					);
 				}
 			}
-			const hasher = utils.streamHasher(res, 'crc32c');
 			const googHash = res.headers['x-goog-hash'];
-			let googCRC;
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {
 				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
-			if(googHash) {
+			let hasher;
+			if(googHash && checkCRC32CifReceived) {
+				hasher = utils.streamHasher(res, 'crc32c');
 				A(googHash.startsWith("crc32c="), googHash);
-				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				hasher.stream.once('end', function getData$hasher$end() {
+					const computedCRC = hasher.hash.digest();
+					if(!computedCRC.equals(googCRC)) {
+						hasher.stream.emit('error', new Error(
+							`CRC32c check failed on fileId=${inspect(fileId)}:` +
+							` expected ${googCRC.toString("hex")},` +
+							` got ${computedCRC.toString("hex")}`
+						));
+					}
+				});
 			}
-			hasher.stream.once('end', function getData$hasher$end() {
-				const computedCRC = hasher.hash.digest();
-				if(googCRC && !computedCRC.equals(googCRC)) {
-					hasher.stream.emit('error', new Error(
-						`CRC32c check failed on fileId=${inspect(fileId)}:` +
-						` expected ${googCRC.toString("hex")},` +
-						` got ${computedCRC.toString("hex")}`
-					));
-				}
-			});
-			return [hasher.stream, res];
+			return [(hasher ? hasher.stream : res), res];
 		} else {
 			let body = yield utils.streamToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
@@ -463,15 +466,15 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream of concatenated chunks.
  */
-function readChunks(gdriver, chunks) {
-	T(gdriver, GDriver, chunks, utils.ChunksType);
+function readChunks(gdriver, chunks, checkWholeChunkCRC32C) {
+	T(gdriver, GDriver, chunks, utils.ChunksType, checkWholeChunkCRC32C, T.boolean);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
 		for(const chunk of chunks) {
-			const _ = yield gdriver.getData(chunk.file_id);
+			const _ = yield gdriver.getData(chunk.file_id, undefined, checkWholeChunkCRC32C);
 			const chunkStream = _[0];
 			const res = _[1];
 

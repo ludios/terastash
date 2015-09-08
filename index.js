@@ -1098,6 +1098,9 @@ function shooFiles(paths, continueOnError) {
 	}));
 }
 
+const MIN_SUPPORTED_VERSION = 2;
+const MAX_SUPPORTED_VERSION = 2;
+
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -1113,7 +1116,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	let row;
 	try {
 		row = yield getRowByPath(client, stashInfo.name, dbPath,
-			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable"]
+			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	} catch(err) {
 		if(!isColumnMissingError(err)) {
@@ -1121,11 +1124,21 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
 		row = yield getRowByPath(client, stashInfo.name, dbPath,
-			["size", "type", "key", "crc32c", "content", "mtime", "executable"]
+			["size", "type", "key", "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	}
 	if(row.type !== 'f') {
 		throw new NotAFileError(`Path ${inspect(dbPath)} in stash ${inspect(stashInfo.name)} is not a file`);
+	}
+
+	utils.assertSafeNonNegativeInteger(row.version);
+	if(row.version < MIN_SUPPORTED_VERSION) {
+		throw new Error(`File ${inspect(dbPath)} has version ${row.version}; ` +
+			`min supported version is ${MIN_SUPPORTED_VERSION}.`);
+	}
+	if(row.version > MAX_SUPPORTED_VERSION) {
+		throw new Error(`File ${inspect(dbPath)} has version ${row.version}; ` +
+			`max supported version is ${MAX_SUPPORTED_VERSION}.`);
 	}
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
@@ -1136,16 +1149,20 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		validateChunks(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
+		utils.assertSafeNonNegativeInteger(row.block_size);
+		// To save CPU time, we check whole-chunk CRC32C's only for chunks
+		// that don't have embedded CRC32C's.
+		const checkWholeChunkCRC32C = (row.block_size === 0);
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
 			const chunksDir = chunkStore.directory;
-			cipherStream = localfs.readChunks(chunksDir, chunks);
+			cipherStream = localfs.readChunks(chunksDir, chunks, checkWholeChunkCRC32C);
 		} else if(chunkStore.type === "gdrive") {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
-			cipherStream = gdrive.readChunks(gdriver, chunks);
+			cipherStream = gdrive.readChunks(gdriver, chunks, checkWholeChunkCRC32C);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
@@ -1153,9 +1170,14 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
 		utils.pipeWithErrors(cipherStream, clearStream);
 
-		hasher = loadNow(hasher);
-		const unhashedStream = new hasher.CRCReader(CRC_BLOCK_SIZE);
-		utils.pipeWithErrors(clearStream, unhashedStream);
+		let unhashedStream;
+		if(row.block_size > 0) {
+			hasher = loadNow(hasher);
+			unhashedStream = new hasher.CRCReader(row.block_size);
+			utils.pipeWithErrors(clearStream, unhashedStream);
+		} else {
+			unhashedStream = clearStream;
+		}
 
 		padded_stream = loadNow(padded_stream);
 		unpaddedStream = new padded_stream.Unpadder(Number(row.size));

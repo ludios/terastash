@@ -59,8 +59,8 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
-function readChunks(directory, chunks) {
-	T(directory, T.string, chunks, utils.ChunksType);
+function readChunks(directory, chunks, checkWholeChunkCRC32C) {
+	T(directory, T.string, chunks, utils.ChunksType, checkWholeChunkCRC32C, T.boolean);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
@@ -71,11 +71,20 @@ function readChunks(directory, chunks) {
 			A.eq(digest.length, 32/8);
 
 			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
-			const hasher = utils.streamHasher(chunkStream, 'crc32c');
-			cipherStream.append(hasher.stream);
+			let hasher;
+			if(checkWholeChunkCRC32C) {
+				hasher = utils.streamHasher(chunkStream, 'crc32c');
+				cipherStream.append(hasher.stream);
+			} else {
+				cipherStream.append(chunkStream);
+			}
 
 			yield new Promise(function readChunks$Promise(resolve, reject) {
-				hasher.stream.once('end', function() {
+				(hasher ? hasher.stream : chunkStream).once('end', function() {
+					if(!checkWholeChunkCRC32C) {
+						resolve();
+						return;
+					}
 					const readDigest = hasher.hash.digest();
 					if(readDigest.equals(digest)) {
 						resolve();
