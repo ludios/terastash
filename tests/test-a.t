@@ -8,12 +8,21 @@ Setup
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '80*1024'
   $ ts destroy unit_tests_a > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
 
-Can add and drop a file
+Continue
 
   $ ts ls
   File '([^\']+)' is not in a terastash working directory (re)
   [1]
   $ ts init unit_tests_a --chunk-store=mychunks
+
+Can list stashes
+
+  $ ts list-stashes | grep -P '^unit_tests_a$'
+  unit_tests_a
+
+Continue
+
+  $ ts export-db # export should be empty for empty db
   $ ts list-chunk-stores
   mychunks
   $ ts get not-here
@@ -122,11 +131,26 @@ Can add and drop a file
   1971-01-01 00:00:00.000000000 +0000
   $ stat -c %y adir/bigfile
   1990-01-01 00:00:00.000000000 +0000
-  $ ts export-db
+  $ ts export-db > .export
+  $ cat .export
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"bigfile","chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~bA4uCLQ==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~bWvLm4w==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~biQB/zA==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~bGRhqIA==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~bNIzMgg==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~b51n3cw==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~boQOUvQ==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~bqCvW8Q==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~bCB6a5A==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":9,"file_id":"deterministic-filename-9","md5":null,"crc32c":"~b93glBA==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":10,"file_id":"deterministic-filename-10","md5":null,"crc32c":"~bvB1taQ==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":11,"file_id":"deterministic-filename-11","md5":null,"crc32c":"~biJo1qw==","size":{"~#Long":"81920"},"version":2,"block_size":8188},{"idx":12,"file_id":"deterministic-filename-12","md5":null,"crc32c":"~bHIXmVw==","size":{"~#Long":"81920"},"version":2,"block_size":8188}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAA==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":null}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAAAQ=="}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crc32c":"~bU49V7A==","executable":false,"key":null,"mtime":"~t1971-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":null}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crc32c":"~bNos/Jg==","executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":null}}
+  $ ts destroy unit_tests_a # destroy before importing the .export we made
+  Destroyed keyspace and removed config for unit_tests_a.
+
+Stash is not listed after being destroyed
+
+  $ ts list-stashes | grep -P '^unit_tests_a$'
+  [1]
+
+Continue
+
+  $ ts init unit_tests_a --chunk-store=mychunks
+  $ ts import-db -n unit_tests_a .export
+  $ ts export-db > .export-again
+  $ diff -u .export .export-again # db should be identical after export, destroy, import
   $ ts drop adir # Can't drop a non-empty directory
   Refusing to drop 'adir' because it is a non-empty directory
   [1]
@@ -171,21 +195,6 @@ Dropping nonexistent file throws an error
   No entry with parent=00000000000000000000000000000000 and basename='doesntexist'
   [1]
   $ ts ls
-
-Can list stashes
-
-  $ ts list-stashes | grep -P '^unit_tests_a$'
-  unit_tests_a
-
-Can destroy a terastash
-
-  $ ts destroy unit_tests_a
-  Destroyed keyspace and removed config for unit_tests_a.
-
-Stash is not listed after being destroyed
-
-  $ ts list-stashes | grep -P '^unit_tests_a$'
-  [1]
 
 End
 
