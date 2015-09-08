@@ -1129,7 +1129,6 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = row[`chunks_in_${storeName}`];
-	let crc32c = null;
 	let bytesRead = 0;
 	let unpaddedStream;
 	if(chunks !== null) {
@@ -1173,7 +1172,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		sse4_crc32 = loadNow(sse4_crc32);
 		unpaddedStream = streamifier.createReadStream(row.content);
 		bytesRead = row.content.length;
-		crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
+		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
 		if(!crc32c.equals(row.crc32c)) {
 			unpaddedStream.emit('error', new Error(
