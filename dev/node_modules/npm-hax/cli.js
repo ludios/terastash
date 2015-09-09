@@ -1,6 +1,5 @@
-#!/usr/bin/env iojs
+#!/usr/bin/env node
 
-"use strong";
 "use strict";
 
 const which = require('which');
