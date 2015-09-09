@@ -14,7 +14,8 @@ const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
 
 class LazyModule {
-	constructor(requirePath, requireFunc, postRequireHook) {
+	constructor(...args) {
+		const [requirePath, requireFunc, postRequireHook] = args;
 		T(requirePath, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
 		this.requirePath = requirePath;
 		this.requireFunc = requireFunc || require;
@@ -44,9 +45,6 @@ function loadNow(obj) {
 
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let https = new LazyModule('https');
-
-const emptyFrozenArray = [];
-Object.freeze(emptyFrozenArray);
 
 const OutputContextType = T.shape({mode: T.string});
 
@@ -157,7 +155,8 @@ function comparator(pred) {
  * Takes a function that maps obj -> (key to sort by) and
  * returns a comparator function that can be passed to arr.sort(...)
  */
-function comparedBy(mapping, reverse) {
+function comparedBy(mapping, ...args) {
+	const [reverse] = args;
 	T(mapping, T.function, reverse, T.optional(T.boolean));
 	if(!reverse) {
 		return comparator(function(x, y) {
@@ -263,7 +262,8 @@ const StreamType = T.shape({
 	resume: T.function
 });
 
-function makeHttpsRequest(options, stream) {
+function makeHttpsRequest(options, ...args) {
+	const [stream] = args;
 	T(options, T.object, stream, T.optional(StreamType));
 	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
@@ -298,7 +298,9 @@ function readableToBuffer(stream) {
 	});
 }
 
-function crc32$digest(encoding) {
+function crc32$digest(...args) {
+	const [encoding] = args;
+	T(encoding, T.optional(T.string));
 	const buf = new Buffer(4);
 	buf.writeUIntBE(this.crc(), 0, 4);
 	if(encoding === undefined) {
@@ -315,7 +317,8 @@ function crc32$digest(encoding) {
  *		length: number of bytes read from input stream
  * }
  */
-function streamHasher(inputStream, algoOrExistingHash, existingLength) {
+function streamHasher(inputStream, algoOrExistingHash, ...args) {
+	let [existingLength] = args;
 	T(
 		inputStream, StreamType,
 		algoOrExistingHash, T.union([T.string, T.object]),
@@ -404,7 +407,8 @@ function filledArray(n, obj) {
 }
 
 class PersistentCounter {
-	constructor(fname, start) {
+	constructor(fname, ...args) {
+		let [start] = args;
 		T(fname, T.string, start, T.optional(T.number));
 		this.fname = fname;
 		if(start === undefined) {
@@ -534,10 +538,38 @@ function pluralize(count, singular, plural) {
 	return `${commaify(count)} ${count === 1 ? singular : plural}`;
 }
 
+/**
+ * For strong mode: an obj['prop'] that doesn't throw when 'prop' is missing.
+ * Does not follow the prototype chain.
+ */
+function getProp(obj, k, ...args) {
+	const [alt] = args;
+	T(obj, T.object, k, T.string, alt, T.any);
+	if(Object.prototype.hasOwnProperty.call(obj, k)) {
+		return obj[k];
+	} else {
+		return alt;
+	}
+}
+
+/**
+ * For strong mode: fill certain properties (keys) with undefined so that we
+ * don't get an exception when they're accessed.  Warning: mutates `obj`.
+ */
+function weakFill(obj, keys) {
+	T(obj, T.object, keys, T.list(T.string));
+	for(const k of keys) {
+		if(!(Object.prototype.hasOwnProperty.call(obj, k))) {
+			obj[k] = undefined;
+		}
+	}
+	return obj;
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
-	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
+	assertSafeNonNegativeInteger, randInt, sameArrayValues,
 	prop, shortISO, pad, commaify, getParentPath, getBaseName, ol,
 	comparator, comparedBy, hasKey, deleteKey,
 
@@ -546,5 +578,5 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill
 };

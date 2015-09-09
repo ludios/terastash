@@ -8,14 +8,16 @@
 
 const T = require('notmytype');
 const Readable = require('stream').Readable;
+const utils = require('./utils');
 
 class MultiStream extends Readable {
-	constructor(buf, options) {
+	constructor(buf, ...args) {
+		let [options] = args;
 		T(buf, Buffer, options, T.optional(T.object));
 		options = options || {};
 		super({
-			highWaterMark: options.highWaterMark,
-			encoding: options.encoding
+			highWaterMark: utils.getProp(options, 'highWaterMark'),
+			encoding: utils.getProp(options, 'encoding')
 		});
 		this._buf = buf;
 		this._idx = 0;
@@ -35,6 +37,7 @@ class MultiStream extends Readable {
 	}
 }
 
-module.exports.createReadStream = function(buf, options) {
+module.exports.createReadStream = function(buf, ...args) {
+	const [options] = args;
 	return new MultiStream(buf, options);
 };

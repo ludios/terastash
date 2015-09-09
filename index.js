@@ -203,11 +203,13 @@ function isKeyspaceMissingError(err) {
  * Run a Cassandra query and return a Promise that is fulfilled
  * with the query results.
  */
-function runQuery(client, statement, args) {
-	T(client, CassandraClientType, statement, T.string, args, T.optional(Array));
-	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(args)})`);
+function runQuery(client, statement, ...args) {
+	const [queryArgs] = args;
+	T(client, CassandraClientType, statement, T.string, queryArgs, T.optional(Array));
+	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(queryArgs)})`);
 	return new Promise(function runQuery$Promise(resolve, reject) {
-		client.execute(statement, args, {prepare: true}, function(err, result) {
+		client.execute(statement, queryArgs, {prepare: true}, function(...args) {
+			const [err, result] = args;
 			if(err) {
 				reject(err);
 			} else {
@@ -229,7 +231,8 @@ function runQuery(client, statement, args) {
 function doWithClient(client, f) {
 	T(client, CassandraClientType, f, T.function);
 	const p = f(client);
-	function shutdown(ret) {
+	function shutdown(...args) {
+		const ret = [args];
 		try {
 			client.shutdown();
 		} catch(e) {
@@ -278,11 +281,11 @@ const pathsorterDesc = utils.comparedBy(function(row) {
 }, true);
 
 const mtimeSorterAsc = utils.comparedBy(function(row) {
-	return row.mtime;
+	return row.mtime.getTime();
 });
 
 const mtimeSorterDesc = utils.comparedBy(function(row) {
-	return row.mtime;
+	return row.mtime.getTime();
 }, true);
 
 class NoSuchPathError extends Error {
@@ -361,7 +364,8 @@ const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stash
 	return getRowByParentBasename(client, stashName, parent, basename, cols);
 });
 
-const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
+const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, ...args) {
+	const [limit] = args;
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 
 	const rows = [];
@@ -424,7 +428,8 @@ function lsPath(stashName, options, p) {
 }
 
 let listRecursively;
-listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, type) {
+listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, ...args) {
+	const [type] = args;
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = yield getChildrenForParent(
@@ -736,7 +741,8 @@ function checkChunkSize(size) {
  * If `dropOldIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent) {
+const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, ...args) {
+	const [dropOldIfDifferent] = args;
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
@@ -969,7 +975,8 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 /**
  * Put files or directories into the Cassandra database.
  */
-function addFiles(outCtx, paths, continueOnExists, dropOldIfDifferent) {
+function addFiles(outCtx, paths, ...args) {
+	const [continueOnExists, dropOldIfDifferent] = args;
 	T(
 		outCtx, OutputContextType,
 		paths, T.list(T.string),
@@ -1079,7 +1086,8 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 	}
 });
 
-function shooFiles(paths, continueOnError) {
+function shooFiles(paths, ...args) {
+	const [continueOnError] =args;
 	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
 	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1520,6 +1528,7 @@ const configChunkStore = Promise.coroutine(function* configChunkStore$coro(store
 	if(!utils.hasKey(config.stores, storeName)) {
 		throw new Error(`${storeName} is not defined in chunk-stores.json`);
 	}
+	utils.weakFill(opts, ['type', 'chunkSize', 'directory', 'clientId', 'clientSecret']);
 	if(opts.type !== undefined) {
 		T(opts.type, T.string);
 		config.stores[storeName].type = opts.type;
@@ -1685,13 +1694,13 @@ function getTransitWriter() {
 		transitWriter = transit.writer("json-verbose", {handlers: transit.map([
 			cassandra.types.Row,
 			transit.makeWriteHandler({
-				tag: function(v, h) { return "Row"; },
-				rep: function(v, h) { return Object.assign({}, v); }
+				tag: function() { return "Row"; },
+				rep: function(v) { return Object.assign({}, v); }
 			}),
 			cassandra.types.Long,
 			transit.makeWriteHandler({
-				tag: function(v, h) { return "Long"; },
-				rep: function(v, h) { return String(v); }
+				tag: function() { return "Long"; },
+				rep: function(v) { return String(v); }
 			})
 		])});
 	}
@@ -1766,7 +1775,7 @@ class TransitToInsert extends Transform {
 		this._client = client;
 		this._stashName = stashName;
 		this._transitReader = getTransitReader();
-		this._columnsCreated = {};
+		this._columnsCreated = new Set();
 		sse4_crc32 = loadNow(sse4_crc32);
 		hasher = loadNow(hasher);
 	}
@@ -1826,10 +1835,10 @@ class TransitToInsert extends Transform {
 		const vals = [obj.basename, obj.parent, obj.type, obj.uuid, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable, obj.version, obj.block_size];
 		for(const k of Object.keys(obj)) {
 			if(k.startsWith("chunks_in_")) {
-				if(!this._columnsCreated[k]) {
+				if(!this._columnsCreated.has(k)) {
 					yield tryCreateColumnOnStashTable(
 						this._client, this._stashName, k, 'list<frozen<chunk>>');
-					this._columnsCreated[k] = true;
+					this._columnsCreated.add(k);
 				}
 				cols.push(k);
 				vals.push(obj[k]);

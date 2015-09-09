@@ -37,6 +37,7 @@ require('better-buffer-inspect');
 
 const terastash = require('..');
 const utils = require('../utils');
+const weak = require('../weak');
 const filename = require('../filename');
 const T = require('notmytype');
 const program = require('commander');
@@ -104,8 +105,9 @@ function a(f) {
 
 function getOutputContext() {
 	let mode;
-	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
-		mode = process.env.TERASTASH_OUTPUT_MODE;
+	const env = utils.weakFill(weak.object(process.env), ['TERASTASH_OUTPUT_MODE']);
+	if(env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
+		mode = env.TERASTASH_OUTPUT_MODE;
 	} else if(process.stdout.clearLine) {
 		mode = 'terminal';
 	} else {
@@ -123,7 +125,7 @@ program
 	.option('-t, --chunk-threshold <chunk-threshold>', 'If file size >= this number of bytes, put it in chunk store instead of database.  Defaults to 4096.')
 	.description(d(`
 		Initializes a stash in this directory and creates corresponding
-		Cassandra keyspace with name ${terastash.CASSANDRA_KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
+		Cassandra keyspace with name ${terastash.KEYSPACE_PREFIX}<name>. Name cannot be changed later.`))
 	.action(a(function(name, options) {
 		T(
 			name, T.string,
@@ -132,6 +134,7 @@ program
 				chunkThreshold: T.optional(T.string)
 			})
 		);
+		utils.weakFill(options, ['chunkStore', 'chunkThreshold']);
 		if(options.chunkThreshold !== undefined) {
 			options.chunkThreshold = utils.evalMultiplications(options.chunkThreshold);
 		} else {
@@ -197,6 +200,7 @@ program
 		Add a file to the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
+		utils.weakFill(options, ['continueOnExists', 'dropOldIfDifferent']);
 		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent));
 	}));
 
@@ -216,6 +220,7 @@ program
 		contain real content.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
+		utils.weakFill(options, ['continueOnError']);
 		catchAndLog(terastash.shooFiles(files, options.continueOnError));
 	}));
 
@@ -229,6 +234,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
+		utils.weakFill(options, ['fake']);
 		catchAndLog(terastash.getFiles(name, files, options.fake || false));
 	}));
 
@@ -300,6 +306,7 @@ program
 	.option('-r, --reverse', 'Reverse order while sorting')
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
+		utils.weakFill(options, ['justNames', 'reverse', 'sortByMtime']);
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
@@ -327,6 +334,7 @@ program
 	.option('-0', 'Print filenames separated by NULL instead of LF')
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
+		utils.weakFill(options, ['type', '0']);
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
@@ -368,6 +376,7 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
+		utils.weakFill(options, ['chunkSize']);
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		} else {

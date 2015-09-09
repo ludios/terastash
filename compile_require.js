@@ -11,7 +11,8 @@ let child_process;
 /**
  * Require a module, building it first if necessary
  */
-function maybeCompileAndRequire(name, verbose) {
+function maybeCompileAndRequire(name, ...args) {
+	const [verbose] = args;
 	T(name, T.string, verbose, T.optional(T.boolean));
 	A(!name.startsWith('.'), name);
 	try {

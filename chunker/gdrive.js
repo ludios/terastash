@@ -8,6 +8,7 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const weak = require('../weak');
 const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
@@ -75,7 +76,7 @@ class GDriver {
 		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
 		const oauth2Client = new FixedOAuth2(clientId, clientSecret, redirectUrl);
 		this._oauth2Client = oauth2Client;
-		this._drive = google.drive({version: 'v2', auth: oauth2Client});
+		this._drive = google.drive(weak.object({version: 'v2', auth: oauth2Client}));
 	}
 
 	getAuthUrl() {
@@ -160,7 +161,8 @@ class GDriver {
 	 * mimeType after sniffing the bytes in your file.  This is not documented
 	 * in their API docs, and there doesn't appear to be a way to turn it off.
 	 */
-	*createFile(name, opts, stream, requestCb) {
+	*createFile(name, opts, stream, ...args) {
+		const [requestCb] = args;
 		T(
 			name, T.string,
 			opts, T.shape({
@@ -173,8 +175,8 @@ class GDriver {
 
 		yield this._maybeRefreshAndSaveToken();
 
-		const parents = (opts.parents || utils.emptyFrozenArray).concat().sort();
-		const mimeType = opts.mimeType || "application/octet-stream";
+		const parents = (utils.getProp(opts, 'parents') || []).concat().sort();
+		const mimeType = utils.getProp(opts, 'mimeType') || "application/octet-stream";
 
 		const insertOpts = {
 			resource: {
@@ -327,7 +329,8 @@ class GDriver {
 	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
-	*getData(fileId, range, checkCRC32CifReceived) {
+	*getData(fileId, ...args) {
+		let [range, checkCRC32CifReceived] = args;
 		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])), checkCRC32CifReceived, T.optional(T.boolean));
 		if(range) {
 			utils.assertSafeNonNegativeInteger(range[0]);
@@ -358,7 +361,7 @@ class GDriver {
 					);
 				}
 			}
-			const googHash = res.headers['x-goog-hash'];
+			const googHash = utils.getProp(res.headers, 'x-goog-hash');
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {

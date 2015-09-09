@@ -10,11 +10,11 @@ class BadFilename extends Error {
 	}
 }
 
-const deviceNames = Object.create(null);
+const deviceNames = new Set();
 for(const dev of
 	(`CON PRN AUX NUL COM1 COM2 COM3 COM4 COM5 COM6 COM7 ` +
 	`COM8 COM9 LPT1 LPT2 LPT3 LPT4 LPT5 LPT6 LPT7 LPT8 LPT9`).split(" ")) {
-	deviceNames[dev] = true;
+	deviceNames.add(dev);
 }
 
 /**
@@ -40,7 +40,7 @@ function check(s) {
 		throw new BadFilename(`Windows shell does not support filenames that end with space; got ${inspect(s)}`);
 	}
 	const firstPart = s.split(".")[0].toUpperCase();
-	if(deviceNames[firstPart] === true) {
+	if(deviceNames.has(firstPart)) {
 		throw new BadFilename(`Some Windows APIs do not support filenames ` +
 			`whose non-extension component is ${inspect(firstPart)}; got ${inspect(s)}`);
 	}

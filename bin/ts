@@ -4,8 +4,8 @@
 export BLUEBIRD_DEBUG=1
 
 SELF="$(dirname "${BASH_SOURCE[0]}")"
-# On Windows, iojs needs a normal Windows path, not a cygwin path
+# On Windows, node needs a normal Windows path, not a cygwin path
 if [ -f /usr/bin/cygpath ]; then
 	SELF="$(/usr/bin/cygpath -w "$SELF")"
 fi
-iojs --harmony --harmony-rest-parameters --harmony-arrow-functions --harmony-object --harmony-arrays --strong-mode "$SELF/ts.js" "$@"
+node --strong-mode --harmony-rest-parameters --harmony-destructuring "$SELF/ts.js" "$@"
