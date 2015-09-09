@@ -11,7 +11,7 @@
   },
   "author": "Ivan Kozik",
   "dependencies": {
-    "ayy": "^0.2.2",
+    "ayy": "^0.2.3",
     "better-buffer-inspect": "^0.1.3",
     "bluebird": "^2.9.34",
     "buffertools": "^2.1.3",
@@ -25,7 +25,7 @@
     "googleapis": "^2.1.3",
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
-    "notmytype": "^1.2.1",
+    "notmytype": "^1.2.2",
     "request": "^2.61.0",
     "sse4_crc32": "^4.0.1",
     "streamifier": "^0.1.1",
