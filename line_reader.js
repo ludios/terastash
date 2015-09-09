@@ -3,8 +3,6 @@
 
 const T = require('notmytype');
 const A = require('ayy');
-const compile_require = require('./compile_require');
-const buffertools = compile_require('buffertools');
 const Transform = require('stream').Transform;
 const JoinedBuffers = require('./utils').JoinedBuffers;
 
@@ -29,7 +27,7 @@ class DelimitedBufferDecoder extends Transform {
 		//console.log(data.length);
 		while(true) {
 			// Search only the new data for the delimiter, not all of this._joined
-			const idx = buffertools.indexOf(data, this._delimiter);
+			const idx = data.indexOf(this._delimiter);
 			if(idx !== -1) {
 				this._joined.push(data.slice(0, idx));
 				this.push(this._joined.joinPop());

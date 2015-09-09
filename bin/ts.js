@@ -421,7 +421,6 @@ program
 	.action(a(function() {
 		const compile_require = require('../compile_require');
 		compile_require('sse4_crc32');
-		compile_require('buffertools');
 	}));
 
 program

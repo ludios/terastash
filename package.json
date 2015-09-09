@@ -14,7 +14,6 @@
     "ayy": "^0.2.4",
     "better-buffer-inspect": "^0.1.4",
     "bluebird": "^2.10.0",
-    "buffertools": "^2.1.3",
     "cache-require-paths": "^0.1.2",
     "cassandra-driver": "^2.2.0",
     "chalk": "^1.1.1",
