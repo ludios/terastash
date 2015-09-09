@@ -102,6 +102,18 @@ function a(f) {
 	};
 }
 
+function getOutputContext() {
+	let mode;
+	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
+		mode = process.env.TERASTASH_OUTPUT_MODE;
+	} else if(process.stdout.clearLine) {
+		mode = 'terminal';
+	} else {
+		mode = 'log';
+	}
+	return {mode};
+}
+
 program
 	.version(require('../package.json').version);
 
@@ -133,20 +145,42 @@ program
 	}));
 
 program
-	.command('dump-db')
+	.command('export-db')
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from current directory')
 	.description(d(`
-		Dump a backup of the database to stdout`))
+		Dump the database for this stash to stdout.  This includes content for small files stored
+		in the database, but it does not retrieve content from chunk stores, merely referencing
+		the chunks with pointers instead.  The dump includes all entries, even mis-parented files
+		or otherwise corrupt rows.`))
 	.action(a(function(options) {
 		T(options, T.object);
 		const name = stringOrNull(options.name);
-		catchAndLog(terastash.dumpDb(name));
+		catchAndLog(terastash.exportDb(name));
+	}));
+
+program
+	.command('import-db <dump-file>')
+	.option('-n, --name <name>', 'Restore into this stash name')
+	.description(d(`
+		Import a database dump produced by 'ts export-db' into an already-initialized
+		(but hopefully empty) stash.
+
+		To load from stdin, use '-' for dump-file.`))
+	.action(a(function(dumpFile, options) {
+		T(dumpFile, T.string, options, T.object);
+		const name = stringOrNull(options.name);
+		if(name === null) {
+			console.error("-n/--name is required");
+			process.exit(1);
+		}
+		catchAndLog(terastash.importDb(getOutputContext(), name, dumpFile));
 	}));
 
 program
 	.command('destroy <name>')
 	.description(d(`
-		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name> and removes stash from stashes.json`))
+		Destroys Cassandra keyspace ${terastash.KEYSPACE_PREFIX}<name>
+		and removes stash from stashes.json.  Does *not* affect the chunk store.`))
 	.action(a(function(name) {
 		T(name, T.string);
 		catchAndLog(terastash.destroyStash(name));
@@ -163,8 +197,7 @@ program
 		Add a file to the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		const progress = Boolean(Number(process.env.PROGRESS ? process.env.PROGRESS : 0));
-		catchAndLog(terastash.addFiles(files, options.continueOnExists, options.dropOldIfDifferent, progress));
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent));
 	}));
 
 program
@@ -340,9 +373,7 @@ program
 		} else {
 			options.chunkSize = 1024*1024*1024;
 		}
-		if(options.chunkSize % 128/8 !== 0) {
-			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
-		}
+		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.defineChunkStore(storeName, options));
 	}));
 
@@ -360,9 +391,7 @@ program
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		}
-		if(options.chunkSize % 128/8 !== 0) {
-			throw new Error(`Chunk size must be a multiple of 16; got ${options.chunkSize}`);
-		}
+		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.configChunkStore(storeName, options));
 	}));
 
@@ -382,8 +411,8 @@ program
 		Requires a C++ compiler.`))
 	.action(a(function() {
 		const compile_require = require('../compile_require');
-		compile_require('blake2');
 		compile_require('sse4_crc32');
+		compile_require('buffertools');
 	}));
 
 program

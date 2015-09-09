@@ -14,15 +14,15 @@ const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
 
 class LazyModule {
-	constructor(path, requireFunc, postRequireHook) {
-		T(path, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
-		this.path = path;
+	constructor(requirePath, requireFunc, postRequireHook) {
+		T(requirePath, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
+		this.requirePath = requirePath;
 		this.requireFunc = requireFunc || require;
 		this.postRequireHook = postRequireHook;
 	}
 
 	load() {
-		const realModule = this.requireFunc(this.path);
+		const realModule = this.requireFunc(this.requirePath);
 		if(this.postRequireHook) {
 			this.postRequireHook(realModule);
 		}
@@ -42,12 +42,13 @@ function loadNow(obj) {
 	return obj;
 }
 
-let blake2 = new LazyModule('blake2', compile_require);
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let https = new LazyModule('https');
 
 const emptyFrozenArray = [];
 Object.freeze(emptyFrozenArray);
+
+const OutputContextType = T.shape({mode: T.string});
 
 function assertSafeNonNegativeInteger(num) {
 	T(num, T.number);
@@ -253,8 +254,17 @@ function pipeWithErrors(src, dest) {
 	});
 }
 
+const StreamType = T.shape({
+	read: T.function,
+	pipe: T.function,
+	on: T.function,
+	once: T.function,
+	pause: T.function,
+	resume: T.function
+});
+
 function makeHttpsRequest(options, stream) {
-	T(options, T.object, stream, T.optional(T.shape({pipe: T.function})));
+	T(options, T.object, stream, T.optional(StreamType));
 	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
 		const req = https.request(options, resolve).once('error', function(err) {
@@ -271,19 +281,14 @@ function makeHttpsRequest(options, stream) {
 	});
 }
 
-function streamToBuffer(stream) {
-	T(stream, T.shape({on: T.function, once: T.function, resume: T.function}));
-	return new Promise(function streamToBuffer$Promise(resolve, reject) {
+function readableToBuffer(stream) {
+	T(stream, StreamType);
+	return new Promise(function readableToBuffer$Promise(resolve, reject) {
 		const bufs = [];
 		stream.on('data', function(data) {
 			bufs.push(data);
 		});
-		// 'end' for Readable
 		stream.once('end', function() {
-			resolve(Buffer.concat(bufs));
-		});
-		// 'finish' for Writable
-		stream.once('finish', function() {
 			resolve(Buffer.concat(bufs));
 		});
 		stream.once('error', function(err) {
@@ -312,7 +317,7 @@ function crc32$digest(encoding) {
  */
 function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	T(
-		inputStream, T.shape({pipe: T.function}),
+		inputStream, StreamType,
 		algoOrExistingHash, T.union([T.string, T.object]),
 		existingLength, T.optional(T.number)
 	);
@@ -323,10 +328,7 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength) {
 	let hash;
 	if(typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
-		if(/^blake2/.test(algo)) {
-			blake2 = loadNow(blake2);
-			hash = blake2.createHash(algo);
-		} else if(algo === "crc32c") {
+		if(algo === "crc32c") {
 			sse4_crc32 = loadNow(sse4_crc32);
 			hash = new sse4_crc32.CRC32();
 			hash.digest = crc32$digest;
@@ -483,8 +485,57 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 	}
 });
 
+
+const EMPTY_BUF = new Buffer(0);
+
+/**
+ * An object that holds multiple Buffers and knows the total
+ * length, allowing you to delay the .concat() until you need
+ * the whole thing.
+ */
+class JoinedBuffers {
+	constructor() {
+		this._bufs = [];
+		this.length = 0;
+	}
+
+	push(buf) {
+		T(buf, Buffer);
+		this.length += buf.length;
+		this._bufs.push(buf);
+	}
+
+	joinPop() {
+		if(!this._bufs.length) {
+			return EMPTY_BUF;
+		}
+		const bufs = this._bufs;
+		this._bufs = [];
+		this.length = 0;
+		if(bufs.length === 1) {
+			return bufs[0];
+		} else {
+			return Buffer.concat(bufs);
+		}
+	}
+}
+
+function clearOrLF(stdStream) {
+	if(stdStream.clearLine && stdStream.cursorTo) {
+		stdStream.clearLine();
+		stdStream.cursorTo(0);
+	} else {
+		stdStream.write('\n');
+	}
+}
+
+function pluralize(count, singular, plural) {
+	T(count, T.number, singular, T.string, plural, T.string);
+	return `${commaify(count)} ${count === 1 ? singular : plural}`;
+}
+
 module.exports = {
-	LazyModule, loadNow,
+	LazyModule, loadNow, OutputContextType,
 
 	assertSafeNonNegativeInteger, emptyFrozenArray, randInt, sameArrayValues,
 	prop, shortISO, pad, commaify, getParentPath, getBaseName, ol,
@@ -492,7 +543,8 @@ module.exports = {
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
-	makeHttpsRequest, streamToBuffer, streamHasher, evalMultiplications,
-	makeChunkFilename, ChunksType, allIdentical, filledArray, PersistentCounter,
-	WILDCARD, colsAsString, ColsType, utimesMilliseconds, tryUnlink
+	makeHttpsRequest, readableToBuffer, streamHasher, evalMultiplications,
+	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
+	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize
 };

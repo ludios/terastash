@@ -27,8 +27,14 @@ class Decayer {
 		return this.current;
 	}
 
+	// For use inside an errback where you want to tell the user how many
+	// seconds the delay will be.
+	getNextDelay() {
+		return Math.min(this.current * this.multiplier, this.max);
+	}
+
 	decay() {
-		this.current = Math.min(this.current * this.multiplier, this.max);
+		this.current = this.getNextDelay();
 		return this.current;
 	}
 }

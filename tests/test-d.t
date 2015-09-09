@@ -5,7 +5,7 @@ Setup
   $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
-  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '100*1024'
+  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '80*1024'
   $ ts destroy unit_tests_d > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
 
 Can add and drop a file
@@ -22,10 +22,10 @@ Can add and drop a file
   $ ts get -n unit_tests_d x
   $ cat x
   hi
-  $ ts dump-db -n unit_tests_d
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","blake2b224":"~bfqWeegAOwAOEa2YH39X5IXtoHcGoGweJtGTDmQ==","chunks_in_mychunks":null,"content":"~baGkK","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null}}
+  $ ts export-db -n unit_tests_d
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","block_size":null,"chunks_in_mychunks":null,"content":"~baGkK","crc32c":"~bG9ywgw==","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null,"version":2}}
   $ ts drop -n unit_tests_d x
-  $ ts dump-db -n unit_tests_d
+  $ ts export-db -n unit_tests_d
   $ ts mkdir -n unit_tests_d sub dir
   $ ts ls -n unit_tests_d -j ""
   dir

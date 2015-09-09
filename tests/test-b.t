@@ -11,8 +11,8 @@ Setup
 
 Can store chunks in gdrive
 
-  $ ts config-chunk-store terastash-tests-gdrive --chunk-size=1024
-  $ dd bs=1025 count=2 if=/dev/urandom of=smallfile 2> /dev/null
+  $ ts config-chunk-store terastash-tests-gdrive --chunk-size=8192
+  $ dd bs=8193 count=2 if=/dev/urandom of=smallfile 2> /dev/null
   $ MD5_BEFORE="$(cat smallfile | md5sum | cut -f 1 -d " ")"
   $ ts add smallfile
   $ rm smallfile

@@ -8,6 +8,7 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
@@ -199,7 +200,14 @@ class GDriver {
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
-					reject(err);
+					if(err.code === 404 && err.errors[0].reason === 'notFound') {
+						reject(new UploadError(`googleapis.com returned:\n${err.message}\n\n` +
+							`Make sure that the Google Drive folder you are uploading into exists ` +
+							`("parents" in config), and that you are using credentials for ` +
+							`the correct Google account.`));
+					} else {
+						reject(err);
+					}
 				} else {
 					resolve(obj);
 				}
@@ -319,12 +327,15 @@ class GDriver {
 	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
-	*getData(fileId, range) {
-		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])));
+	*getData(fileId, range, checkCRC32CifReceived) {
+		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])), checkCRC32CifReceived, T.optional(T.boolean));
 		if(range) {
 			utils.assertSafeNonNegativeInteger(range[0]);
 			utils.assertSafeNonNegativeInteger(range[1]);
 			A.gte(range[1], range[0], "end must be >= start in range [start, end]");
+		}
+		if(checkCRC32CifReceived === undefined) {
+			checkCRC32CifReceived = true;
 		}
 		yield this._maybeRefreshAndSaveToken();
 		const reqHeaders = this._getHeaders();
@@ -347,29 +358,29 @@ class GDriver {
 					);
 				}
 			}
-			const hasher = utils.streamHasher(res, 'crc32c');
 			const googHash = res.headers['x-goog-hash'];
-			let googCRC;
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {
 				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
-			if(googHash) {
+			let hasher;
+			if(googHash && checkCRC32CifReceived) {
+				hasher = utils.streamHasher(res, 'crc32c');
 				A(googHash.startsWith("crc32c="), googHash);
-				googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				hasher.stream.once('end', function getData$hasher$end() {
+					const computedCRC = hasher.hash.digest();
+					if(!computedCRC.equals(googCRC)) {
+						hasher.stream.emit('error', new Error(
+							`CRC32c check failed on fileId=${inspect(fileId)}:` +
+							` expected ${googCRC.toString("hex")},` +
+							` got ${computedCRC.toString("hex")}`
+						));
+					}
+				});
 			}
-			hasher.stream.once('end', function getData$hasher$end() {
-				const computedCRC = hasher.hash.digest();
-				if(googCRC && !computedCRC.equals(googCRC)) {
-					hasher.stream.emit('error', new Error(
-						`CRC32c check failed on fileId=${inspect(fileId)}:` +
-						` expected ${googCRC.toString("hex")},` +
-						` got ${computedCRC.toString("hex")}`
-					));
-				}
-			});
-			return [hasher.stream, res];
+			return [(hasher ? hasher.stream : res), res];
 		} else {
 			let body = yield utils.streamToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
@@ -395,8 +406,8 @@ GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
-const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parents, getChunkStream) {
-	T(gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
+const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver, parents, getChunkStream) {
+	T(outCtx, OutputContextType, gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
 
 	let totalSize = 0;
 	let idx = 0;
@@ -421,9 +432,11 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(gdriver, parent
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}), function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
-			if(Number(process.env.TERASTASH_LOG_LEVEL) > 0) {
-				console.error(`Error while uploading chunk ${idx}; ${triesLeft} tries left:`);
+			if(outCtx.mode !== 'quiet') {
+				console.error(`Error while uploading chunk ${idx}:\n`);
 				console.error(e.stack);
+				console.error(`\n${utils.pluralize(triesLeft, 'try', 'tries')} left; ` +
+					`trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
 		}, 10, decayer);
 		if(response === null) {
@@ -453,15 +466,15 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream of concatenated chunks.
  */
-function readChunks(gdriver, chunks) {
-	T(gdriver, GDriver, chunks, utils.ChunksType);
+function readChunks(gdriver, chunks, checkWholeChunkCRC32C) {
+	T(gdriver, GDriver, chunks, utils.ChunksType, checkWholeChunkCRC32C, T.boolean);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
 		for(const chunk of chunks) {
-			const _ = yield gdriver.getData(chunk.file_id);
+			const _ = yield gdriver.getData(chunk.file_id, undefined, checkWholeChunkCRC32C);
 			const chunkStream = _[0];
 			const res = _[1];
 

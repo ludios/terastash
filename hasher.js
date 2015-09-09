@@ -1,13 +1,13 @@
 "use strong";
 "use strict";
 
-const T = require('notmytype');
 const A = require('ayy');
 const utils = require('./utils');
 const commaify = utils.commaify;
 const compile_require = require('./compile_require');
 const loadNow = utils.loadNow;
 const LazyModule = utils.LazyModule;
+const JoinedBuffers = utils.JoinedBuffers;
 const Transform = require('stream').Transform;
 
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
@@ -42,43 +42,37 @@ class CRCWriter extends Transform {
 		A.gt(blockSize, 0);
 		super();
 		this._blockSize = blockSize;
-		this._buf = new Buffer(0);
+		this._joined = new JoinedBuffers();
 		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
+	_pushCRCAndBuf(buf) {
+		this.push(crcToBuf(sse4_crc32.calculate(buf)));
+		this.push(buf);
+	}
+
 	_transform(data, encoding, callback) {
+		this._joined.push(data);
 		// Can write out at least one new block?
-		if(this._buf.length + data.length >= this._blockSize) {
-			// First block is special: need to include this._buf in crc32
-			const firstBuf = data.slice(0, this._blockSize - this._buf.length);
-			const firstCRC = sse4_crc32.calculate(
-				firstBuf,
-				sse4_crc32.calculate(this._buf));
-			this.push(crcToBuf(firstCRC));
-			this.push(this._buf);
-			this.push(firstBuf);
+		if(this._joined.length >= this._blockSize) {
+			const _ = splitBuffer(this._joined.joinPop(), this._blockSize);
+			const splitBufs = _[0];
+			const remainder = _[1];
+			this._joined.push(remainder);
 
-			const _ = splitBuffer(data.slice(this._blockSize - this._buf.length), this._blockSize);
-			const bufs = _[0];
-			this._buf = _[1];
-
-			for(const buf of bufs) {
-				this.push(crcToBuf(sse4_crc32.calculate(buf)));
-				this.push(buf);
+			for(const buf of splitBufs) {
+				this._pushCRCAndBuf(buf);
 			}
-		} else {
-			this._buf = Buffer.concat([this._buf, data]);
 		}
 		callback();
 	}
 
 	_flush(callback) {
 		// Need to write out the last block, even if it's under-sized
-		if(this._buf.length > 0) {
-			this.push(crcToBuf(sse4_crc32.calculate(this._buf)));
-			this.push(this._buf);
-			// Blow up if an io.js bug causes _flush to be called twice
-			this._buf = null;
+		if(this._joined.length > 0) {
+			const buf = this._joined.joinPop();
+			this._pushCRCAndBuf(buf);
+			this._joined = null;
 		}
 		callback();
 	}
@@ -104,7 +98,7 @@ class CRCReader extends Transform {
 		super();
 		this._blockSize = blockSize;
 		this._counter = 0;
-		this._buf = new Buffer(0);
+		this._joined = new JoinedBuffers();
 		this._crc = null;
 		this._mode = MODE_CRC;
 		sse4_crc32 = loadNow(sse4_crc32);
@@ -113,8 +107,8 @@ class CRCReader extends Transform {
 	_checkCRC(callback, actual, expect) {
 		if(actual !== expect) {
 			callback(new BadData(
-				`CRC32C of block ${commaify(this._counter)} is allegedly \n` +
-				`${crcToBuf(expect).toString('hex')} but CRC32C of data is \n` +
+				`CRC32C of block ${commaify(this._counter)} is allegedly\n` +
+				`${crcToBuf(expect).toString('hex')} but CRC32C of data is\n` +
 				`${crcToBuf(actual).toString('hex')}`)
 			);
 			return false;
@@ -122,9 +116,16 @@ class CRCReader extends Transform {
 		return true;
 	}
 
-	_transform(data, encoding, callback) {
-		data = Buffer.concat([this._buf, data]);
-		this._buf = EMPTY_BUF;
+	_transform(newData, encoding, callback) {
+		this._joined.push(newData);
+		// Don't bother processing anything if we don't have enough to decode
+		// a CRC or a block.
+		if(this._mode === MODE_CRC && this._joined.length < 4 ||
+		this._mode === MODE_DATA && this._joined.length < this._blockSize) {
+			callback();
+			return;
+		}
+		let data = this._joined.joinPop();
 		while(data.length) {
 			//console.error(this._counter, data.length, this._mode);
 			if(this._mode === MODE_CRC) {
@@ -133,8 +134,7 @@ class CRCReader extends Transform {
 					this._mode = MODE_DATA;
 					data = data.slice(4);
 				} else {
-					// TODO: copy to avoid leaving full data in memory?
-					this._buf = data;
+					this._joined.push(data);
 					data = EMPTY_BUF;
 				}
 			} else if(this._mode === MODE_DATA) {
@@ -149,8 +149,7 @@ class CRCReader extends Transform {
 					this._mode = MODE_CRC;
 					data = data.slice(this._blockSize);
 				} else {
-					// TODO: copy to avoid leaving full data in memory?
-					this._buf = data;
+					this._joined.push(data);
 					data = EMPTY_BUF;
 				}
 			}
@@ -161,25 +160,26 @@ class CRCReader extends Transform {
 	_flush(callback) {
 		// Last block might not be full-size, and now that we know we've reached
 		// the end, we handle it here.
-		if(!this._buf.length) {
+		if(!this._joined.length) {
+			callback();
 			return;
 		}
+		let buf = this._joined.joinPop();
 		if(this._mode === MODE_CRC) {
-			callback(new BadData(`Stream ended in the middle of a CRC32C: ${this._buf.toString('hex')}`));
+			callback(new BadData(`Stream ended in the middle of a CRC32C: ${buf.toString('hex')}`));
 			return;
 		}
 		// It should be smaller than the block size, else it would have been handled in _transform
-		A(this._buf.length < this._blockSize, this._buf.length);
-		const crc = sse4_crc32.calculate(this._buf);
+		A(buf.length < this._blockSize, buf.length);
+		const crc = sse4_crc32.calculate(buf);
 		if(!this._checkCRC(callback, crc, this._crc)) {
 			return;
 		}
-		this.push(this._buf);
-		// Blow up if an io.js bug causes _flush to be called twice
-		this._buf = null;
+		this.push(buf);
+		this._joined = null;
 		callback();
 	}
 }
 
 
-module.exports = {BadData, CRCWriter, CRCReader};
+module.exports = {BadData, CRCWriter, CRCReader, crcToBuf};

@@ -4,7 +4,7 @@ Setup
   $ export TERASTASH_COUNTERS_DIR="$(mktemp --tmpdir -d ts-test-e-state.XXXXXXXXXX)"
   $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p /tmp/mychunks-e
-  $ ts define-chunk-store mychunks-e -t localfs -d /tmp/mychunks-e -s '100*1024'
+  $ ts define-chunk-store mychunks-e -t localfs -d /tmp/mychunks-e -s '80*1024'
   $ ts destroy unit_tests_e > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
   $ ts init unit_tests_e --chunk-store=mychunks-e "--chunk-threshold=10*10"
 

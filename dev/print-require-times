@@ -1,4 +1,4 @@
-iojs --harmony --harmony-rest-parameters --harmony-object --strong-mode -e "\
+./dev/js -e "\
 rt = require('require-times')();\
 rt.start();\
 require('./index');\
