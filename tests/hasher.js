@@ -14,6 +14,24 @@ const Promise = require('bluebird');
 const crypto = require('crypto');
 
 describe('CRCWriter+CRCReader', function() {
+	it("yields 0-byte stream for 0-byte input", Promise.coroutine(function*() {
+		const inputBuf = new Buffer(0);
+		const inputStream = realistic_streamifier.createReadStream(inputBuf);
+		const writer = new hasher.CRCWriter(4096);
+		utils.pipeWithErrors(inputStream, writer);
+		const outputBuf = yield utils.readableToBuffer(writer);
+		A.eq(outputBuf.length, 0);
+	}));
+
+	it("yields 5-byte stream for 1-byte input", Promise.coroutine(function*() {
+		const inputBuf = new Buffer(1).fill(0);
+		const inputStream = realistic_streamifier.createReadStream(inputBuf);
+		const writer = new hasher.CRCWriter(4096);
+		utils.pipeWithErrors(inputStream, writer);
+		const outputBuf = yield utils.readableToBuffer(writer);
+		A.eq(outputBuf.length, 5);
+	}));
+
 	it("works for all block sizes", Promise.coroutine(function*() {
 		this.timeout(60000);
 		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256, 8 * 1024]) {
