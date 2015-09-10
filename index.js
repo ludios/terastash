@@ -15,11 +15,12 @@ const noop = require('lodash.noop');
 const Transform = require('stream').Transform;
 
 const utils = require('./utils');
-const filename = require('./filename');
 const commaify = utils.commaify;
 const LazyModule = utils.LazyModule;
 const loadNow = utils.loadNow;
 const OutputContextType = utils.OutputContextType;
+const getProp = utils.getProp;
+const filename = require('./filename');
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const deepEqual = require('deep-equal');
@@ -128,7 +129,7 @@ const StashInfoType = T.shape({path: T.string});
 const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(pathname) {
 	T(pathname, T.string);
 	const config = yield getStashes();
-	if(!config.stashes || typeof config.stashes !== "object") {
+	if(!getProp(config, 'stashes') || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
@@ -151,11 +152,11 @@ const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(p
 const getStashInfoByName = Promise.coroutine(function* getStashInfoByName$coro(stashName) {
 	T(stashName, T.string);
 	const config = yield getStashes();
-	if(!config.stashes || typeof config.stashes !== "object") {
+	if(!getProp(config, 'stashes') || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
-	const stash = config.stashes[stashName];
+	const stash = getProp(config.stashes, stashName);
 	if(!stash) {
 		throw new Error(`No stash with name ${stashName}`);
 	}
@@ -1571,14 +1572,18 @@ const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	T(name, T.string);
 	gdrive = loadNow(gdrive);
 	const config = yield getChunkStores();
-	const chunkStore = config.stores[name];
+	const stores = getProp(config, 'stores');
+	if(!(typeof stores === "object" && stores !== null)) {
+		throw new Error(`'stores' in chunk-stores.json is not an object`);
+	}
+	const chunkStore = getProp(stores, name);
 	if(!(typeof chunkStore === "object" && chunkStore !== null)) {
 		throw new Error(`Chunk store ${name} was ${chunkStore}, should be an object`);
 	}
-	if(!chunkStore.clientId) {
+	if(!getProp(chunkStore, 'clientId')) {
 		throw new Error(`Chunk store ${name} is missing a clientId`);
 	}
-	if(!chunkStore.clientSecret) {
+	if(!getProp(chunkStore, 'clientSecret')) {
 		throw new Error(`Chunk store ${name} is missing a clientSecret`);
 	}
 	const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
