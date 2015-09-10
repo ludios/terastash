@@ -1,40 +1,49 @@
 "use strong";
 "use strict";
 
+const crypto = require('crypto');
 const A = require('ayy');
+const T = require('notmytype');
 const utils = require('./utils');
+const aes = require('./aes');
 const commaify = utils.commaify;
-const compile_require = require('./compile_require');
-const loadNow = utils.loadNow;
-const LazyModule = utils.LazyModule;
 const JoinedBuffers = utils.JoinedBuffers;
 const Transform = require('stream').Transform;
 
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+const IV_SIZE = 12;
 
-function crcToBuf(n) {
-	const buf = new Buffer(4);
-	buf.writeUIntBE(n, 0, 4);
+// terastash block, not AES block
+function blockNumberToIv(blockNum) {
+	utils.assertSafeNonNegativeInteger(blockNum);
+	const buf = new Buffer(aes.strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
+	A(buf.length, IV_SIZE);
 	return buf;
 }
 
-function bufToCrc(buf) {
-	return buf.readUIntBE(0, 4);
-}
-
-class CRCWriter extends Transform {
-	constructor(blockSize) {
+class GCMWriter extends Transform {
+	constructor(blockSize, key, initialBlockNum) {
+		T(blockSize, T.number, key, Buffer, initialBlockNum, T.number);
 		utils.assertSafeNonNegativeInteger(blockSize);
+		utils.assertSafeNonNegativeInteger(initialBlockNum);
 		A.gt(blockSize, 0);
+		A.eq(key.length, 128/8);
 		super();
 		this._blockSize = blockSize;
+		this._key = key;
+		this._blockNum = initialBlockNum;
 		this._joined = new JoinedBuffers();
-		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
-	_pushCRCAndBuf(buf) {
-		this.push(crcToBuf(sse4_crc32.calculate(buf)));
-		this.push(buf);
+	_pushTagAndEncryptedBuf(buf) {
+		const cipher = crypto.createCipheriv('aes-128-gcm', this._key, blockNumberToIv(this._blockNum));
+		this._blockNum += 1;
+		const encryptedBuf = cipher.update(buf);
+		const ret = cipher.final();
+		A.eq(ret.length, 0);
+		const tag = cipher.getAuthTag();
+		A.eq(tag.length, 128/8);
+		this.push(tag);
+		this.push(encryptedBuf);
 	}
 
 	_transform(data, encoding, callback) {
@@ -45,7 +54,7 @@ class CRCWriter extends Transform {
 			this._joined.push(remainder);
 
 			for(const buf of splitBufs) {
-				this._pushCRCAndBuf(buf);
+				this._pushTagAndEncryptedBuf(buf);
 			}
 		}
 		callback();
@@ -55,7 +64,7 @@ class CRCWriter extends Transform {
 		// Need to write out the last block, even if it's under-sized
 		if(this._joined.length > 0) {
 			const buf = this._joined.joinPop();
-			this._pushCRCAndBuf(buf);
+			this._pushTagAndEncryptedBuf(buf);
 			this._joined = null;
 		}
 		callback();
@@ -71,40 +80,50 @@ class BadData extends Error {
 
 
 const MODE_DATA = Symbol("MODE_DATA");
-const MODE_CRC = Symbol("MODE_CRC");
+const MODE_TAG = Symbol("MODE_TAG");
 
 const EMPTY_BUF = new Buffer(0);
 
-class CRCReader extends Transform {
-	constructor(blockSize) {
+class GCMReader extends Transform {
+	constructor(blockSize, key, initialBlockNum) {
+		T(blockSize, T.number, key, Buffer, initialBlockNum, T.number);
 		utils.assertSafeNonNegativeInteger(blockSize);
+		utils.assertSafeNonNegativeInteger(initialBlockNum);
 		A.gt(blockSize, 0);
+		A.eq(key.length, 128/8);
 		super();
 		this._blockSize = blockSize;
-		this._counter = 0;
+		this._key = key;
+		this._blockNum = initialBlockNum;
 		this._joined = new JoinedBuffers();
-		this._crc = null;
-		this._mode = MODE_CRC;
-		sse4_crc32 = loadNow(sse4_crc32);
+		this._tag = null;
+		this._mode = MODE_TAG;
 	}
 
-	_checkCRC(callback, actual, expect) {
-		if(actual !== expect) {
+	_decrypt(callback, buf) {
+		const decipher = crypto.createDecipheriv('aes-128-gcm', this._key, blockNumberToIv(this._blockNum));
+		decipher.setAuthTag(this._tag);
+		const decryptedBuf = decipher.update(buf);
+		try {
+			const ret = decipher.final();
+			A.eq(ret.length, 0);
+		} catch(e) {
 			callback(new BadData(
-				`CRC32C of block ${commaify(this._counter)} is allegedly\n` +
-				`${crcToBuf(expect).toString('hex')} but CRC32C of data is\n` +
-				`${crcToBuf(actual).toString('hex')}`)
+				`Authenticated decryption of block ${commaify(this._blockNum)} failed:\n` +
+				`${e}`)
 			);
 			return false;
 		}
+		this._blockNum += 1;
+		this.push(decryptedBuf);
 		return true;
 	}
 
 	_transform(newData, encoding, callback) {
 		this._joined.push(newData);
 		// Don't bother processing anything if we don't have enough to decode
-		// a CRC or a block.
-		if(this._mode === MODE_CRC && this._joined.length < 4 ||
+		// a tag or a block.
+		if(this._mode === MODE_TAG && this._joined.length < 16 ||
 		this._mode === MODE_DATA && this._joined.length < this._blockSize) {
 			callback();
 			return;
@@ -112,11 +131,11 @@ class CRCReader extends Transform {
 		let data = this._joined.joinPop();
 		while(data.length) {
 			//console.error(this._counter, data.length, this._mode);
-			if(this._mode === MODE_CRC) {
-				if(data.length >= 4) {
-					this._crc = bufToCrc(data.slice(0, 4));
+			if(this._mode === MODE_TAG) {
+				if(data.length >= 16) {
+					this._tag = data.slice(0, 16);
 					this._mode = MODE_DATA;
-					data = data.slice(4);
+					data = data.slice(16);
 				} else {
 					this._joined.push(data);
 					data = EMPTY_BUF;
@@ -124,13 +143,10 @@ class CRCReader extends Transform {
 			} else if(this._mode === MODE_DATA) {
 				if(data.length >= this._blockSize) {
 					const block = data.slice(0, this._blockSize);
-					const crc = sse4_crc32.calculate(block);
-					if(!this._checkCRC(callback, crc, this._crc)) {
+					if(!this._decrypt(callback, block)) {
 						return;
 					}
-					this.push(block);
-					this._counter += 1;
-					this._mode = MODE_CRC;
+					this._mode = MODE_TAG;
 					data = data.slice(this._blockSize);
 				} else {
 					this._joined.push(data);
@@ -149,21 +165,19 @@ class CRCReader extends Transform {
 			return;
 		}
 		let buf = this._joined.joinPop();
-		if(this._mode === MODE_CRC) {
-			callback(new BadData(`Stream ended in the middle of a CRC32C: ${buf.toString('hex')}`));
+		if(this._mode === MODE_TAG) {
+			callback(new BadData(`Stream ended in the middle of a tag: ${buf.toString('hex')}`));
 			return;
 		}
 		// It should be smaller than the block size, else it would have been handled in _transform
 		A(buf.length < this._blockSize, buf.length);
-		const crc = sse4_crc32.calculate(buf);
-		if(!this._checkCRC(callback, crc, this._crc)) {
+		if(!this._decrypt(callback, buf)) {
 			return;
 		}
-		this.push(buf);
 		this._joined = null;
 		callback();
 	}
 }
 
 
-module.exports = {BadData, CRCWriter, CRCReader, crcToBuf};
+module.exports = {blockNumberToIv, BadData, GCMWriter, GCMReader};

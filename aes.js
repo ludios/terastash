@@ -55,4 +55,4 @@ function selfTest() {
 	A.eq(decrypted.toString('utf-8'), text.substr(BLOCK_SIZE));
 }
 
-module.exports = {BLOCK_SIZE, blockNumberToIv, selfTest};
+module.exports = {BLOCK_SIZE, strictZeroPad, blockNumberToIv, selfTest};

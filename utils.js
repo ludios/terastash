@@ -566,6 +566,20 @@ function weakFill(obj, keys) {
 	return obj;
 }
 
+// Returns [full-size blocks, remainder block]
+function splitBuffer(buf, blockSize) {
+	let start = 0;
+	const bufs = [];
+	while(true) {
+		const block = buf.slice(start, start + blockSize);
+		if(block.length < blockSize) {
+			return [bufs, block];
+		}
+		bufs.push(block);
+		start += blockSize;
+	}
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -578,5 +592,5 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer
 };
