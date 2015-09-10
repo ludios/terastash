@@ -298,6 +298,23 @@ function readableToBuffer(stream) {
 	});
 }
 
+function writableToBuffer(stream) {
+	T(stream, StreamType);
+	return new Promise(function writableToBuffer$Promise(resolve, reject) {
+		const bufs = [];
+		stream.on('data', function(data) {
+			bufs.push(data);
+		});
+		stream.once('finish', function() {
+			resolve(Buffer.concat(bufs));
+		});
+		stream.once('error', function(err) {
+			reject(err);
+		});
+		stream.resume();
+	});
+}
+
 function crc32$digest(...args) {
 	const [encoding] = args;
 	T(encoding, T.optional(T.string));
@@ -589,7 +606,7 @@ module.exports = {
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
-	makeHttpsRequest, readableToBuffer, streamHasher, evalMultiplications,
+	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
 	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer

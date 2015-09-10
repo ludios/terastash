@@ -6,8 +6,6 @@ require('better-buffer-inspect');
 const assert = require('assert');
 const A = require('ayy');
 const utils = require('../utils');
-const fs = require('fs');
-const os = require('os');
 const hasher = require('../hasher');
 const realistic_streamifier = require('../realistic_streamifier');
 const Promise = require('bluebird');
@@ -44,19 +42,14 @@ describe('CRCWriter+CRCReader', function() {
 
 			//console.error(blockSize);
 			let inputStream = realistic_streamifier.createReadStream(inputBuf);
-			const tempfname = `${os.tmpdir()}/terastash_tests_hasher_crc`;
 			const writer = new hasher.CRCWriter(blockSize);
 			utils.pipeWithErrors(inputStream, writer);
-			const outputStream = fs.createWriteStream(tempfname);
-			utils.pipeWithErrors(writer, outputStream);
-			yield new Promise(function(resolve) {
-				outputStream.once('finish', resolve);
-			});
-			A.eq(fs.statSync(tempfname).size, size + (4 * Math.ceil(size / blockSize)));
+			const buf = yield utils.writableToBuffer(writer);
+			A.eq(buf.length, size + (4 * Math.ceil(size / blockSize)));
 
 			// Now, read it back
 			const reader = new hasher.CRCReader(blockSize);
-			inputStream = fs.createReadStream(tempfname);
+			inputStream = realistic_streamifier.createReadStream(buf);
 			utils.pipeWithErrors(inputStream, reader);
 			const outputBuf = yield utils.readableToBuffer(reader);
 			assert.deepStrictEqual(outputBuf, inputBuf);
