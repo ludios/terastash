@@ -403,7 +403,7 @@ function allIdentical(arr) {
 function filledArray(n, obj) {
 	T(n, T.number, obj, T.any);
 	assertSafeNonNegativeInteger(n);
-	return Array.apply(null, new Array(n)).map(function(_) { return obj; });
+	return Array.apply(null, new Array(n)).map(function() { return obj; });
 }
 
 class PersistentCounter {
