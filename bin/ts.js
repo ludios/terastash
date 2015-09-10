@@ -26,11 +26,17 @@ process.on("unhandledRejection", function(err) {
 //new Promise(function(){ throw new Error("boom"); });
 //new Promise(function(){ throw 3; });
 
+function hasKey(obj, key) {
+	return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 mkdirp.sync(basedir.configPath("terastash"));
-process.env.CACHE_REQUIRE_PATHS_FILE =
-	basedir.configPath("terastash/internal-require-cache.json");
+if(!hasKey(process.env, 'CACHE_REQUIRE_PATHS_FILE')) {
+	process.env.CACHE_REQUIRE_PATHS_FILE =
+		basedir.configPath("terastash/internal-require-cache.json");
+}
 require('cache-require-paths');
 
 require('better-buffer-inspect');
