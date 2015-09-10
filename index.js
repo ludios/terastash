@@ -1232,9 +1232,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename, fake) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
 
-	const _ = yield streamFile(client, stashInfo, dbPath);
-	const row = _[0];
-	const readStream = _[1];
+	const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
 
 	yield mkdirpAsync(path.dirname(outputFilename));
 
@@ -1291,9 +1289,7 @@ function getFiles(stashName, paths, fake) {
 
 const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
-	const _ = yield streamFile(client, stashInfo, dbPath);
-	//const row = _[0];
-	const readStream = _[1];
+	const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
 	utils.pipeWithErrors(readStream, process.stdout);
 	yield new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
