@@ -1,4 +1,4 @@
 # Enable "long stack traces" on bluebird promises
 export BLUEBIRD_DEBUG=1
 
-node --strong-mode --harmony-rest-parameters "$@"
+node --strong-mode --harmony-rest-parameters --harmony-destructuring "$@"
