@@ -1151,7 +1151,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	}
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
-	const chunks = row[`chunks_in_${storeName}`];
+	const chunks = getProp(row, `chunks_in_${storeName}`, null);
 	let bytesRead = 0;
 	let unpaddedStream;
 	if(chunks !== null) {
