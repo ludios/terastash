@@ -37,6 +37,22 @@ Continue
   $ touch --date=1980-01-01 sample2
   $ chmod +x sample2
   $ mkdir adir
+
+Test for 'bytes instead of the expected' regression with 6MB file
+
+  $ dd if=/dev/zero of=6MBfile bs=1000000 count=6 2> /dev/null
+  $ md5sum 6MBfile
+  75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
+  $ ts add 6MBfile
+  $ rm 6MBfile
+  $ ts get 6MBfile
+  $ md5sum 6MBfile
+  75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
+  $ rm 6MBfile
+  $ ts drop 6MBfile
+
+Continue
+
   $ dd bs=1024 count=1024 if=/dev/zero of=adir/bigfile 2> /dev/null
   $ touch --date=1995-01-01 adir
   $ cat adir/bigfile | md5sum | cut -f 1 -d " "
