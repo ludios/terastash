@@ -888,18 +888,18 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			const inputStream = fs.createReadStream(
 				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
-			const paddedStream = new padded_stream.Padder(
-				Math.min(dataBytesPerChunk, concealedSize - sizeOfHashes - startData));
-			utils.pipeWithErrors(inputStream, paddedStream);
-
 			const hashedStream = new hasher.CRCWriter(CRC_BLOCK_SIZE);
-			utils.pipeWithErrors(paddedStream, hashedStream);
+			utils.pipeWithErrors(inputStream, hashedStream);
+
+			const paddedStream = new padded_stream.Padder(
+				Math.min(chunkStore.chunkSize, concealedSize - startChunk));
+			utils.pipeWithErrors(hashedStream, paddedStream);
 
 			selfTests.aes();
 			A.eq(startChunk % aes.BLOCK_SIZE, 0);
 			const cipherStream = crypto.createCipheriv(
 				'aes-128-ctr', key, aes.blockNumberToIv(startChunk / aes.BLOCK_SIZE));
-			utils.pipeWithErrors(hashedStream, cipherStream);
+			utils.pipeWithErrors(paddedStream, cipherStream);
 
 			return cipherStream;
 		});
@@ -923,7 +923,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			A.lte(info.size, chunkStore.chunkSize, `uploaded a too-big chunk:\n${inspect(info)}`);
 		}
 		A.eq(totalSize, concealedSize,
-			`For ${dbPath}, wrote to chunks\n` +
+			`For ${inspect(dbPath)}, wrote to chunks\n` +
 			`${commaify(totalSize)} bytes instead of the expected\n` +
 			`${commaify(concealedSize)} (concealed) bytes`);
 		T(chunkInfo, Array);
@@ -937,7 +937,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		crc32c = hasher.crcToBuf(sse4_crc32.calculate(content));
 		size = content.length;
 		A.eq(size, stat.size,
-			`For ${dbPath}, read\n` +
+			`For ${inspect(dbPath)}, read\n` +
 			`${commaify(size)} bytes instead of the expected\n` +
 			`${commaify(stat.size)} bytes; did file change during reading?`);
 	}
@@ -1153,7 +1153,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = getProp(row, `chunks_in_${storeName}`, null);
 	let bytesRead = 0;
-	let unpaddedStream;
+	let unhashedStream;
 	if(chunks !== null) {
 		validateChunks(chunks);
 		A.eq(row.content, null);
@@ -1179,51 +1179,56 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
 		utils.pipeWithErrors(cipherStream, clearStream);
 
-		let unhashedStream;
+		padded_stream = loadNow(padded_stream);
 		if(row.block_size > 0) {
+			const sizeOfHashes = 4 * Math.ceil(Number(row.size) / row.block_size);
+			const sizeWithHashes = Number(row.size) + sizeOfHashes;
+			utils.assertSafeNonNegativeInteger(sizeWithHashes);
+
+			const unpaddedStream = new padded_stream.Unpadder(sizeWithHashes);
+			utils.pipeWithErrors(clearStream, unpaddedStream);
+
 			hasher = loadNow(hasher);
 			unhashedStream = new hasher.CRCReader(row.block_size);
-			utils.pipeWithErrors(clearStream, unhashedStream);
+			utils.pipeWithErrors(unpaddedStream, unhashedStream);
 		} else {
-			unhashedStream = clearStream;
+			const unpaddedStream = new padded_stream.Unpadder(Number(row.size));
+			utils.pipeWithErrors(clearStream, unpaddedStream);
+			unhashedStream = unpaddedStream;
 		}
 
-		padded_stream = loadNow(padded_stream);
-		unpaddedStream = new padded_stream.Unpadder(Number(row.size));
-		utils.pipeWithErrors(unhashedStream, unpaddedStream);
-
-		unpaddedStream.on('data', function(data) {
+		unhashedStream.on('data', function(data) {
 			bytesRead += data.length;
 		});
 		// We attached a 'data' handler, but don't let that put us into
 		// flowing mode yet, because the user hasn't attached their own
 		// 'data' handler yet.
-		unpaddedStream.pause();
+		unhashedStream.pause();
 	} else {
 		hasher = loadNow(hasher);
 		sse4_crc32 = loadNow(sse4_crc32);
-		unpaddedStream = streamifier.createReadStream(row.content);
+		unhashedStream = streamifier.createReadStream(row.content);
 		bytesRead = row.content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
 		if(!crc32c.equals(row.crc32c)) {
-			unpaddedStream.emit('error', new Error(
-				`For dbPath=${dbPath}, CRC32C is allegedly\n` +
+			unhashedStream.emit('error', new Error(
+				`For dbPath=${inspect(dbPath)}, CRC32C is allegedly\n` +
 				`${row.crc32c.toString('hex')} but CRC32C of data is\n` +
 				`${crc32c.toString('hex')}`
 			));
 		}
 	}
-	unpaddedStream.once('end', function streamFile$end() {
+	unhashedStream.once('end', function streamFile$end() {
 		if(bytesRead !== Number(row.size)) {
-			unpaddedStream.emit('error', new Error(
-				`For dbPath=${dbPath}, expected length of content to be\n` +
+			unhashedStream.emit('error', new Error(
+				`For dbPath=${inspect(dbPath)}, expected length of content to be\n` +
 				`${commaify(row.size)} but was\n` +
 				`${commaify(bytesRead)}`
 			));
 		}
 	});
-	return [row, unpaddedStream];
+	return [row, unhashedStream];
 });
 
 /**
