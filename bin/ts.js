@@ -53,6 +53,11 @@ const NativePromise = global.Promise;
 
 const EitherPromise = T.union([Promise, NativePromise]);
 
+utils.weakFill(process.env, [
+	'TERASTASH_INSECURE_AND_DETERMINISTIC',
+	'TERASTASH_UPLOAD_FAIL_RATIO'
+]);
+
 /**
  * Attaches a logging .catch to a Promise.  If an error is caught,
  * print it and exit with exit code 1.  Some known errors are handled
