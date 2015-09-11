@@ -735,15 +735,15 @@ function dropFiles(stashName, paths) {
 }
 
 // Does *not* include the length of the GCM tag itself
-const GCM_BLOCK_SIZE = (8 * 1024) - 16;
+const DEFAULT_GCM_BLOCK_SIZE = (8 * 1024) - 16;
 
 function checkChunkSize(size) {
 	T(size, T.number);
 	// (GCM block size + GCM tag length) must be a multiple of chunkSize, for
 	// implementation convenience.
-	if(size % (GCM_BLOCK_SIZE + 16) !== 0) {
+	if(size % (DEFAULT_GCM_BLOCK_SIZE + 16) !== 0) {
 		throw new Error(`Chunk size must be a multiple of ` +
-			`${GCM_BLOCK_SIZE + 16}; got ${size}`);
+			`${DEFAULT_GCM_BLOCK_SIZE + 16}; got ${size}`);
 	}
 }
 
@@ -835,6 +835,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 	if(stat.size >= stashInfo.chunkThreshold) {
 		key = makeKey();
+		block_size = DEFAULT_GCM_BLOCK_SIZE;
 
 		aes = loadNow(aes);
 		gcmer = loadNow(gcmer);
@@ -842,7 +843,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 		checkChunkSize(chunkStore.chunkSize);
 
-		const sizeOfTags = 16 * Math.ceil(stat.size / GCM_BLOCK_SIZE);
+		const sizeOfTags = 16 * Math.ceil(stat.size / block_size);
 		const sizeWithTags = stat.size + sizeOfTags;
 		utils.assertSafeNonNegativeInteger(sizeWithTags);
 
@@ -852,7 +853,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 		// Note: a 1GB chunk has less than 1GB of data because of the GCM tags
 		// every 8176 bytes.
-		const dataBytesPerChunk = chunkStore.chunkSize * (GCM_BLOCK_SIZE / (GCM_BLOCK_SIZE + 16));
+		const dataBytesPerChunk = chunkStore.chunkSize * (block_size / (block_size + 16));
 		utils.assertSafeNonNegativeInteger(dataBytesPerChunk);
 		let startData = -dataBytesPerChunk;
 		let startChunk = -chunkStore.chunkSize;
@@ -899,11 +900,11 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			const inputStream = fs.createReadStream(
 				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
-			const iv = startData / GCM_BLOCK_SIZE;
+			const iv = startData / block_size;
 			utils.assertSafeNonNegativeInteger(iv);
 
 			selfTests.gcm();
-			const cipherStream = new gcmer.GCMWriter(GCM_BLOCK_SIZE, key, iv);
+			const cipherStream = new gcmer.GCMWriter(block_size, key, iv);
 			utils.pipeWithErrors(inputStream, cipherStream);
 
 			// Last chunk and need padding?
@@ -947,7 +948,6 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		T(chunkInfo, Array);
 
 		size = stat.size;
-		block_size = GCM_BLOCK_SIZE;
 	} else {
 		content = yield fs.readFileAsync(p);
 		hasher = loadNow(hasher);
@@ -1959,5 +1959,5 @@ module.exports = {
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	GCM_BLOCK_SIZE, checkChunkSize
+	checkChunkSize
 };
