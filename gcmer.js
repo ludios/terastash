@@ -62,6 +62,7 @@ class GCMWriter extends Transform {
 	}
 
 	_pushTagAndEncryptedBuf(buf) {
+		//console.error("GCMWriter", {iv: this._blockNum});
 		const cipher = crypto.createCipheriv('aes-128-gcm', this._key, blockNumberToIv(this._blockNum));
 		const oldBlockNum = this._blockNum;
 		this._blockNum += 1;

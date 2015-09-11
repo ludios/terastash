@@ -901,6 +901,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
 			const iv = startData / block_size;
+			//console.error("addFile", {iv: iv});
 			utils.assertSafeNonNegativeInteger(iv);
 
 			selfTests.gcm();
