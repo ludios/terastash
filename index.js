@@ -524,6 +524,10 @@ class PathAlreadyExistsError extends Error {
 	}
 }
 
+const MIN_SUPPORTED_VERSION = 1;
+const MAX_SUPPORTED_VERSION = 2;
+const CURRENT_VERSION = 2;
+
 function checkDbPath(dbPath) {
 	T(dbPath, T.string);
 	if(!dbPath) {
@@ -556,8 +560,8 @@ makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, 
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
-			(basename, parent, uuid, type, mtime) VALUES (?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime]
+			(basename, parent, uuid, type, mtime, version) VALUES (?, ?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime, CURRENT_VERSION]
 		);
 	} else if(typeInDb === FILE) {
 		throw new PathAlreadyExistsError(
@@ -823,7 +827,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	let content = null;
 	let chunkInfo;
 	let size;
-	const version = 2;
+	const version = CURRENT_VERSION;
 	// For file stored in chunk store, whole-file crc32c is not available.
 	let crc32c = null;
 	let key = null;
@@ -1121,9 +1125,6 @@ function shooFiles(paths, ...args) {
 	}));
 }
 
-const MIN_SUPPORTED_VERSION = 2;
-const MAX_SUPPORTED_VERSION = 2;
-
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -1172,10 +1173,14 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		validateChunks(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
-		utils.assertSafeNonNegativeInteger(row.block_size);
+		if(row.version === 1) {
+			A.eq(row.block_size, null);
+		} else {
+			utils.assertSafeNonNegativeInteger(row.block_size);
+		}
 		// To save CPU time, we check whole-chunk CRC32C's only for chunks
 		// that don't have embedded authentication tags.
-		const checkWholeChunkCRC32C = (row.block_size === 0);
+		const checkWholeChunkCRC32C = (row.version === 1);
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
@@ -1191,7 +1196,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 
 		padded_stream = loadNow(padded_stream);
-		if(row.block_size > 0) {
+		if(row.version === 2) {
 			const sizeOfTags = 16 * Math.ceil(Number(row.size) / row.block_size);
 			const sizeWithTags = Number(row.size) + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
@@ -1204,12 +1209,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			dataStream = new gcmer.GCMReader(row.block_size, row.key, 0);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
-			selfTests.aes();
-			const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
-			utils.pipeWithErrors(cipherStream, clearStream);
+			const unpaddedStream = new padded_stream.Unpadder(Number(row.size));
+			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
-			dataStream = new padded_stream.Unpadder(Number(row.size));
-			utils.pipeWithErrors(clearStream, dataStream);
+			selfTests.aes();
+			dataStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
+			utils.pipeWithErrors(unpaddedStream, dataStream);
 		}
 
 		dataStream.on('data', function(data) {
@@ -1735,19 +1740,7 @@ function getTransitReader() {
 	if(!transitReader) {
 		transitReader = transit.reader("json-verbose", {handlers: {
 			"Long": function(v) { return new cassandra.types.Long(v); },
-			"Row": function(v) {
-				const obj = transit.mapToObject(v);
-				// We also need to fix the TransitMap objects inside
-				// chunks_in_* -> [TransitMap, ...]
-				for(const k of Object.keys(obj)) {
-					if(k.startsWith("chunks_in_") && obj[k] !== null) {
-						obj[k] = obj[k].map(function(v) {
-							return transit.mapToObject(v);
-						});
-					}
-				}
-				return obj;
-			}
+			"Row": function(v) { return v; }
 		}});
 	}
 	return transitReader;
@@ -1805,64 +1798,74 @@ class TransitToInsert extends Transform {
 		const line = lineBuf.toString('utf-8');
 		const obj = this._transitReader.read(line);
 
-		if(obj.crc32c === undefined) {
-			obj.crc32c = null;
+		function undefinedToNull(o, k) {
+			if(o.get(k) === undefined) {
+				o.set(k, null);
+			}
 		}
-		if(obj.content === undefined) {
-			obj.content = null;
-		}
+		undefinedToNull(obj, 'crc32c');
+		undefinedToNull(obj, 'content');
+		undefinedToNull(obj, 'version');
+		undefinedToNull(obj, 'block_size');
 
-		T(obj.basename, T.string);
-		T(obj.type, T.string);
-		T(obj.mtime, Date);
-		T(obj.parent, Buffer);
-		A.eq(obj.parent.length, 128/8);
-		if(obj.type === 'f') {
-			if(obj.crc32c === null) {
-				if(obj.content !== null) {
+		T(obj.get('basename'), T.string);
+		T(obj.get('type'), T.string);
+		T(obj.get('mtime'), Date);
+		T(obj.get('parent'), Buffer);
+		A.eq(obj.get('parent').length, 128/8);
+		if(obj.get('type') === 'f') {
+			if(obj.get('crc32c') === null) {
+				if(obj.get('content') !== null) {
 					// Generate crc32c for version 1 dumps, which have blake2b224
 					// instead of crc32c.
-					T(obj.content, Buffer);
-					obj.crc32c = hasher.crcToBuf(sse4_crc32.calculate(obj.content));
+					T(obj.get('content'), Buffer);
+					obj.set('crc32c', hasher.crcToBuf(sse4_crc32.calculate(obj.get('content'))));
 				}
 			} else {
-				T(obj.crc32c, Buffer);
+				T(obj.get('crc32c'), Buffer);
 			}
-			if(obj.content === null) {
-				T(obj.key, Buffer);
-				A.eq(obj.key.length, 128/8);
+			if(obj.get('content') === null) {
+				T(obj.get('key'), Buffer);
+				A.eq(obj.get('key').length, 128/8);
 			}
-			T(obj.size, cassandra.types.Long);
-			A.eq(obj.uuid, null);
-			T(obj.executable, T.boolean);
-		} else if(obj.type === 'd') {
-			T(obj.uuid, Buffer);
-			A.eq(obj.uuid.length, 128/8);
-			A.eq(obj.content, null);
-			A.eq(obj.executable, null);
-			A.eq(obj.crc32c, null);
-			A.eq(obj.size, null);
+			T(obj.get('size'), cassandra.types.Long);
+			A.eq(obj.get('uuid'), null);
+			T(obj.get('executable'), T.boolean);
+		} else if(obj.get('type') === 'd') {
+			T(obj.get('uuid'), Buffer);
+			A.eq(obj.get('uuid').length, 128/8);
+			A.eq(obj.get('content'), null);
+			A.eq(obj.get('executable'), null);
+			A.eq(obj.get('crc32c'), null);
+			A.eq(obj.get('size'), null);
 		}
 
-		if(obj.version === undefined) {
-			A.eq(obj.block_size, undefined);
-			// version 1 had no CRC32C inside the chunks, upgrade to version 2
-			// with block_size = 0 (no CRC32C)
-			obj.version = 2;
-			obj.block_size = 0;
+		if(obj.get('version') === null) {
+			A.eq(obj.get('block_size'), null);
+			obj.set('version', 1);
+		} else if(obj.get('version') >= 2 && obj.get('type') === 'f' && obj.get('content') === null) {
+			utils.assertSafeNonNegativeInteger(obj.get('block_size'));
+			A.gt(obj.get('block_size'), 0);
 		}
 
-		const cols = ['basename', 'parent', 'type', 'uuid', 'content', 'key', 'size', 'crc32c', 'mtime', 'executable', 'version', 'block_size'];
-		const vals = [obj.basename, obj.parent, obj.type, obj.uuid, obj.content, obj.key, obj.size, obj.crc32c, obj.mtime, obj.executable, obj.version, obj.block_size];
-		for(const k of Object.keys(obj)) {
-			if(k.startsWith("chunks_in_")) {
+		const cols = [
+			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
+			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
+		const vals = [
+			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
+			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+		for(const k of utils.getMapKeys(obj)) {
+			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
 				if(!this._columnsCreated.has(k)) {
 					yield tryCreateColumnOnStashTable(
 						this._client, this._stashName, k, 'list<frozen<chunk>>');
 					this._columnsCreated.add(k);
 				}
+				const chunksArray = obj.get(k).map(function(v) {
+					return transit.mapToObject(v);
+				});
 				cols.push(k);
-				vals.push(obj[k]);
+				vals.push(chunksArray);
 			}
 		}
 		const qMarks = utils.filledArray(cols.length, "?");
