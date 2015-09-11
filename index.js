@@ -730,7 +730,7 @@ function dropFiles(stashName, paths) {
 	}));
 }
 
-// Does *not* include the length of the CRC32C itself
+// Does *not* include the length of the GCM tag itself
 const GCM_BLOCK_SIZE = (8 * 1024) - 16;
 
 function checkChunkSize(size) {
