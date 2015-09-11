@@ -11,7 +11,7 @@ const realistic_streamifier = require('../realistic_streamifier');
 const Promise = require('bluebird');
 const crypto = require('crypto');
 
-describe('CRCWriter+CRCReader', function() {
+describe('CRCWriter', function() {
 	it("yields 0-byte stream for 0-byte input", Promise.coroutine(function*() {
 		const inputBuf = new Buffer(0);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
@@ -29,9 +29,11 @@ describe('CRCWriter+CRCReader', function() {
 		const outputBuf = yield utils.readableToBuffer(writer);
 		A.eq(outputBuf.length, 5);
 	}));
+});
 
+describe('CRCWriter+CRCReader', function() {
 	it("works for all block sizes", Promise.coroutine(function*() {
-		this.timeout(60000);
+		this.timeout(20000);
 		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256, 8 * 1024]) {
 			// Need 8KB / 32MB test to catch lack-of-'this._buf = EMPTY_BUF;' bug
 			const size =
