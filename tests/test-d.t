@@ -5,7 +5,7 @@ Setup
   $ nanos-now > "$TERASTASH_COUNTERS_DIR/start"
   $ mkdir -p /tmp/mychunks
   $ ts list-chunk-stores
-  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '80*1024'
+  $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '128*1024'
   $ ts destroy unit_tests_d > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
 
 Can add and drop a file

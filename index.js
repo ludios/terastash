@@ -735,7 +735,7 @@ function dropFiles(stashName, paths) {
 }
 
 // Does *not* include the length of the GCM tag itself
-const DEFAULT_GCM_BLOCK_SIZE = (8 * 1024) - 16;
+const DEFAULT_GCM_BLOCK_SIZE = (64 * 1024) - 16;
 
 function checkChunkSize(size) {
 	T(size, T.number);
