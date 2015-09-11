@@ -33,6 +33,12 @@ describe('gcmer.blockNumberToIv()', function() {
 	});
 });
 
+describe('gcmer.selfTest()', function() {
+	it('works', function() {
+		gcmer.selfTest();
+	});
+});
+
 const KEY = crypto.pseudoRandomBytes(16);
 
 describe('GCMWriter', function() {

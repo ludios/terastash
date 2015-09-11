@@ -386,7 +386,7 @@ function evalMultiplications(s) {
 
 let filenameCounter = 0;
 function makeChunkFilename() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const s = `deterministic-filename-${filenameCounter}`;
 		filenameCounter += 1;
 		return s;

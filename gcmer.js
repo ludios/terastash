@@ -20,6 +20,33 @@ function blockNumberToIv(blockNum) {
 	return buf;
 }
 
+/**
+ * Make sure that OpenSSL's AES-128-GCM cipher works as expected, including
+ * our use of the IV as the counter.
+ */
+function selfTest() {
+	const key = new Buffer('12300000000000045600000000000789', 'hex');
+	const iv1 = blockNumberToIv(1);
+
+	// Test for exact ciphertext
+	const cipher = crypto.createCipheriv('aes-128-gcm', key, iv1);
+	const text = 'Hello, world. This is a test string spanning multiple AES blocks.';
+	const encrypted = cipher.update(new Buffer(text));
+	cipher.final();
+	const tag = cipher.getAuthTag();
+	A.eq(
+		encrypted.toString('hex'),
+		'ad7c82cce770a643f140a3c1d8a9da65ad91f7175d6326dc3c7ddc743cd82fa5f' +
+		'2b5da363e1ec0834ae94cd333f8acb64b7a154b58cb9206bed6f78023dfba6068'
+	);
+
+	// Test that encryption->decryption round-trips
+	const decipher = crypto.createDecipheriv('aes-128-gcm', key, iv1);
+	decipher.setAuthTag(tag);
+	const decrypted = decipher.update(encrypted);
+	A.eq(decrypted.toString('utf-8'), text);
+}
+
 class GCMWriter extends Transform {
 	constructor(blockSize, key, initialBlockNum) {
 		T(blockSize, T.number, key, Buffer, initialBlockNum, T.number);
@@ -186,4 +213,4 @@ class GCMReader extends Transform {
 }
 
 
-module.exports = {blockNumberToIv, BadData, GCMWriter, GCMReader};
+module.exports = {blockNumberToIv, BadData, GCMWriter, GCMReader, selfTest};

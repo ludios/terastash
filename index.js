@@ -25,10 +25,12 @@ const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const deepEqual = require('deep-equal');
 const Table = require('cli-table');
+const Combine = require('combine-streams');
 
 let CassandraClientType = T.object;
 
 let aes = new LazyModule('./aes');
+let gcmer = new LazyModule('./gcmer');
 let hasher = new LazyModule('./hasher');
 let cassandra;
 cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
@@ -41,6 +43,7 @@ let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
 let line_reader = new LazyModule('./line_reader');
 let work_stealer = new LazyModule('./work_stealer');
+let random_stream = new LazyModule('./random_stream');
 let transit = new LazyModule('transit-js');
 
 const KEYSPACE_PREFIX = "ts_";
@@ -581,9 +584,9 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnO
 });
 
 function makeKey() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const keyCounter = new utils.PersistentCounter(
-			path.join(process.env.TERASTASH_COUNTERS_DIR, 'key-counter'));
+			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-key-counter'));
 		const buf = new Buffer(128/8).fill(0);
 		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
 		return buf;
@@ -594,9 +597,9 @@ function makeKey() {
 
 function makeUuid() {
 	let uuid;
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const uuidCounter = new utils.PersistentCounter(
-			path.join(process.env.TERASTASH_COUNTERS_DIR, 'uuid-counter'), 1);
+			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-uuid-counter'), 1);
 		const buf = new Buffer(128/8).fill(0);
 		buf.writeIntBE(uuidCounter.getNext(), 0, 128/8);
 		uuid = buf;
@@ -625,11 +628,18 @@ const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) 
 });
 
 let selfTests;
-selfTests = {aes: function selfTests$aes() {
-	aes = loadNow(aes);
-	aes.selfTest();
-	selfTests.aes = noop;
-}};
+selfTests = {
+	aes: function selfTests$aes() {
+		aes = loadNow(aes);
+		aes.selfTest();
+		selfTests.aes = noop;
+	},
+	gcm: function selfTests$gcm() {
+		gcmer = loadNow(gcmer);
+		gcmer.selfTest();
+		selfTests.gcm = noop;
+	}
+};
 
 const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
 	// Make sure all paths are in the same stash
@@ -721,19 +731,16 @@ function dropFiles(stashName, paths) {
 }
 
 // Does *not* include the length of the CRC32C itself
-const CRC_BLOCK_SIZE = (8 * 1024) - 4;
+const GCM_BLOCK_SIZE = (8 * 1024) - 16;
 
 function checkChunkSize(size) {
 	T(size, T.number);
-	// (CRC block size + CRC length) must be a multiple of chunkSize, for
+	// (GCM block size + GCM tag length) must be a multiple of chunkSize, for
 	// implementation convenience.
-	if(size % (CRC_BLOCK_SIZE + 4) !== 0) {
+	if(size % (GCM_BLOCK_SIZE + 16) !== 0) {
 		throw new Error(`Chunk size must be a multiple of ` +
-			`${CRC_BLOCK_SIZE + 4}; got ${size}`);
+			`${GCM_BLOCK_SIZE + 16}; got ${size}`);
 	}
-	aes = loadNow(aes);
-	// Chunk size must be a multiple of an AES block, for implementation convenience.
-	A.eq(size % aes.BLOCK_SIZE, 0);
 }
 
 /**
@@ -826,22 +833,22 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		key = makeKey();
 
 		aes = loadNow(aes);
-		hasher = loadNow(hasher);
+		gcmer = loadNow(gcmer);
 		padded_stream = loadNow(padded_stream);
 
 		checkChunkSize(chunkStore.chunkSize);
 
-		const sizeOfHashes = 4 * Math.ceil(stat.size / CRC_BLOCK_SIZE);
-		const sizeWithHashes = stat.size + sizeOfHashes;
-		utils.assertSafeNonNegativeInteger(sizeWithHashes);
+		const sizeOfTags = 16 * Math.ceil(stat.size / GCM_BLOCK_SIZE);
+		const sizeWithTags = stat.size + sizeOfTags;
+		utils.assertSafeNonNegativeInteger(sizeWithTags);
 
-		const concealedSize = utils.concealSize(sizeWithHashes);
+		const concealedSize = utils.concealSize(sizeWithTags);
 		utils.assertSafeNonNegativeInteger(concealedSize);
-		A.gte(concealedSize, sizeWithHashes);
+		A.gte(concealedSize, sizeWithTags);
 
-		// Note: a 1GB chunk stores less than 1GB of data because of the CRC32C's
-		// every 8188 bytes.
-		const dataBytesPerChunk = chunkStore.chunkSize * (CRC_BLOCK_SIZE / (CRC_BLOCK_SIZE + 4));
+		// Note: a 1GB chunk has less than 1GB of data because of the GCM tags
+		// every 8176 bytes.
+		const dataBytesPerChunk = chunkStore.chunkSize * (GCM_BLOCK_SIZE / (GCM_BLOCK_SIZE + 16));
 		utils.assertSafeNonNegativeInteger(dataBytesPerChunk);
 		let startData = -dataBytesPerChunk;
 		let startChunk = -chunkStore.chunkSize;
@@ -888,20 +895,26 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			const inputStream = fs.createReadStream(
 				p, {start: startData, end: (startData + dataBytesPerChunk - 1)});
 
-			const hashedStream = new hasher.CRCWriter(CRC_BLOCK_SIZE);
-			utils.pipeWithErrors(inputStream, hashedStream);
+			const iv = startData / GCM_BLOCK_SIZE;
+			utils.assertSafeNonNegativeInteger(iv);
 
-			const paddedStream = new padded_stream.Padder(
-				Math.min(chunkStore.chunkSize, concealedSize - startChunk));
-			utils.pipeWithErrors(hashedStream, paddedStream);
+			selfTests.gcm();
+			const cipherStream = new gcmer.GCMWriter(GCM_BLOCK_SIZE, key, iv);
+			utils.pipeWithErrors(inputStream, cipherStream);
 
-			selfTests.aes();
-			A.eq(startChunk % aes.BLOCK_SIZE, 0);
-			const cipherStream = crypto.createCipheriv(
-				'aes-128-ctr', key, aes.blockNumberToIv(startChunk / aes.BLOCK_SIZE));
-			utils.pipeWithErrors(paddedStream, cipherStream);
+			const isLastChunk = startChunk + chunkStore.chunkSize >= concealedSize;
+			let outStream;
+			if(isLastChunk) {
+				outStream = new Combine();
+				outStream.append(cipherStream);
+				random_stream = loadNow(random_stream);
+				outStream.append(new random_stream.SecureRandomStream(concealedSize - sizeWithTags));
+				outStream.append(null);
+			} else {
+				outStream = cipherStream;
+			}
 
-			return cipherStream;
+			return outStream;
 		});
 
 		let _;
@@ -929,7 +942,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		T(chunkInfo, Array);
 
 		size = stat.size;
-		block_size = CRC_BLOCK_SIZE;
+		block_size = GCM_BLOCK_SIZE;
 	} else {
 		content = yield fs.readFileAsync(p);
 		hasher = loadNow(hasher);
@@ -1153,14 +1166,14 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	const chunkStore = (yield getChunkStores()).stores[storeName];
 	const chunks = getProp(row, `chunks_in_${storeName}`, null);
 	let bytesRead = 0;
-	let unhashedStream;
+	let dataStream;
 	if(chunks !== null) {
 		validateChunks(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
 		utils.assertSafeNonNegativeInteger(row.block_size);
 		// To save CPU time, we check whole-chunk CRC32C's only for chunks
-		// that don't have embedded CRC32C's.
+		// that don't have embedded authentication tags.
 		const checkWholeChunkCRC32C = (row.block_size === 0);
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
@@ -1175,60 +1188,61 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
-		selfTests.aes();
-		const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
-		utils.pipeWithErrors(cipherStream, clearStream);
 
 		padded_stream = loadNow(padded_stream);
 		if(row.block_size > 0) {
-			const sizeOfHashes = 4 * Math.ceil(Number(row.size) / row.block_size);
-			const sizeWithHashes = Number(row.size) + sizeOfHashes;
-			utils.assertSafeNonNegativeInteger(sizeWithHashes);
+			const sizeOfTags = 16 * Math.ceil(Number(row.size) / row.block_size);
+			const sizeWithTags = Number(row.size) + sizeOfTags;
+			utils.assertSafeNonNegativeInteger(sizeWithTags);
 
-			const unpaddedStream = new padded_stream.Unpadder(sizeWithHashes);
-			utils.pipeWithErrors(clearStream, unpaddedStream);
+			const unpaddedStream = new padded_stream.Unpadder(sizeWithTags);
+			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
-			hasher = loadNow(hasher);
-			unhashedStream = new hasher.CRCReader(row.block_size);
-			utils.pipeWithErrors(unpaddedStream, unhashedStream);
+			gcmer = loadNow(gcmer);
+			selfTests.gcm();
+			dataStream = new gcmer.GCMReader(row.block_size, row.key, 0);
+			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
-			const unpaddedStream = new padded_stream.Unpadder(Number(row.size));
-			utils.pipeWithErrors(clearStream, unpaddedStream);
-			unhashedStream = unpaddedStream;
+			selfTests.aes();
+			const clearStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
+			utils.pipeWithErrors(cipherStream, clearStream);
+
+			dataStream = new padded_stream.Unpadder(Number(row.size));
+			utils.pipeWithErrors(clearStream, dataStream);
 		}
 
-		unhashedStream.on('data', function(data) {
+		dataStream.on('data', function(data) {
 			bytesRead += data.length;
 		});
 		// We attached a 'data' handler, but don't let that put us into
 		// flowing mode yet, because the user hasn't attached their own
 		// 'data' handler yet.
-		unhashedStream.pause();
+		dataStream.pause();
 	} else {
 		hasher = loadNow(hasher);
 		sse4_crc32 = loadNow(sse4_crc32);
-		unhashedStream = streamifier.createReadStream(row.content);
+		dataStream = streamifier.createReadStream(row.content);
 		bytesRead = row.content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
 		if(!crc32c.equals(row.crc32c)) {
-			unhashedStream.emit('error', new Error(
+			dataStream.emit('error', new Error(
 				`For dbPath=${inspect(dbPath)}, CRC32C is allegedly\n` +
 				`${row.crc32c.toString('hex')} but CRC32C of data is\n` +
 				`${crc32c.toString('hex')}`
 			));
 		}
 	}
-	unhashedStream.once('end', function streamFile$end() {
+	dataStream.once('end', function streamFile$end() {
 		if(bytesRead !== Number(row.size)) {
-			unhashedStream.emit('error', new Error(
+			dataStream.emit('error', new Error(
 				`For dbPath=${inspect(dbPath)}, expected length of content to be\n` +
 				`${commaify(row.size)} but was\n` +
 				`${commaify(bytesRead)}`
 			));
 		}
 	});
-	return [row, unhashedStream];
+	return [row, dataStream];
 });
 
 /**
@@ -1941,5 +1955,5 @@ module.exports = {
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	CRC_BLOCK_SIZE, checkChunkSize
+	GCM_BLOCK_SIZE, checkChunkSize
 };
