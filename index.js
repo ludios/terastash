@@ -902,9 +902,10 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			const cipherStream = new gcmer.GCMWriter(GCM_BLOCK_SIZE, key, iv);
 			utils.pipeWithErrors(inputStream, cipherStream);
 
-			const isLastChunk = startChunk + chunkStore.chunkSize >= concealedSize;
+			// Last chunk and need padding?
+			const needPadding = startChunk + chunkStore.chunkSize > sizeWithTags;
 			let outStream;
-			if(isLastChunk) {
+			if(needPadding) {
 				outStream = new Combine();
 				outStream.append(cipherStream);
 				random_stream = loadNow(random_stream);
