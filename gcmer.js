@@ -36,7 +36,10 @@ class GCMWriter extends Transform {
 
 	_pushTagAndEncryptedBuf(buf) {
 		const cipher = crypto.createCipheriv('aes-128-gcm', this._key, blockNumberToIv(this._blockNum));
+		const oldBlockNum = this._blockNum;
 		this._blockNum += 1;
+		// Because we're dealing with JS doubles, make sure that the IV is no longer the same.
+		A.gt(this._blockNum, oldBlockNum);
 		const encryptedBuf = cipher.update(buf);
 		const ret = cipher.final();
 		A.eq(ret.length, 0);
@@ -114,7 +117,10 @@ class GCMReader extends Transform {
 			);
 			return false;
 		}
+		const oldBlockNum = this._blockNum;
 		this._blockNum += 1;
+		// Because we're dealing with JS doubles, make sure that the IV is no longer the same.
+		A.gt(this._blockNum, oldBlockNum);
 		this.push(decryptedBuf);
 		return true;
 	}
