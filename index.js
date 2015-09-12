@@ -734,6 +734,78 @@ function dropFiles(stashName, paths) {
 	}));
 }
 
+const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
+	T(p, T.string, size, T.number);
+	// First delete the existing file because it may have hard links, and we
+	// don't want to overwrite the content of said hard links.
+	yield utils.tryUnlink(p);
+	const handle = yield fs.openAsync(p, "w");
+	try {
+		yield fs.truncateAsync(handle, size);
+	} finally {
+		yield fs.closeAsync(handle);
+	}
+});
+
+const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size, mtime) {
+	T(p, T.string, size, T.number, mtime, Date);
+	yield makeEmptySparseFile(p, size);
+	yield utils.utimesMilliseconds(p, mtime, mtime);
+	// TODO: do this without a stat?
+	const stat = yield fs.statAsync(p);
+	const withSticky = stat.mode | 0o1000;
+	yield fs.chmodAsync(p, withSticky);
+});
+
+const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
+	if(row.type === 'd') {
+		throw new NotAFileError(`Can't shoo dbPath=${inspect(dbPath)}; it is a directory`);
+	} else if(row.type === 'f') {
+		const stat = yield fs.statAsync(p);
+		T(stat.mtime, Date);
+		if(stat.mtime.getTime() !== Number(row.mtime)) {
+			throw new UnexpectedFileError(
+				`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
+				` but mtime for dbPath=${inspect(dbPath)} is` +
+				`\n${new Date(Number(row.mtime)).toISOString()}`
+			);
+		}
+		T(stat.size, T.number);
+		if(stat.size !== Number(row.size)) {
+			throw new UnexpectedFileError(
+				`size for working directory file ${inspect(p)} is \n${commaify(stat.size)}` +
+				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
+			);
+		}
+		yield makeFakeFile(p, stat.size, row.mtime);
+	} else {
+		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
+	}
+});
+
+function shooFiles(paths, ...args) {
+	const [continueOnError] =args;
+	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
+	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
+		const stashInfo = yield getStashInfoForPaths(paths);
+		for(const p of paths) {
+			try {
+				yield shooFile(client, stashInfo, p);
+			} catch(err) {
+				if(!(err instanceof UnexpectedFileError ||
+					err instanceof NoSuchPathError)
+				|| !continueOnError) {
+					throw err;
+				}
+				console.error(chalk.red(err.message));
+			}
+		}
+	}));
+}
+
 // Does *not* include the length of the GCM tag itself
 const DEFAULT_GCM_BLOCK_SIZE = (64 * 1024) - 16;
 
@@ -996,12 +1068,13 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
  * Put files or directories into the Cassandra database.
  */
 function addFiles(outCtx, paths, ...args) {
-	const [continueOnExists, dropOldIfDifferent] = args;
+	const [continueOnExists, dropOldIfDifferent, thenShoo] = args;
 	T(
 		outCtx, OutputContextType,
 		paths, T.list(T.string),
 		continueOnExists, T.optional(T.boolean),
-		dropOldIfDifferent, T.optional(T.boolean)
+		dropOldIfDifferent, T.optional(T.boolean),
+		thenShoo, T.optional(T.boolean)
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1034,6 +1107,10 @@ function addFiles(outCtx, paths, ...args) {
 					}
 					console.error(chalk.red(err.message));
 				}
+				// TODO: should we not shoo for some types of errors from addFile?
+				if(thenShoo) {
+					yield shooFile(client, stashInfo, p);
+				}
 				if(stopNow) {
 					break;
 				}
@@ -1052,78 +1129,6 @@ function validateChunks(chunks) {
 		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
 		expectIdx += 1;
 	}
-}
-
-const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
-	T(p, T.string, size, T.number);
-	// First delete the existing file because it may have hard links, and we
-	// don't want to overwrite the content of said hard links.
-	yield utils.tryUnlink(p);
-	const handle = yield fs.openAsync(p, "w");
-	try {
-		yield fs.truncateAsync(handle, size);
-	} finally {
-		yield fs.closeAsync(handle);
-	}
-});
-
-const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size, mtime) {
-	T(p, T.string, size, T.number, mtime, Date);
-	yield makeEmptySparseFile(p, size);
-	yield utils.utimesMilliseconds(p, mtime, mtime);
-	// TODO: do this without a stat?
-	const stat = yield fs.statAsync(p);
-	const withSticky = stat.mode | 0o1000;
-	yield fs.chmodAsync(p, withSticky);
-});
-
-const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
-	const dbPath = userPathToDatabasePath(stashInfo.path, p);
-	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
-	if(row.type === 'd') {
-		throw new NotAFileError(`Can't shoo dbPath=${inspect(dbPath)}; it is a directory`);
-	} else if(row.type === 'f') {
-		const stat = yield fs.statAsync(p);
-		T(stat.mtime, Date);
-		if(stat.mtime.getTime() !== Number(row.mtime)) {
-			throw new UnexpectedFileError(
-				`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
-				` but mtime for dbPath=${inspect(dbPath)} is` +
-				`\n${new Date(Number(row.mtime)).toISOString()}`
-			);
-		}
-		T(stat.size, T.number);
-		if(stat.size !== Number(row.size)) {
-			throw new UnexpectedFileError(
-				`size for working directory file ${inspect(p)} is \n${commaify(stat.size)}` +
-				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
-			);
-		}
-		yield makeFakeFile(p, stat.size, row.mtime);
-	} else {
-		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
-	}
-});
-
-function shooFiles(paths, ...args) {
-	const [continueOnError] =args;
-	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
-	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(paths);
-		for(const p of paths) {
-			try {
-				yield shooFile(client, stashInfo, p);
-			} catch(err) {
-				if(!(err instanceof UnexpectedFileError ||
-					err instanceof NoSuchPathError)
-				|| !continueOnError) {
-					throw err;
-				}
-				console.error(chalk.red(err.message));
-			}
-		}
-	}));
 }
 
 /**

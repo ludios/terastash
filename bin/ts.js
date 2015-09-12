@@ -235,6 +235,19 @@ program
 		catchAndLog(terastash.shooFiles(files, options.continueOnError));
 	}));
 
+program
+	.command('add-shoo <path...>')
+	.option('-d, --drop-old-if-different',
+		"If path already exists in the db, and (mtime, size, executable) of " +
+		"new file is different, drop the old file instead of throwing 'already exists'")
+	.option('-c, --continue-on-exists', "Keep going on 'already exists' errors")
+	.description(d(`
+		Add a file to the database, then shoo it.`))
+	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
+		utils.weakFill(options, ['continueOnExists', 'dropOldIfDifferent']);
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, true));
+	}));
 
 program
 	.command('get <path...>')
