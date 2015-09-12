@@ -69,7 +69,7 @@ class CustomRetryPolicy extends RetryPolicy {
 function getNewClient() {
 	cassandra = loadNow(cassandra);
 	return new cassandra.Client({
-		contactPoints: ['localhost'],
+		contactPoints: [getProp(process.env, 'TERASTASH_CASSANDRA_HOST', '127.0.0.1')],
 		policies: {
 			retry: new CustomRetryPolicy()
 		}
