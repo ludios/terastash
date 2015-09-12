@@ -524,7 +524,7 @@ class PathAlreadyExistsError extends Error {
 	}
 }
 
-const MIN_SUPPORTED_VERSION = 1;
+const MIN_SUPPORTED_VERSION = 2;
 const MAX_SUPPORTED_VERSION = 2;
 const CURRENT_VERSION = 2;
 
@@ -1174,14 +1174,10 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		validateChunks(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
-		if(row.version === 1) {
-			A.eq(row.block_size, null);
-		} else {
-			utils.assertSafeNonNegativeInteger(row.block_size);
-		}
+		utils.assertSafeNonNegativeInteger(row.block_size);
 		// To save CPU time, we check whole-chunk CRC32C's only for chunks
 		// that don't have embedded authentication tags.
-		const checkWholeChunkCRC32C = (row.version === 1);
+		const checkWholeChunkCRC32C = (row.block_size === 0);
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
@@ -1197,7 +1193,9 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 
 		padded_stream = loadNow(padded_stream);
-		if(row.version === 2) {
+		// block_size > 0 uses AES-128-GCM, block size == 0 uses AES-128-CTR with no
+		// authentication tags or in-stream checksums.
+		if(row.block_size > 0) {
 			const sizeOfTags = 16 * Math.ceil(Number(row.size) / row.block_size);
 			const sizeWithTags = Number(row.size) + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
@@ -1817,7 +1815,7 @@ class TransitToInsert extends Transform {
 		if(obj.get('type') === 'f') {
 			if(obj.get('crc32c') === null) {
 				if(obj.get('content') !== null) {
-					// Generate crc32c for version 1 dumps, which have blake2b224
+					// Generate crc32c for version null dumps, which have blake2b224
 					// instead of crc32c.
 					T(obj.get('content'), Buffer);
 					obj.set('crc32c', hasher.crcToBuf(sse4_crc32.calculate(obj.get('content'))));
@@ -1843,10 +1841,10 @@ class TransitToInsert extends Transform {
 
 		if(obj.get('version') === null) {
 			A.eq(obj.get('block_size'), null);
-			obj.set('version', 1);
-		} else if(obj.get('version') >= 2 && obj.get('type') === 'f' && obj.get('content') === null) {
-			utils.assertSafeNonNegativeInteger(obj.get('block_size'));
-			A.gt(obj.get('block_size'), 0);
+			if(obj.get('type') === 'f' && obj.get('content') === null) {
+				obj.set('block_size', 0);
+			}
+			obj.set('version', 2);
 		}
 
 		const cols = [
