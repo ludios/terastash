@@ -1097,6 +1097,7 @@ function addFiles(outCtx, paths, ...args) {
 					process.stdout.write(`${count}/${paths.length}...`);
 				}
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
+				let error = null;
 				try {
 					yield addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent);
 				} catch(err) {
@@ -1105,10 +1106,10 @@ function addFiles(outCtx, paths, ...args) {
 					|| !continueOnExists) {
 						throw err;
 					}
+					error = err;
 					console.error(chalk.red(err.message));
 				}
-				// TODO: should we not shoo for some types of errors from addFile?
-				if(thenShoo) {
+				if(thenShoo && !error) {
 					yield shooFile(client, stashInfo, p);
 				}
 				if(stopNow) {
