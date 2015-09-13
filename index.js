@@ -1632,12 +1632,20 @@ function assertName(name) {
 
 const destroyStash = Promise.coroutine(function* destroyStash$coro(stashName) {
 	assertName(stashName);
-	yield doWithClient(getNewClient(), function destroyStash$doWithClient(client) {
-		return runQuery(
+	yield doWithClient(getNewClient(), Promise.coroutine(function* destroyStash$doWithClient(client) {
+		yield runQuery(
+			client,
+			`DROP TABLE IF EXISTS "${KEYSPACE_PREFIX + stashName}".fs;`
+		);
+		yield runQuery(
+			client,
+			`DROP TYPE IF EXISTS "${KEYSPACE_PREFIX + stashName}".chunk;`
+		);
+		yield runQuery(
 			client,
 			`DROP KEYSPACE "${KEYSPACE_PREFIX + stashName}";`
 		);
-	});
+	}));
 	const config = yield getStashes();
 	utils.deleteKey(config.stashes, stashName);
 	yield utils.writeObjectToConfigFile("stashes.json", config);
