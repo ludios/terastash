@@ -72,6 +72,11 @@ function getNewClient() {
 		contactPoints: [getProp(process.env, 'TERASTASH_CASSANDRA_HOST', '127.0.0.1')],
 		policies: {
 			retry: new CustomRetryPolicy()
+		},
+		socketOptions: {
+			/* Disable the read timeout (default 12000ms) because
+			 * otherwise we see ts export-db failures */
+			readTimeout: 0
 		}
 	});
 }
