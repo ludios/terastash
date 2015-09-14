@@ -1846,12 +1846,18 @@ class TransitToInsert extends Transform {
 		T(obj.get('parent'), Buffer);
 		A.eq(obj.get('parent').length, 128/8);
 
+		if(obj.get('version') === null) {
+			A.eq(obj.get('block_size'), null);
+			if(obj.get('type') === 'f' && obj.get('content') === null) {
+				obj.set('block_size', 0);
+			}
+			obj.set('version', 2);
+		}
+
 		const cols = [
 			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
 			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
-		const vals = [
-			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
-			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+		const extraVals = [];
 		let totalChunksSize = 0;
 		for(const k of utils.getMapKeys(obj)) {
 			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
@@ -1865,7 +1871,7 @@ class TransitToInsert extends Transform {
 					return transit.mapToObject(v);
 				});
 				cols.push(k);
-				vals.push(chunksArray);
+				extraVals.push(chunksArray);
 			}
 		}
 
@@ -1912,20 +1918,14 @@ class TransitToInsert extends Transform {
 			A.eq(obj.get('size'), null);
 		}
 
-		if(obj.get('version') === null) {
-			A.eq(obj.get('block_size'), null);
-			if(obj.get('type') === 'f' && obj.get('content') === null) {
-				obj.set('block_size', 0);
-			}
-			obj.set('version', 2);
-		}
-
 		const qMarks = utils.filledArray(cols.length, "?");
 		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols)})
 			VALUES (${qMarks.join(", ")});`;
-		//console.log({query, cols, vals});
-		yield runQuery(this._client, query, vals);
+		const vals = [
+			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
+			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+		yield runQuery(this._client, query, vals.concat(extraVals));
 		return obj;
 	}
 
