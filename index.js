@@ -297,6 +297,14 @@ const mtimeSorterDesc = utils.comparedBy(function(row) {
 	return row.mtime.getTime();
 }, true);
 
+const sizeSorterAsc = utils.comparedBy(function(row) {
+	return Number(row.size);
+});
+
+const sizeSorterDesc = utils.comparedBy(function(row) {
+	return Number(row.size);
+}, true);
+
 class NoSuchPathError extends Error {
 	get name() {
 		return this.constructor.name;
@@ -409,6 +417,8 @@ function lsPath(stashName, options, p) {
 			);
 			if(options.sortByMtime) {
 				rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+			} else if(options.sortBySize) {
+				rows.sort(options.reverse ? sizeSorterAsc : sizeSorterDesc);
 			} else {
 				rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
 			}

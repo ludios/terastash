@@ -327,10 +327,11 @@ program
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.option('-j, --just-names', 'Print just the filenames without any decoration')
 	.option('-t, --sort-by-mtime', 'Sort by modification time, newest first') /* newest first to match ls behavior */
+	.option('-S, --sort-by-size', 'Sort by file size, largest first') /* largest first to match ls behavior */
 	.option('-r, --reverse', 'Reverse order while sorting')
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
-		utils.weakFill(options, ['justNames', 'reverse', 'sortByMtime']);
+		utils.weakFill(options, ['justNames', 'reverse', 'sortByMtime', 'sortBySize']);
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
@@ -344,7 +345,8 @@ program
 			name, {
 				justNames: options.justNames,
 				reverse: options.reverse,
-				sortByMtime: options.sortByMtime
+				sortByMtime: options.sortByMtime,
+				sortBySize: options.sortBySize
 			},
 			paths[0]
 		));
