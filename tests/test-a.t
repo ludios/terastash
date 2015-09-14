@@ -167,7 +167,8 @@ Continue
 
 Add a file with size > 4GB to test for Long decoding regression
 
-  $ echo '{"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"zz_over4gb","block_size":65520,"chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"7681243620"},"type":"f","uuid":null,"version":2}}' >> .export
+  $ touch /tmp/mychunks/deterministic-filename-FAKEFAKE # need a file for 'ts drop' to unlink later
+  $ echo '{"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"zz_over4gb","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-FAKEFAKE","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"7717519360"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"7681243620"},"type":"f","uuid":null,"version":2}}' >> .export
 
 Continue
 

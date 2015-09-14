@@ -1830,6 +1830,30 @@ class TransitToInsert extends Transform {
 		T(obj.get('mtime'), Date);
 		T(obj.get('parent'), Buffer);
 		A.eq(obj.get('parent').length, 128/8);
+
+		const cols = [
+			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
+			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
+		const vals = [
+			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
+			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+		let totalChunksSize = 0;
+		for(const k of utils.getMapKeys(obj)) {
+			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
+				if(!this._columnsCreated.has(k)) {
+					yield tryCreateColumnOnStashTable(
+						this._client, this._stashName, k, 'list<frozen<chunk>>');
+					this._columnsCreated.add(k);
+				}
+				const chunksArray = obj.get(k).map(function(v) {
+					totalChunksSize += Number(v.get('size'));
+					return transit.mapToObject(v);
+				});
+				cols.push(k);
+				vals.push(chunksArray);
+			}
+		}
+
 		if(obj.get('type') === 'f') {
 			if(obj.get('crc32c') === null) {
 				if(obj.get('content') !== null) {
@@ -1841,11 +1865,27 @@ class TransitToInsert extends Transform {
 			} else {
 				T(obj.get('crc32c'), Buffer);
 			}
+
+			T(obj.get('size'), cassandra.types.Long);
+			utils.assertSafeNonNegativeLong(obj.get('size'));
+			const size = Number(obj.get('size'));
+
 			if(obj.get('content') === null) {
 				T(obj.get('key'), Buffer);
 				A.eq(obj.get('key').length, 128/8);
+
+				// Check size
+				const sizeOfTags =
+					obj.get('block_size') > 0 ?
+						16 * Math.ceil(size / obj.get('block_size')) :
+						0;
+				const sizeWithTags = size + sizeOfTags;
+				const concealedSize = utils.concealSize(sizeWithTags);
+				A.eq(concealedSize, totalChunksSize);
+			} else {
+				A.eq(size, obj.get('content').length);
 			}
-			T(obj.get('size'), cassandra.types.Long);
+
 			A.eq(obj.get('uuid'), null);
 			T(obj.get('executable'), T.boolean);
 		} else if(obj.get('type') === 'd') {
@@ -1865,28 +1905,7 @@ class TransitToInsert extends Transform {
 			obj.set('version', 2);
 		}
 
-		const cols = [
-			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
-			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
-		const vals = [
-			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
-			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
-		for(const k of utils.getMapKeys(obj)) {
-			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
-				if(!this._columnsCreated.has(k)) {
-					yield tryCreateColumnOnStashTable(
-						this._client, this._stashName, k, 'list<frozen<chunk>>');
-					this._columnsCreated.add(k);
-				}
-				const chunksArray = obj.get(k).map(function(v) {
-					return transit.mapToObject(v);
-				});
-				cols.push(k);
-				vals.push(chunksArray);
-			}
-		}
 		const qMarks = utils.filledArray(cols.length, "?");
-
 		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols)})
 			VALUES (${qMarks.join(", ")});`;

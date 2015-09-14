@@ -55,6 +55,11 @@ function assertSafeNonNegativeInteger(num) {
 	A.lte(num, Number.MAX_SAFE_INTEGER);
 }
 
+function assertSafeNonNegativeLong(long) {
+	A(long.greaterThanOrEqual(0), long);
+	A(long.lessThanOrEqual(Number.MAX_SAFE_INTEGER), long);
+}
+
 function randInt(min, max) {
 	const range = max - min;
 	const rand = Math.floor(Math.random() * (range + 1));
@@ -619,9 +624,9 @@ function* getMapKeys(m) {
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
-	assertSafeNonNegativeInteger, randInt, sameArrayValues,
-	prop, shortISO, pad, commaify, getParentPath, getBaseName, ol,
-	comparator, comparedBy, hasKey, deleteKey,
+	assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
+	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
+	getBaseName, ol, comparator, comparedBy, hasKey, deleteKey,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
