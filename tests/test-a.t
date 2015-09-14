@@ -147,12 +147,12 @@ Continue
   1971-01-01 00:00:00.000000000 +0000
   $ stat -c %y adir/bigfile
   1990-01-01 00:00:00.000000000 +0000
-  $ ts export-db > .export
+  $ ts export-db | sort > .export
   $ cat .export
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"bigfile","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~bZdoBLQ==","size":{"~#Long":"131072"}},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~b62ZSlw==","size":{"~#Long":"131072"}},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~bDyImiQ==","size":{"~#Long":"131072"}},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~brRBZbw==","size":{"~#Long":"131072"}},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~bMKfGxg==","size":{"~#Long":"131072"}},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"131072"}},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~bGCG9VA==","size":{"~#Long":"131072"}},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~bJwFm4A==","size":{"~#Long":"131072"}},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~b3bVTWA==","size":{"~#Long":"16384"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":null,"version":2}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","block_size":null,"chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAAAQ==","version":2}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","block_size":null,"chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crc32c":"~bU49V7A==","executable":false,"key":null,"mtime":"~t1971-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":null,"version":2}}
   {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","block_size":null,"chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crc32c":"~bNos/Jg==","executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":null,"version":2}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"bigfile","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~bZdoBLQ==","size":{"~#Long":"131072"}},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~b62ZSlw==","size":{"~#Long":"131072"}},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~bDyImiQ==","size":{"~#Long":"131072"}},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~brRBZbw==","size":{"~#Long":"131072"}},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~bMKfGxg==","size":{"~#Long":"131072"}},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"131072"}},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~bGCG9VA==","size":{"~#Long":"131072"}},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~bJwFm4A==","size":{"~#Long":"131072"}},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~b3bVTWA==","size":{"~#Long":"16384"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":null,"version":2}}
   $ ts destroy unit_tests_a # destroy before importing the .export we made
   Destroyed keyspace and removed config for unit_tests_a.
 
@@ -164,13 +164,20 @@ Stash is not listed after being destroyed
 Continue
 
   $ ts init unit_tests_a --chunk-store=mychunks
+
+Add a file with size > 4GB to test for Long decoding regression
+
+  $ echo '{"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAQ==","basename":"zz_over4gb","block_size":65520,"chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"7681243620"},"type":"f","uuid":null,"version":2}}' >> .export
+
+Continue
+
   $ ts import-db -n unit_tests_a .export
-  $ ts export-db > .export-again
+  $ ts export-db | sort > .export-again
   $ diff -u .export .export-again # db should be identical after export, destroy, import
   $ ts drop adir # Can't drop a non-empty directory
   Refusing to drop 'adir' because it is a non-empty directory
   [1]
-  $ ts drop sample1 adir/bigfile adir
+  $ ts drop sample1 adir/zz_over4gb adir/bigfile adir
   $ ts ls
                   14 1980-01-01 00:00 sample2*
   $ ls -1F sample2

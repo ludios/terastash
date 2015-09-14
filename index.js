@@ -1752,7 +1752,11 @@ function getTransitReader() {
 	transit = loadNow(transit);
 	if(!transitReader) {
 		transitReader = transit.reader("json-verbose", {handlers: {
-			"Long": function(v) { return new cassandra.types.Long(v); },
+			"Long": function(v) {
+				const long = cassandra.types.Long.fromString(v);
+				A.eq(long.toString(), v);
+				return long;
+			},
 			"Row": function(v) { return v; }
 		}});
 	}

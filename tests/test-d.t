@@ -8,7 +8,7 @@ Setup
   $ ts define-chunk-store mychunks -t localfs -d /tmp/mychunks -s '128*1024'
   $ ts destroy unit_tests_d > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
 
-Can add and drop a file
+Terastash works with -n option
 
   $ mkdir unit_tests_d
   $ cd unit_tests_d
