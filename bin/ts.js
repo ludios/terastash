@@ -58,10 +58,15 @@ utils.weakFill(process.env, [
 	'TERASTASH_UPLOAD_FAIL_RATIO'
 ]);
 
+const ERROR_EXIT_CODE = 255;
+
 /**
  * Attaches a logging .catch to a Promise.  If an error is caught,
- * print it and exit with exit code 1.  Some known errors are handled
- * without printing a stack trace.
+ * print it and exit with exit code 255.  We use 255 because we
+ * frequently use ts with xargs, and 255 is the only error code that
+ * makes xargs stop processing further input.
+ *
+ * Some known errors are handled without printing a stack trace.
  */
 function catchAndLog(p) {
 	T(p, EitherPromise);
@@ -81,7 +86,7 @@ function catchAndLog(p) {
 		} else {
 			console.error(err.stack);
 		}
-		process.exit(1);
+		process.exit(ERROR_EXIT_CODE);
 	});
 }
 
@@ -153,7 +158,7 @@ program
 		}
 		if(options.chunkStore === undefined) {
 			console.error("-c/--chunk-store is required");
-			process.exit(1);
+			process.exit(ERROR_EXIT_CODE);
 		}
 		catchAndLog(terastash.initStash(process.cwd(), name, options));
 	}));
@@ -185,7 +190,7 @@ program
 		const name = stringOrNull(options.name);
 		if(name === null) {
 			console.error("-n/--name is required");
-			process.exit(1);
+			process.exit(ERROR_EXIT_CODE);
 		}
 		catchAndLog(terastash.importDb(getOutputContext(), name, dumpFile));
 	}));
@@ -335,7 +340,7 @@ program
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
-			process.exit(1);
+			process.exit(ERROR_EXIT_CODE);
 		}
 		// When not using -n, and no path given, use '.'
 		if(name === null && !paths.length) {
@@ -364,7 +369,7 @@ program
 		const name = stringOrNull(options.name);
 		if(name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
-			process.exit(1);
+			process.exit(ERROR_EXIT_CODE);
 		}
 		// When not using -n, and no path given, use '.'
 		if(name === null && !paths.length) {
@@ -461,5 +466,5 @@ program.parse(process.argv);
 
 if(!ranCommand) {
 	console.error(chalk.bold(chalk.red(`Unknown command: ${program.args[0]}; see ts help`)));
-	process.exit(1);
+	process.exit(ERROR_EXIT_CODE);
 }
