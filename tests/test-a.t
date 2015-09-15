@@ -12,7 +12,7 @@ Continue
 
   $ ts ls
   File '([^\']+)' is not in a terastash working directory (re)
-  [1]
+  [255]
   $ ts init unit_tests_a --chunk-store=mychunks
 
 Can list stashes
@@ -27,10 +27,10 @@ Continue
   mychunks
   $ ts get not-here
   No entry with parent=00000000000000000000000000000000 and basename='not-here'
-  [1]
+  [255]
   $ ts get dir/not-here
   No entry with parent=00000000000000000000000000000000 and basename='dir'
-  [1]
+  [255]
   $ echo -e "hello\nworld" > sample1
   $ touch --date=1970-01-01 sample1
   $ echo -e "second\nsample" > sample2
@@ -61,12 +61,12 @@ Continue
   $ ts add sample1 sample2 adir/bigfile
   $ ts add sample1 # can't add again
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
-  [1]
+  [255]
   $ ts add -c sample1 # exit code 0
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   $ ts add -d sample1 # still the same, can't replace
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
-  [1]
+  [255]
   $ touch --date=1971-01-01 sample1
   $ ts add -d sample1 # different now, can replace
   Notice: replacing 'sample1' in db
@@ -79,12 +79,12 @@ Continue
   $ touch adir
   $ ts add adir # can't add again
   Cannot add to database: 'adir' in stash 'unit_tests_a' already exists as a directory
-  [1]
+  [255]
   $ rm adir
   $ mv adir.1 adir
   $ ts ls -n unit_tests_a
   When using -n/--name, a database path is required
-  [1]
+  [255]
   $ ts ls
                    0 1995-01-01 00:00 adir/
                   12 1971-01-01 00:00 sample1
@@ -119,7 +119,7 @@ Continue
   sample2
   $ ts cat adir
   Path 'adir' in stash 'unit_tests_a' is not a file
-  [1]
+  [255]
   $ ts cat sample1
   hello
   world
@@ -185,7 +185,7 @@ Continue
   $ diff -u .export .export-again # db should be identical after export, destroy, import
   $ ts drop adir # Can't drop a non-empty directory
   Refusing to drop 'adir' because it is a non-empty directory
-  [1]
+  [255]
   $ ts drop sample1 adir/zz_over4gb adir/bigfile adir
   $ ts ls
                   14 1980-01-01 00:00 sample2*
@@ -218,14 +218,14 @@ Dropping file again throws an error
 
   $ ts drop sample1
   No entry with parent=00000000000000000000000000000000 and basename='sample1'
-  [1]
+  [255]
   $ ts ls
 
 Dropping nonexistent file throws an error
 
   $ ts drop doesntexist
   No entry with parent=00000000000000000000000000000000 and basename='doesntexist'
-  [1]
+  [255]
   $ ts ls
 
 End

@@ -27,15 +27,15 @@ Can create directories
   $ rm a
   $ ts mkdir a # despite failing, this leaves behind an 'a' dir in working dir
   Cannot mkdir in database: 'a' in stash 'unit_tests_c' already exists as a file
-  [1]
+  [255]
   $ touch a/b
   $ ts add a/b
   Cannot mkdir in database: 'a' in stash 'unit_tests_c' already exists as a file
-  [1]
+  [255]
   $ touch c
   $ ts mkdir c
   Cannot mkdir in working directory: 'c' already exists and is not a directory
-  [1]
+  [255]
 
 Can move files to directories
 
@@ -54,14 +54,14 @@ Can move files to directories
   $ ts add f
   $ ts mv f dir
   Cannot mv in database: destination parent=[0-9a-f]{32} basename='f' already exists in stash 'unit_tests_c' (re)
-  [1]
+  [255]
   $ ts drop dir/f
   $ touch dir/b
   $ touch b
   $ ts add b
   $ ts mv b dir
   Cannot mv in working directory: refusing to overwrite .* (re)
-  [1]
+  [255]
   $ mkdir sub1 sub2
   $ touch sub1/x sub2/y
   $ ts add sub1/x sub2/y
@@ -99,7 +99,7 @@ Can shoo files
   $ mv hello hello2
   $ ts add hello2
   Refusing to add file 'hello2' because it has sticky bit set, which may have been set by 'ts shoo'
-  [1]
+  [255]
 
 Can get a fake file
 
@@ -112,13 +112,13 @@ Cannot create files with illegal filenames
   $ touch 'con.c'
   $ ts add con.c
   Some Windows APIs do not support filenames whose non-extension component is 'CON'; got 'con.c'
-  [1]
+  [255]
   $ ts mkdir aux.c
   Some Windows APIs do not support filenames whose non-extension component is 'AUX'; got 'aux.c'
-  [1]
+  [255]
   $ ts mv hello aux.c
   Some Windows APIs do not support filenames whose non-extension component is 'AUX'; got 'aux.c'
-  [1]
+  [255]
 
 End
 
