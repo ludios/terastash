@@ -1854,9 +1854,7 @@ class TransitToInsert extends Transform {
 			obj.set('version', 2);
 		}
 
-		const cols = [
-			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
-			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
+		const extraCols = [];
 		const extraVals = [];
 		let totalChunksSize = 0;
 		for(const k of utils.getMapKeys(obj)) {
@@ -1870,7 +1868,7 @@ class TransitToInsert extends Transform {
 					totalChunksSize += Number(v.get('size'));
 					return transit.mapToObject(v);
 				});
-				cols.push(k);
+				extraCols.push(k);
 				extraVals.push(chunksArray);
 			}
 		}
@@ -1918,13 +1916,16 @@ class TransitToInsert extends Transform {
 			A.eq(obj.get('size'), null);
 		}
 
-		const qMarks = utils.filledArray(cols.length, "?");
-		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
-			(${utils.colsAsString(cols)})
-			VALUES (${qMarks.join(", ")});`;
+		const cols = [
+			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
+			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
 		const vals = [
 			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
 			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+		const qMarks = utils.filledArray(cols.length + extraCols.length, "?");
+		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
+			(${utils.colsAsString(cols.concat(extraCols))})
+			VALUES (${qMarks.join(", ")});`;
 		yield runQuery(this._client, query, vals.concat(extraVals));
 		return obj;
 	}
