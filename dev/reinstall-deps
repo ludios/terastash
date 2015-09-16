@@ -14,6 +14,8 @@ rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.mi
 rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.map
 rm -rf node_modules/eslint/node_modules/handlebars/dist
 rm -f  node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/node_modules/google-p12-pem/node_modules/node-forge/nodejs/ui/test.min.js
+rm -f  node_modules/cassandra-driver/build.yaml
+rm -rf node_modules/request/node_modules/qs/dist
 # Web bundles
 rm -f  node_modules/mocha/mocha.js
 rm -rf node_modules/bluebird/js/browser

@@ -1,9 +1,19 @@
 /**
  * @fileoverview A rule to choose between single and double quote marks
  * @author Matt DuVall <http://www.mattduvall.com/>, Brandon Payton
+ * @copyright 2013 Matt DuVall. All rights reserved.
+ * See LICENSE file in root directory for full license.
  */
 
 "use strict";
+
+//------------------------------------------------------------------------------
+// Requirements
+//------------------------------------------------------------------------------
+
+var astUtils = require("../ast-utils"),
+    toSingleQuotes = require("to-single-quotes"),
+    toDoubleQuotes = require("to-double-quotes");
 
 //------------------------------------------------------------------------------
 // Constants
@@ -13,41 +23,37 @@ var QUOTE_SETTINGS = {
     "double": {
         quote: "\"",
         alternateQuote: "'",
-        description: "doublequote"
+        description: "doublequote",
+        convert: function(str) {
+            return toDoubleQuotes(str);
+        }
     },
     "single": {
         quote: "'",
         alternateQuote: "\"",
-        description: "singlequote"
+        description: "singlequote",
+        convert: function(str) {
+            return toSingleQuotes(str);
+        }
     },
     "backtick": {
         quote: "`",
         alternateQuote: "\"",
-        description: "backtick"
+        description: "backtick",
+        convert: function(str) {
+            return str.replace(/`/g, "\`").replace(/^(?:\\*)["']|(?:\\*)["']$/g, "`");
+        }
     }
 };
 
-var AVOID_ESCAPE = "avoid-escape";
-
-var FUNCTION_TYPE = /^(?:Arrow)?Function(?:Declaration|Expression)$/;
+var AVOID_ESCAPE = "avoid-escape",
+    FUNCTION_TYPE = /^(?:Arrow)?Function(?:Declaration|Expression)$/;
 
 //------------------------------------------------------------------------------
 // Rule Definition
 //------------------------------------------------------------------------------
 
 module.exports = function(context) {
-
-    /**
-     * Validate that a string passed in is surrounded by the specified character
-     * @param  {string} val The text to check.
-     * @param  {string} character The character to see if it's surrounded by.
-     * @returns {boolean} True if the text is surrounded by the character, false if not.
-     * @private
-     */
-    function isSurroundedBy(val, character) {
-        return val[0] === character && val[val.length - 1] === character;
-    }
-
     /**
      * Determines if a given node is part of JSX syntax.
      * @param {ASTNode} node The node to check.
@@ -142,14 +148,20 @@ module.exports = function(context) {
                 isValid;
 
             if (settings && typeof val === "string") {
-                isValid = (quoteOption === "backtick" && isAllowedAsNonBacktick(node)) || isJSXElement(node.parent) || isSurroundedBy(rawVal, settings.quote);
+                isValid = (quoteOption === "backtick" && isAllowedAsNonBacktick(node)) || isJSXElement(node.parent) || astUtils.isSurroundedBy(rawVal, settings.quote);
 
                 if (!isValid && avoidEscape) {
-                    isValid = isSurroundedBy(rawVal, settings.alternateQuote) && rawVal.indexOf(settings.quote) >= 0;
+                    isValid = astUtils.isSurroundedBy(rawVal, settings.alternateQuote) && rawVal.indexOf(settings.quote) >= 0;
                 }
 
                 if (!isValid) {
-                    context.report(node, "Strings must use " + settings.description + ".");
+                    context.report({
+                        node: node,
+                        message: "Strings must use " + settings.description + ".",
+                        fix: function(fixer) {
+                            return fixer.replaceText(node, settings.convert(node.raw));
+                        }
+                    });
                 }
             }
         }

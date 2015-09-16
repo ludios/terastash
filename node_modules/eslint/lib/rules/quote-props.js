@@ -123,7 +123,7 @@ module.exports = function(context) {
             var key = property.key,
                 tokens;
 
-            if (property.method || property.computed || property.shorthand) {
+            if (!key || property.method || property.computed || property.shorthand) {
                 return;
             }
 
@@ -141,6 +141,9 @@ module.exports = function(context) {
 
                     necessaryQuotes = necessaryQuotes || !areQuotesRedundant(tokens) || KEYWORDS && isKeyword(tokens[0].value);
                 }
+            } else if (KEYWORDS && checkQuotesRedundancy && key.type === "Identifier" && isKeyword(key.name)) {
+                necessaryQuotes = true;
+                context.report(node, "Properties should be quoted as `{{property}}` is a reserved word.", {property: key.name});
             } else {
                 lackOfQuotes = true;
             }
