@@ -89,7 +89,18 @@ function getNewClient() {
 		contactPoints: [getContactPoint()],
 		policies: {
 			retry: new CustomRetryPolicy(),
-			/* Use a policy that doesn't give up when we reach the last host */
+			/**
+			 * Use a load balancing policy that doesn't give up when we reach the
+			 * last host.  If we don't do this, ts export-db will fail most of the
+			 * time on a large database with:
+			 *
+			 *   Error: All host(s) tried for query failed. First host tried,
+			 *   127.0.0.1:9042: ResponseError: Operation timed out -
+			 *   received only 0 responses.. See innerErrors.
+			 *
+			 * The error itself is thrown by RequestHandler.prototype.send
+			 * near line "//No connection available".
+			 */
 			loadBalancing: new AlwaysLocalPolicy()
 		},
 		socketOptions: {
