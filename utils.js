@@ -602,25 +602,6 @@ function splitBuffer(buf, blockSize) {
 	}
 }
 
-const MapLikeType = T.shape({'get': T.function, 'set': T.function, 'keys': T.function});
-
-/**
- * Yield the keys of either an ES6 Map or a TransitMap.
- * https://github.com/cognitect/transit-js/issues/34
- */
-function* getMapKeys(m) {
-	T(m, MapLikeType);
-	const keys = m.keys();
-	let k;
-	while(true) {
-		k = keys.next();
-		if(k.value === null || k.value === undefined) {
-			break;
-		}
-		yield k.value;
-	}
-}
-
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -633,6 +614,5 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer,
-	getMapKeys
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer
 };

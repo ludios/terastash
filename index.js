@@ -1887,7 +1887,7 @@ class TransitToInsert extends Transform {
 		const extraCols = [];
 		const extraVals = [];
 		let totalChunksSize = 0;
-		for(const k of utils.getMapKeys(obj)) {
+		for(const k of obj.keys()) {
 			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
 				if(!this._columnsCreated.has(k)) {
 					yield tryCreateColumnOnStashTable(
