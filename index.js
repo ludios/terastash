@@ -23,6 +23,7 @@ const getProp = utils.getProp;
 const filename = require('./filename');
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
+const LoadBalancingPolicy = require('cassandra-driver/lib/policies/load-balancing').LoadBalancingPolicy;
 const deepEqual = require('deep-equal');
 const Table = require('cli-table');
 const Combine = require('combine-streams');
@@ -66,12 +67,30 @@ class CustomRetryPolicy extends RetryPolicy {
 	}
 }
 
+class AlwaysLocalPolicy extends LoadBalancingPolicy {
+	newQueryPlan(keyspace, queryOptions, callback) {
+		const hosts = this.hosts.values();
+		callback(null, {next: function() {
+			return {
+				value: hosts[0],
+				done: false
+			};
+		}});
+	}
+}
+
+function getContactPoint() {
+	return getProp(process.env, 'TERASTASH_CASSANDRA_HOST', '127.0.0.1');
+}
+
 function getNewClient() {
 	cassandra = loadNow(cassandra);
 	return new cassandra.Client({
-		contactPoints: [getProp(process.env, 'TERASTASH_CASSANDRA_HOST', '127.0.0.1')],
+		contactPoints: [getContactPoint()],
 		policies: {
-			retry: new CustomRetryPolicy()
+			retry: new CustomRetryPolicy(),
+			/* Use a policy that doesn't give up when we reach the last host */
+			loadBalancing: new AlwaysLocalPolicy()
 		},
 		socketOptions: {
 			/* Disable the read timeout (default 12000ms) because
