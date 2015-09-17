@@ -67,7 +67,7 @@ class CustomRetryPolicy extends RetryPolicy {
 	}
 }
 
-class AlwaysLocalPolicy extends LoadBalancingPolicy {
+class RepeatHostPolicy extends LoadBalancingPolicy {
 	newQueryPlan(keyspace, queryOptions, callback) {
 		const hosts = this.hosts.values();
 		callback(null, {next: function() {
@@ -101,7 +101,7 @@ function getNewClient() {
 			 * The error itself is thrown by RequestHandler.prototype.send
 			 * near line "//No connection available".
 			 */
-			loadBalancing: new AlwaysLocalPolicy()
+			loadBalancing: new RepeatHostPolicy()
 		},
 		socketOptions: {
 			/* Disable the read timeout (default 12000ms) because
