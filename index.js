@@ -1880,20 +1880,21 @@ function getTransitReader() {
 }
 
 class RowToTransit extends Transform {
-	constructor(options) {
-		super(options);
+	constructor() {
+		super({objectMode: true});
 		this.transitWriter = getTransitWriter();
 	}
 
 	_transform(row, encoding, callback) {
 		let s;
 		try {
-			s = this.transitWriter.write(row) + "\n";
+			this.push(this.transitWriter.write(row));
+			this.push("\n");
 		} catch(err) {
 			callback(err);
 			return;
 		}
-		callback(null, s);
+		callback();
 	}
 }
 
@@ -1907,7 +1908,7 @@ function exportDb(stashName) {
 			yield new Promise(function(resolve, reject) {
 				const rowStream = client.stream(
 					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true});
-				const transitStream = new RowToTransit({objectMode: true});
+				const transitStream = new RowToTransit();
 				utils.pipeWithErrors(rowStream, transitStream);
 				utils.pipeWithErrors(transitStream, process.stdout);
 				transitStream.once('end', resolve);
