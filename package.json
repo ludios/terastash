@@ -22,6 +22,7 @@
     "commander": "^2.8.1",
     "deep-equal": "^1.0.1",
     "googleapis": "^2.1.3",
+    "heapdump": "^0.3.7",
     "lodash.noop": "^3.0.0",
     "mkdirp": "^0.5.1",
     "notmytype": "^1.2.3",

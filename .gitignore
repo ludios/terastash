@@ -1,5 +1,5 @@
 /node_modules/sse4_crc32/build
-/node_modules/buffertools/build
+/node_modules/heapdump/build
 /.terastash.json
 /tests/*.err
 /trash
