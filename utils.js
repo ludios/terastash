@@ -389,6 +389,14 @@ function evalMultiplications(s) {
 	}
 }
 
+function dateNow() {
+	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+		return new Date(1970);
+	} else {
+		return new Date();
+	}
+}
+
 let filenameCounter = 0;
 function makeChunkFilename() {
 	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
@@ -609,7 +617,7 @@ module.exports = {
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
 	getBaseName, ol, comparator, comparedBy, hasKey, deleteKey,
 
-	writeObjectToConfigFile, readObjectFromConfigFile, clone,
+	writeObjectToConfigFile, readObjectFromConfigFile, clone, dateNow,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
 	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,

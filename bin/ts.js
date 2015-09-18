@@ -133,7 +133,7 @@ function getOutputContext() {
 }
 
 program
-	.version(require('../package.json').version);
+	.version(terastash.TERASTASH_VERSION);
 
 program
 	.command('init <name>')
@@ -293,6 +293,17 @@ program
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
 		catchAndLog(terastash.dropFiles(name, files));
+	}));
+
+program
+	.command('info <file...>')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
+	.description(d(`
+		For each file, dump its database information in JSON format to stdout`))
+	.action(a(function(files, options) {
+		T(files, T.list(T.string), options, T.object);
+		const name = stringOrNull(options.name);
+		catchAndLog(terastash.infoFiles(name, files));
 	}));
 
 program

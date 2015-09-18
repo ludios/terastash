@@ -23,7 +23,7 @@ Terastash works with -n option
   $ cat x
   hi
   $ ts export-db -n unit_tests_d
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","block_size":null,"chunks_in_mychunks":null,"content":"~baGkK","crc32c":"~bG9ywgw==","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":null,"version":2}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"x","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":"~baGkK","crc32c":"~bG9ywgw==","executable":false,"key":null,"mtime":"~t2015-01-01T00:00:00.000Z","size":{"~#Long":"3"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAAAQ==","version":3}}
   $ ts drop -n unit_tests_d x
   $ ts export-db -n unit_tests_d
   $ ts mkdir -n unit_tests_d sub dir

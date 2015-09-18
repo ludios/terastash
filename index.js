@@ -13,6 +13,7 @@ const inspect = require('util').inspect;
 const streamifier = require('streamifier');
 const noop = require('lodash.noop');
 const Transform = require('stream').Transform;
+const os = require('os');
 
 const utils = require('./utils');
 const commaify = utils.commaify;
@@ -46,6 +47,27 @@ let line_reader = new LazyModule('./line_reader');
 let work_stealer = new LazyModule('./work_stealer');
 let random_stream = new LazyModule('./random_stream');
 let transit = new LazyModule('transit-js');
+
+let TERASTASH_VERSION;
+let HOSTNAME;
+let USERNAME;
+if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	TERASTASH_VERSION = 'test-version';
+	HOSTNAME = 'test-hostname';
+	USERNAME = 'test-username';
+} else {
+	TERASTASH_VERSION =
+		require('./package.json').version +
+		'D' + fs.readFileSync(__dirname + '/date-version').toString('utf-8').trim();
+	// TODO: will need to be re-initialized after V8 snapshot
+	HOSTNAME = os.hostname();
+	USERNAME =
+		getProp(process.env, 'USER') ? // Linux, OS X
+			process.env.USER :
+			getProp(process.env, 'USERNAME'); // Windows
+}
+T(HOSTNAME, T.string);
+T(USERNAME, T.string);
 
 const KEYSPACE_PREFIX = "ts_";
 
@@ -570,8 +592,8 @@ class PathAlreadyExistsError extends Error {
 }
 
 const MIN_SUPPORTED_VERSION = 2;
-const MAX_SUPPORTED_VERSION = 2;
-const CURRENT_VERSION = 2;
+const MAX_SUPPORTED_VERSION = 3;
+const CURRENT_VERSION = 3;
 
 function checkDbPath(dbPath) {
 	T(dbPath, T.string);
@@ -586,7 +608,8 @@ let makeDirsInDb;
 makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	checkDbPath(dbPath);
-	let mtime = new Date();
+	// If directory does not exist on host fs, we'll use the current time.
+	let mtime = utils.dateNow();
 	try {
 		mtime = (yield fs.statAsync(p)).mtime;
 	} catch(err) {
@@ -602,11 +625,12 @@ makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, 
 	if(typeInDb === MISSING) {
 		const parentUuid = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 		const uuid = makeUuid();
+		const added_time = utils.dateNow();
 		yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
-			(basename, parent, uuid, type, mtime, version) VALUES (?, ?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime, CURRENT_VERSION]
+			(basename, parent, uuid, type, mtime, version, added_time, added_user, added_host, added_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime, CURRENT_VERSION, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION]
 		);
 	} else if(typeInDb === FILE) {
 		throw new PathAlreadyExistsError(
@@ -802,6 +826,39 @@ const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, siz
 	yield fs.chmodAsync(p, withSticky);
 });
 
+const infoFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
+	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+	const row = yield getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
+	if(row.size !== null) {
+		utils.assertSafeNonNegativeLong(row.size);
+		row.size = Number(row.size);
+	}
+	for(const k of Object.keys(row)) {
+		if(row[k] instanceof Buffer) {
+			row[k] = row[k].toString('hex');
+		}
+		if(k.startsWith('chunks_in') && row[k]) {
+			for(const chunkInfo of row[k]) {
+				chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
+				utils.assertSafeNonNegativeLong(chunkInfo.size);
+				chunkInfo.size = Number(chunkInfo.size);
+			}
+		}
+	}
+	console.log(JSON.stringify(row, null, 2));
+});
+
+function infoFiles(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+	return doWithClient(getNewClient(), Promise.coroutine(function* infoFiles$coro(client) {
+		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+		for(const p of paths) {
+			yield infoFile(client, stashInfo, p);
+		}
+	}));
+}
+
 const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
@@ -945,6 +1002,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	let chunkInfo;
 	let size;
 	const version = CURRENT_VERSION;
+	const uuid = makeUuid();
 	// For file stored in chunk store, whole-file crc32c is not available.
 	let crc32c = null;
 	let key = null;
@@ -1085,12 +1143,15 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		}
 		// TODO: make makeDirsInDb return uuid so that we don't have to get it again
 		const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
+		const added_time = utils.dateNow();
 		return yield runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
-			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size, crc32c, mtime, executable, version, block_size)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size, crc32c, mtime, executable, version, block_size]
+			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size,
+			crc32c, mtime, executable, version, block_size, uuid, added_time, added_user, added_host, added_version)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size,
+			crc32c, mtime, executable, version, block_size, uuid, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION]
 		);
 	});
 
@@ -1751,6 +1812,10 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			executable boolean,
 			version int,
 			block_size int,
+			added_time timestamp,
+			added_user text,
+			added_host text,
+			added_version text,
 			PRIMARY KEY (parent, basename)
 		);`);
 		// The above PRIMARY KEY lets us select on both parent and (parent, basename)
@@ -1884,6 +1949,27 @@ class TransitToInsert extends Transform {
 			obj.set('version', 2);
 		}
 
+		if(obj.get('version') === 2) {
+			// Pre-version 3 rows don't have uuid for files, so we must add one.
+			A.eq(obj.get('uuid'), null);
+			obj.set('uuid', makeUuid());
+
+			// Pre-version 3 rows don't have added_ information, so add it now,
+			// as if it were added by the current user on the current host.
+			obj.set('added_time', utils.dateNow());
+			obj.set('added_user', USERNAME);
+			obj.set('added_host', HOSTNAME);
+			obj.set('added_version', TERASTASH_VERSION);
+			obj.set('version', 3);
+		}
+
+		T(obj.get('added_time'), Date);
+		T(obj.get('added_user'), T.string);
+		T(obj.get('added_host'), T.string);
+		T(obj.get('added_version'), T.string);
+		T(obj.get('uuid'), Buffer);
+		A.eq(obj.get('uuid').length, 128/8);
+
 		const extraCols = [];
 		const extraVals = [];
 		let totalChunksSize = 0;
@@ -1934,12 +2020,8 @@ class TransitToInsert extends Transform {
 			} else {
 				A.eq(size, obj.get('content').length);
 			}
-
-			A.eq(obj.get('uuid'), null);
 			T(obj.get('executable'), T.boolean);
 		} else if(obj.get('type') === 'd') {
-			T(obj.get('uuid'), Buffer);
-			A.eq(obj.get('uuid').length, 128/8);
 			A.eq(obj.get('content'), null);
 			A.eq(obj.get('executable'), null);
 			A.eq(obj.get('crc32c'), null);
@@ -1948,10 +2030,12 @@ class TransitToInsert extends Transform {
 
 		const cols = [
 			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
-			'crc32c', 'mtime', 'executable', 'version', 'block_size'];
+			'crc32c', 'mtime', 'executable', 'version', 'block_size',
+			'added_time', 'added_user', 'added_host', 'added_version'];
 		const vals = [
 			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
-			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size')];
+			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size'),
+			obj.get('added_time'), obj.get('added_user'), obj.get('added_host'), obj.get('added_version')];
 		const qMarks = utils.filledArray(cols.length + extraCols.length, "?");
 		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols.concat(extraCols))})
@@ -2033,11 +2117,12 @@ function importDb(outCtx, stashName, dumpFile) {
 }
 
 module.exports = {
+	TERASTASH_VERSION,
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath,
-	KEYSPACE_PREFIX, exportDb, importDb,
+	infoFile, infoFiles, KEYSPACE_PREFIX, exportDb, importDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
