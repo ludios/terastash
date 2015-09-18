@@ -1842,8 +1842,7 @@ function getTransitWriter() {
 	transit = loadNow(transit);
 	if(!transitWriter) {
 		transitWriter = transit.writer("json-verbose", {
-			/* Don't need a cache because we're using json-verbose; also,
-			 * caching all our Buffers causes a multi-GB memory leak. */
+			/* Don't need a cache because we're using json-verbose */
 			cache: false,
 			handlers: transit.map([
 				cassandra.types.Row,
