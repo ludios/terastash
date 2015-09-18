@@ -1841,18 +1841,24 @@ function getTransitWriter() {
 	cassandra = loadNow(cassandra);
 	transit = loadNow(transit);
 	if(!transitWriter) {
-		transitWriter = transit.writer("json-verbose", {handlers: transit.map([
-			cassandra.types.Row,
-			transit.makeWriteHandler({
-				tag: function() { return "Row"; },
-				rep: function(v) { return Object.assign({}, v); }
-			}),
-			cassandra.types.Long,
-			transit.makeWriteHandler({
-				tag: function() { return "Long"; },
-				rep: function(v) { return String(v); }
-			})
-		])});
+		transitWriter = transit.writer("json-verbose", {
+			/* Don't need a cache because we're using json-verbose; also,
+			 * caching all our Buffers causes a multi-GB memory leak. */
+			cache: false,
+			handlers: transit.map([
+				cassandra.types.Row,
+				transit.makeWriteHandler({
+					tag: function() { return "Row"; },
+					rep: function(v) { return Object.assign({}, v); }
+				}),
+				cassandra.types.Long,
+				transit.makeWriteHandler({
+					tag: function() { return "Long"; },
+					rep: function(v) { return String(v); }
+				})
+			])
+		});
+		A.eq(transitWriter.cache, null);
 	}
 	return transitWriter;
 }
