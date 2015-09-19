@@ -841,7 +841,12 @@ const infoFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 		}
 		if(k.startsWith('chunks_in') && row[k]) {
 			for(const chunkInfo of row[k]) {
-				chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
+				if(utils.hasKey(chunkInfo, 'crc32c')) {
+					chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
+				}
+				if(utils.hasKey(chunkInfo, 'md5')) {
+					chunkInfo.md5 = chunkInfo.md5.toString('hex');
+				}
 				utils.assertSafeNonNegativeLong(chunkInfo.size);
 				chunkInfo.size = Number(chunkInfo.size);
 			}
