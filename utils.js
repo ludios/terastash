@@ -610,6 +610,78 @@ function splitBuffer(buf, blockSize) {
 	}
 }
 
+
+/**
+ * Like Python's s.split(delim, num) and s.split(delim)
+ * This does *NOT* implement Python's no-argument s.split()
+ *
+ * @param {string} s The string to split.
+ * @param {string} sep The separator to split by.
+ * @param {number} maxsplit Maximum number of times to split.
+ *
+ * @return {!Array.<string>} The splitted string, as an array.
+ */
+function splitString(s, sep, ...args) {
+	const [maxsplit] = args;
+	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
+	if(maxsplit === undefined || maxsplit < 0) {
+		return s.split(sep);
+	}
+	const pieces = s.split(sep);
+	const head = pieces.splice(0, maxsplit);
+	// after the splice, pieces is shorter and no longer has the `head` elements.
+	if(pieces.length > 0) {
+		const tail = pieces.join(sep);
+		head.push(tail); // no longer just the head.
+	}
+	return head;
+}
+
+/**
+ * Like Python's s.rsplit(delim, num) and s.rsplit(delim)
+ * This does *NOT* implement Python's no-argument s.rsplit()
+ *
+ * @param {string} s The string to rsplit.
+ * @param {string} sep The separator to rsplit by.
+ * @param {number} maxsplit Maximum number of times to rsplit.
+ *
+ * @return {!Array.<string>} The rsplitted string, as an array.
+ */
+function rsplitString(s, sep, ...args) {
+	const [maxsplit] = args;
+	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
+	if(maxsplit === undefined || maxsplit < 0) {
+		return s.split(sep);
+	}
+	const pieces = s.split(sep);
+	const tail = pieces.splice(pieces.length - maxsplit, pieces.length);
+	// after the splice, pieces is shorter and no longer has the C{tail} elements.
+	if(pieces.length > 0) {
+		const head = pieces.join(sep);
+		tail.splice(0, 0, head); // no longer just the tail.
+	}
+	return tail;
+}
+
+const RangeType = T.tuple([T.number, T.number]);
+
+function checkRange(range) {
+	T(range, RangeType);
+	A.lt(range[0], range[1]);
+}
+
+function intersect(range1, range2) {
+	checkRange(range1);
+	checkRange(range2);
+	// Range is the max of the beginnings to the min of the ends
+	const start = Math.max(range1[0], range2[0]);
+	const end = Math.min(range1[1], range2[1]);
+	if(!(start < end)) {
+		return null;
+	}
+	return [start, end];
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -622,5 +694,6 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer,
+	splitString, rsplitString, RangeType, intersect
 };

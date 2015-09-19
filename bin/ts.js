@@ -279,6 +279,20 @@ program
 	}));
 
 program
+	.command('cat-ranges <fileSlashRange...>')
+	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
+	.description(d(`
+		Dump the contents of the specified range of each file in the database to stdout.
+
+		For each argument, specify filename/start-end where start is the first byte
+		(inclusive) and end is the last byte (exclusive).`))
+	.action(a(function(args, options) {
+		T(args, T.list(T.string), options, T.object);
+		const name = stringOrNull(options.name);
+		catchAndLog(terastash.catRangedFiles(name, args));
+	}));
+
+program
 	.command('drop <file...>')
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
 	.description(d(`

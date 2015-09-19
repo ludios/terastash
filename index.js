@@ -1243,8 +1243,14 @@ function validateChunks(chunks) {
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
-const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, dbPath) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, dbPath, ...args) {
+	const [ranges] = args;
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
+	if(ranges) {
+		A.eq(ranges.length, 1, "Only support 1 range right now");
+		utils.assertSafeNonNegativeInteger(ranges[0][0]);
+		utils.assertSafeNonNegativeInteger(ranges[0][1]);
+	}
 	// TODO: instead of checking just this one stash, check all stashes
 	const storeName = stashInfo.chunkStore;
 	if(!storeName) {
@@ -1352,7 +1358,11 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 	}
 	dataStream.once('end', function streamFile$end() {
-		if(bytesRead !== Number(row.size)) {
+		const expectedBytesRead =
+			ranges ?
+				ranges[0][1] - ranges[0][0] :
+				Number(row.size);
+		if(bytesRead !== expectedBytesRead) {
 			dataStream.emit('error', new Error(
 				`For dbPath=${inspect(dbPath)}, expected length of content to be\n` +
 				`${commaify(row.size)} but was\n` +
@@ -1424,9 +1434,10 @@ function getFiles(stashName, paths, fake) {
 	}));
 }
 
-const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
-	const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
+const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath, ...args) {
+	const [ranges] = args;
+	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
+	const [row, readStream] = yield streamFile(client, stashInfo, dbPath, ranges);
 	utils.pipeWithErrors(readStream, process.stdout);
 	yield new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
@@ -1441,6 +1452,25 @@ function catFiles(stashName, paths) {
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			yield catFile(client, stashInfo, dbPath);
+		}
+	}));
+}
+
+function catRangedFiles(stashName, args) {
+	T(stashName, T.maybe(T.string), args, T.list(T.string));
+	return doWithClient(getNewClient(), Promise.coroutine(function* catFiles$coro(client) {
+		const paths = args.map(function(s) { return utils.rsplitString(s, "/", 1)[0]; });
+		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+		for(const a of args) {
+			const [p, range] = utils.rsplitString(a, "/", 1);
+			let [start, end] = utils.splitString(range, "-", 1);
+			start = Number(start);
+			end = Number(end);
+			utils.assertSafeNonNegativeInteger(start);
+			utils.assertSafeNonNegativeInteger(end);
+			const ranges = [[start, end]];
+			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
+			yield catFile(client, stashInfo, dbPath, ranges);
 		}
 	}));
 }
@@ -1886,7 +1916,6 @@ class RowToTransit extends Transform {
 	}
 
 	_transform(row, encoding, callback) {
-		let s;
 		try {
 			this.push(this.transitWriter.write(row));
 			this.push("\n");
