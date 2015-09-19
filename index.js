@@ -1988,9 +1988,13 @@ class TransitToInsert extends Transform {
 		}
 
 		if(obj.get('version') === 2) {
-			// Pre-version 3 rows don't have uuid for files, so we must add one.
-			A.eq(obj.get('uuid'), null);
-			obj.set('uuid', makeUuid());
+			if(obj.get('type') === 'f') {
+				// Pre-version 3 rows don't have uuid for files, so we must add one.
+				A.eq(obj.get('uuid'), null);
+				obj.set('uuid', makeUuid());
+			} else if(obj.get('type') === 'd') {
+				T(obj.get('uuid'), Buffer);
+			}
 
 			// Pre-version 3 rows don't have added_ information, so add it now,
 			// as if it were added by the current user on the current host.
