@@ -416,7 +416,7 @@ const ChunksType = T.list(
 		"idx": T.number,
 		"file_id": T.string,
 		"crc32c": Buffer,
-		"size": T.object /* Long */
+		"size": T.number
 	})
 );
 
@@ -664,9 +664,12 @@ function rsplitString(s, sep, ...args) {
 }
 
 const RangeType = T.tuple([T.number, T.number]);
+const RangesType = T.list(RangeType);
 
 function checkRange(range) {
 	T(range, RangeType);
+	assertSafeNonNegativeInteger(range[0]);
+	assertSafeNonNegativeInteger(range[1]);
 	A.lt(range[0], range[1]);
 }
 
@@ -682,6 +685,18 @@ function intersect(range1, range2) {
 	return [start, end];
 }
 
+function* zip(...iterables) {
+	T(iterables, T.list(T.any));
+	if(!iterables.length) {
+		return;
+	}
+	iterables = iterables.map(iterable => iterable[Symbol.iterator]());
+	const rest = iterables.slice(1);
+	for(const item of iterables[0]) {
+		yield [item].concat(rest.map(iterable => iterable.next().value));
+	}
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -695,5 +710,5 @@ module.exports = {
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
 	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer,
-	splitString, rsplitString, RangeType, intersect
+	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip
 };

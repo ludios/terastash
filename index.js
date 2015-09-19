@@ -777,7 +777,7 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 		[parentUuid, utils.getBaseName(dbPath)]
 	);
 	if(chunks !== null) {
-		validateChunks(chunks);
+		validateChunksFixBigints(chunks);
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
 			yield localfs.deleteChunks(chunkStore.directory, chunks);
@@ -917,16 +917,17 @@ function shooFiles(paths, ...args) {
 	}));
 }
 
+const GCM_TAG_SIZE = 16;
 // Does *not* include the length of the GCM tag itself
-const DEFAULT_GCM_BLOCK_SIZE = (64 * 1024) - 16;
+const DEFAULT_GCM_BLOCK_SIZE = (64 * 1024) - GCM_TAG_SIZE;
 
 function checkChunkSize(size) {
 	T(size, T.number);
 	// (GCM block size + GCM tag length) must be a multiple of chunkSize, for
 	// implementation convenience.
-	if(size % (DEFAULT_GCM_BLOCK_SIZE + 16) !== 0) {
+	if(size % (DEFAULT_GCM_BLOCK_SIZE + GCM_TAG_SIZE) !== 0) {
 		throw new Error(`Chunk size must be a multiple of ` +
-			`${DEFAULT_GCM_BLOCK_SIZE + 16}; got ${size}`);
+			`${DEFAULT_GCM_BLOCK_SIZE + GCM_TAG_SIZE}; got ${size}`);
 	}
 }
 
@@ -1027,7 +1028,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 		checkChunkSize(chunkStore.chunkSize);
 
-		const sizeOfTags = 16 * Math.ceil(stat.size / block_size);
+		const sizeOfTags = GCM_TAG_SIZE * Math.ceil(stat.size / block_size);
 		const sizeWithTags = stat.size + sizeOfTags;
 		utils.assertSafeNonNegativeInteger(sizeWithTags);
 
@@ -1037,7 +1038,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 		// Note: a 1GB chunk has less than 1GB of data because of the GCM tags
 		// every 8176 bytes.
-		const dataBytesPerChunk = chunkStore.chunkSize * (block_size / (block_size + 16));
+		const dataBytesPerChunk = chunkStore.chunkSize * (block_size / (block_size + GCM_TAG_SIZE));
 		utils.assertSafeNonNegativeInteger(dataBytesPerChunk);
 		let startData = -dataBytesPerChunk;
 		let startChunk = -chunkStore.chunkSize;
@@ -1238,13 +1239,39 @@ function addFiles(outCtx, paths, ...args) {
 	}));
 }
 
-function validateChunks(chunks) {
-	T(chunks, utils.ChunksType);
+function validateChunksFixBigints(chunks) {
+	T(chunks, T.list(T.shape({size: T.object, idx: T.number})));
 	let expectIdx = 0;
 	for(const chunk of chunks) {
+		utils.assertSafeNonNegativeLong(chunk.size);
+		chunk.size = Number(chunk.size);
 		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
 		expectIdx += 1;
 	}
+}
+
+/**
+ * For an array of chunkInfos, return a [[start1, end1], ...]
+ * Where start1 (inclusive) and end1 (exclusive) indicate
+ * block-indexed chunk boundaries.
+ */
+function chunksToBlockRanges(chunks, blockSize) {
+	T(chunks, utils.ChunksType, blockSize, T.number);
+	utils.assertSafeNonNegativeInteger(blockSize);
+	const blockRanges = [];
+	let start = 0;
+	for(const c of chunks) {
+		const scaledSize = c.size / blockSize;
+		utils.assertSafeNonNegativeInteger(scaledSize);
+		blockRanges.push([start, start + scaledSize]);
+		start += scaledSize;
+	}
+	return blockRanges;
+}
+
+function normalizeRangeTo0(range) {
+	T(range, utils.RangeType);
+	return [0, range[1] - range[0]];
 }
 
 /**
@@ -1298,36 +1325,71 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	let bytesRead = 0;
 	let dataStream;
 	if(chunks !== null) {
-		validateChunks(chunks);
+		validateChunksFixBigints(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
 		utils.assertSafeNonNegativeInteger(row.block_size);
 		// To save CPU time, we check whole-chunk CRC32C's only for chunks
 		// that don't have embedded authentication tags.
 		const checkWholeChunkCRC32C = (row.block_size === 0);
+
+		let wantedChunks;
+		let wantedRanges;
+		// User requested a range, so we have to determine which chunks we actually
+		// need to read and also carefully map the range to read on AES-128-CTR
+		// or AES-128-GCM boundaries.
+		if(ranges) {
+			wantedChunks = [];
+			wantedRanges = [];
+			aes = loadNow(aes);
+			// block_size > 0 uses AES-128-GCM, block size == 0 uses AES-128-CTR with no
+			// authentication tags or in-stream checksums.
+			//
+			// For AES-128-CTR, we'll unnecessarily read from the chunk store up to 15
+			// bytes before and 15 bytes ahead, but that's totally okay.
+			// For AES-128-GCM, we *have* to "unnecessarily" read up to block_size-1
+			// bytes before and ahead because we must verify the GCM tags.
+			const readBlockSize =
+				row.block_size > 0 ?
+					(row.block_size + GCM_TAG_SIZE) :
+					aes.BLOCK_SIZE;
+			const scaledChunkRanges = chunksToBlockRanges(chunks, readBlockSize);
+			const scaledRequestedRange = [Math.floor(ranges[0][0]), Math.ceil(ranges[0][1])];
+			scaledChunkRanges.map(function(scaledChunkRange, idx) {
+				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
+				if(intersection !== null) {
+					wantedChunks.push(chunks[idx]);
+					wantedRanges.push(normalizeRangeTo0(
+						[intersection[0] * readBlockSize, intersection[1] * readBlockSize]));
+				}
+			});
+		} else {
+			wantedChunks = chunks;
+			wantedRanges = chunks.map(chunk => [0, chunk.size]);
+		}
+		A.eq(wantedChunks.length, wantedRanges.length);
+
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
 			const chunksDir = chunkStore.directory;
-			cipherStream = localfs.readChunks(chunksDir, chunks, checkWholeChunkCRC32C);
+			cipherStream = localfs.readChunks(chunksDir, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else if(chunkStore.type === "gdrive") {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			yield gdriver.loadCredentials();
-			cipherStream = gdrive.readChunks(gdriver, chunks, checkWholeChunkCRC32C);
+			cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
 
 		padded_stream = loadNow(padded_stream);
-		// block_size > 0 uses AES-128-GCM, block size == 0 uses AES-128-CTR with no
-		// authentication tags or in-stream checksums.
 		if(row.block_size > 0) {
-			const sizeOfTags = 16 * Math.ceil(Number(row.size) / row.block_size);
+			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(Number(row.size) / row.block_size);
 			const sizeWithTags = Number(row.size) + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
 
-			const unpaddedStream = new padded_stream.Unpadder(sizeWithTags);
+			const unpaddedStream = new padded_stream.RightTruncate(sizeWithTags);
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
 			gcmer = loadNow(gcmer);
@@ -1335,7 +1397,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			dataStream = new gcmer.GCMReader(row.block_size, row.key, 0);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
-			const unpaddedStream = new padded_stream.Unpadder(Number(row.size));
+			const unpaddedStream = new padded_stream.RightTruncate(Number(row.size));
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
 			selfTests.aes();
@@ -2062,7 +2124,7 @@ class TransitToInsert extends Transform {
 				// Check size
 				const sizeOfTags =
 					obj.get('block_size') > 0 ?
-						16 * Math.ceil(size / obj.get('block_size')) :
+						GCM_TAG_SIZE * Math.ceil(size / obj.get('block_size')) :
 						0;
 				const sizeWithTags = size + sizeOfTags;
 				const concealedSize = utils.concealSize(sizeWithTags);
@@ -2170,11 +2232,11 @@ module.exports = {
 	TERASTASH_VERSION,
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
-	addFile, addFiles, getFile, getFiles, catFile, catFiles, dropFile, dropFiles,
+	addFile, addFiles, getFile, getFiles, catFile, catFiles, catRangedFiles, dropFile, dropFiles,
 	shooFile, shooFiles, moveFiles, makeDirectories, lsPath, findPath,
 	infoFile, infoFiles, KEYSPACE_PREFIX, exportDb, importDb,
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	checkChunkSize
+	checkChunkSize, chunksToBlockRanges
 };

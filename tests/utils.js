@@ -189,3 +189,21 @@ describe('utils.intersect()', function() {
 		assert.deepStrictEqual(utils.intersect([50, 150], [200, 300]), null);
 	});
 });
+
+describe('utils.zip()', function() {
+	function* yielder() {
+		yield 7;
+		yield 8;
+		yield 9;
+	}
+
+	it('zips things', function() {
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5, 6])), [[1, 4], [2, 5], [3, 6]]);
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5, 6, 7])), [[1, 4], [2, 5], [3, 6]]);
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5])), [[1, 4], [2, 5], [3, undefined]]);
+		assert.deepStrictEqual(Array.from(utils.zip()), []);
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3])), [[1], [2], [3]]);
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5, 6], [7, 8, 9])), [[1, 4, 7], [2, 5, 8], [3, 6, 9]]);
+		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5, 6], yielder())), [[1, 4, 7], [2, 5, 8], [3, 6, 9]]);
+	});
+});

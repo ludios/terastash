@@ -331,11 +331,9 @@ class GDriver {
 	 */
 	*getData(fileId, ...args) {
 		let [range, checkCRC32CifReceived] = args;
-		T(fileId, T.string, range, T.optional(T.tuple([T.number, T.number])), checkCRC32CifReceived, T.optional(T.boolean));
+		T(fileId, T.string, range, T.optional(utils.RangeType), checkCRC32CifReceived, T.optional(T.boolean));
 		if(range) {
-			utils.assertSafeNonNegativeInteger(range[0]);
-			utils.assertSafeNonNegativeInteger(range[1]);
-			A.gte(range[1], range[0], "end must be >= start in range [start, end]");
+			utils.checkRange(range);
 		}
 		if(checkCRC32CifReceived === undefined) {
 			checkCRC32CifReceived = true;
@@ -469,17 +467,16 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream of concatenated chunks.
  */
-function readChunks(gdriver, chunks, checkWholeChunkCRC32C) {
-	T(gdriver, GDriver, chunks, utils.ChunksType, checkWholeChunkCRC32C, T.boolean);
+function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
+	T(gdriver, GDriver, chunks, utils.ChunksType, ranges, utils.RangesType, checkWholeChunkCRC32C, T.boolean);
+	A.eq(chunks.length, ranges.length);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
-		for(const chunk of chunks) {
-			const _ = yield gdriver.getData(chunk.file_id, undefined, checkWholeChunkCRC32C);
-			const chunkStream = _[0];
-			const res = _[1];
+		for(const [chunk, range] of utils.zip(chunks, ranges)) {
+			const [chunkStream, res] = yield gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
 
 			const googHash = res.headers['x-goog-hash'];
 			T(googHash, T.string);

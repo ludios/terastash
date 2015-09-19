@@ -1,0 +1,31 @@
+no GCM tags:
+
+Chunks are
+0-100
+100-200
+200-300
+
+Want range [50, 150]
+
+For each chunk,
+	intersect chunk range & want range
+	if has intersection, get that range
+	if no intersection, filter out
+
+intersect([0, 100], [50, 150]) == [50, 100]
+intersect([100, 200], [50, 150]) == [100, 150]
+intersect([200, 300], [50, 150]) == null
+
+Set up AES decipher, position up to 16-1 bytes before the bytes we need
+Feed up to 16-1 NULL bytes into AES decipher
+Feed each chunk into AES decipher
+
+with GCM tags:
+
+0-100000
+100000-200000
+200000-300000
+
+Want range [50000, 150000]
+Adjust range to include GCM tags
+Idea: map byte ranges to GCM blocks, then map blocks to physical byte ranges

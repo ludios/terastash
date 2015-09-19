@@ -25,27 +25,46 @@ class Padder extends Transform {
 	}
 }
 
-class Unpadder extends Transform {
-	constructor(unpadToLength) {
-		utils.assertSafeNonNegativeInteger(unpadToLength);
+class RightTruncate extends Transform {
+	constructor(desiredLength) {
+		utils.assertSafeNonNegativeInteger(desiredLength);
 		super();
 		this.bytesRead = 0;
-		this._unpadToLength = unpadToLength;
+		this._desiredLength = desiredLength;
 	}
 
 	_transform(data, encoding, callback) {
 		// If we already read past the length we want, drop the rest of the data.
-		if(this.bytesRead >= this._unpadToLength) {
+		if(this.bytesRead >= this._desiredLength) {
 			callback();
 			return;
 		}
 		this.bytesRead += data.length;
-		if(this.bytesRead <= this._unpadToLength) {
+		if(this.bytesRead <= this._desiredLength) {
 			callback(null, data);
 		} else {
-			callback(null, data.slice(0, data.length - (this.bytesRead - this._unpadToLength)));
+			callback(null, data.slice(0, data.length - (this.bytesRead - this._desiredLength)));
 		}
 	}
 }
 
-module.exports = {Padder, Unpadder};
+class LeftTruncate extends Transform {
+	constructor(skipBytes) {
+		utils.assertSafeNonNegativeInteger(skipBytes);
+		super();
+		this.bytesRead = 0;
+		this._skipBytes = skipBytes;
+	}
+
+	_transform(data, encoding, callback) {
+		if(this.bytesRead >= this._skipBytes) {
+			this.push(data);
+		} else {
+			this.push(data.slice(this._skipBytes - this.bytesRead));
+		}
+		this.bytesRead += data.length;
+		callback();
+	}
+}
+
+module.exports = {Padder, RightTruncate, LeftTruncate};

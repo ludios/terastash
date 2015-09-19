@@ -59,18 +59,21 @@ class BadChunk extends Error {
 /**
  * Returns a readable stream by decrypting and concatenating the chunks.
  */
-function readChunks(directory, chunks, checkWholeChunkCRC32C) {
-	T(directory, T.string, chunks, utils.ChunksType, checkWholeChunkCRC32C, T.boolean);
+function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
+	T(directory, T.string, chunks, utils.ChunksType, ranges, utils.RangesType, checkWholeChunkCRC32C, T.boolean);
+	A.eq(chunks.length, ranges.length);
 
 	const cipherStream = new Combine();
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
-		for(const chunk of chunks) {
+		for(const [chunk, range] of utils.zip(chunks, ranges)) {
 			const digest = chunk.crc32c;
 			A.eq(digest.length, 32/8);
 
-			const chunkStream = fs.createReadStream(path.join(directory, chunk.file_id));
+			const chunkStream = fs.createReadStream(
+				path.join(directory, chunk.file_id),
+				{start: range[0], end: range[1] - 1}); // end is inclusive
 			let hasher;
 			if(checkWholeChunkCRC32C) {
 				hasher = utils.streamHasher(chunkStream, 'crc32c');
