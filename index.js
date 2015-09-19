@@ -579,7 +579,7 @@ const getTypeInWorkingDirectory = Promise.coroutine(function* getTypeInWorkingDi
 			return FILE;
 		}
 	} catch(err) {
-		if(err.code !== 'ENOENT') {
+		if(getProp(err, 'code') !== 'ENOENT') {
 			throw err;
 		}
 		return MISSING;
@@ -614,7 +614,7 @@ makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, 
 	try {
 		mtime = (yield fs.statAsync(p)).mtime;
 	} catch(err) {
-		if(err.code !== 'ENOENT') {
+		if(getProp(err, 'code') !== 'ENOENT') {
 			throw err;
 		}
 	}
@@ -1566,7 +1566,7 @@ function makeDirectories(stashName, paths) {
 			try {
 				yield mkdirpAsync(p);
 			} catch(err) {
-				if(err.code !== 'EEXIST') {
+				if(getProp(err, 'code') !== 'EEXIST') {
 					throw err;
 				}
 				throw new PathAlreadyExistsError(
@@ -1673,7 +1673,7 @@ function moveFiles(stashName, sources, dest) {
 				try {
 					yield fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
 				} catch(err) {
-					if(err.code !== "ENOENT") {
+					if(getProp(err, 'code') !== "ENOENT") {
 						throw err;
 					}
 					// It's okay if the file was missing in work dir
