@@ -208,9 +208,9 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 	return Promise.coroutine(function* makeConfigFileInitializer$coro() {
 		try {
 			return (yield readObjectFromConfigFile(fname));
-		} catch(e) {
-			if(e.code !== 'ENOENT') {
-				throw e;
+		} catch(err) {
+			if(getProp(err, 'code') !== 'ENOENT') {
+				throw err;
 			}
 			// If there is no config file, write defaultConfig.
 			yield writeObjectToConfigFile(fname, defaultConfig);
@@ -453,7 +453,7 @@ class PersistentCounter {
 		try {
 			n = Number(fs.readFileSync(this.fname));
 		} catch(err) {
-			if(err.code !== 'ENOENT') {
+			if(getProp(err, 'code') !== 'ENOENT') {
 				throw err;
 			}
 			n = this.start;
@@ -512,7 +512,7 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 	try {
 		yield fs.unlinkAsync(fname);
 	} catch(err) {
-		if(err.code !== "ENOENT") {
+		if(getProp(err, 'code') !== "ENOENT") {
 			throw err;
 		}
 		// else, ignore error
