@@ -827,8 +827,8 @@ const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, siz
 	yield fs.chmodAsync(p, withSticky);
 });
 
-const infoFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
+const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, p, showKeys) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, showKeys, T.boolean);
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
 	if(row.size !== null) {
@@ -841,10 +841,10 @@ const infoFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 		}
 		if(k.startsWith('chunks_in') && row[k]) {
 			for(const chunkInfo of row[k]) {
-				if(utils.hasKey(chunkInfo, 'crc32c')) {
+				if(utils.hasKey(chunkInfo, 'crc32c') && chunkInfo.crc32c) {
 					chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
 				}
-				if(utils.hasKey(chunkInfo, 'md5')) {
+				if(utils.hasKey(chunkInfo, 'md5') && chunkInfo.md5) {
 					chunkInfo.md5 = chunkInfo.md5.toString('hex');
 				}
 				utils.assertSafeNonNegativeLong(chunkInfo.size);
@@ -852,15 +852,18 @@ const infoFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 			}
 		}
 	}
+	if(!showKeys && utils.hasKey(row, 'key') && row.key) {
+		row.key = 'X'.repeat(row.key.length);
+	}
 	console.log(JSON.stringify(row, null, 2));
 });
 
-function infoFiles(stashName, paths) {
-	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+function infoFiles(stashName, paths, showKeys) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string), showKeys, T.boolean);
 	return doWithClient(getNewClient(), Promise.coroutine(function* infoFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			yield infoFile(client, stashInfo, p);
+			yield infoFile(client, stashInfo, p, showKeys);
 		}
 	}));
 }

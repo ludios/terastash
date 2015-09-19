@@ -312,12 +312,14 @@ program
 program
 	.command('info <file...>')
 	.option('-n, --name <name>', 'Use this stash name instead of inferring from paths')
+	.option('-k, --show-keys', "Don't conceal encryption keys in the output")
 	.description(d(`
 		For each file, dump its database information in JSON format to stdout`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		catchAndLog(terastash.infoFiles(name, files));
+		utils.weakFill(options, ['showKeys']);
+		catchAndLog(terastash.infoFiles(name, files, options.showKeys || false));
 	}));
 
 program
