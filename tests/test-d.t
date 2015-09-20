@@ -52,6 +52,9 @@ Terastash works with -n option
     "uuid": "00000000000000000000000000000003",
     "version": 3
   }
+  $ ts info -n unit_tests_d no-such-file
+  No entry with parent=00000000000000000000000000000000 and basename='no-such-file'
+  [255]
 
 End
 
