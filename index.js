@@ -1498,9 +1498,6 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
  */
 const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename, fake) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
-
-	const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
-
 	yield mkdirpAsync(path.dirname(outputFilename));
 
 	// Delete the existing file because it may
@@ -1510,8 +1507,10 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 	yield utils.tryUnlink(outputFilename);
 
 	if(fake) {
+		const row = yield getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
 		yield makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
+		const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
 		yield new Promise(function getFiles$Promise(resolve, reject) {
