@@ -1333,6 +1333,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		let truncateLeft;
 		let truncateRight;
 		let scaledRequestedRange;
+		let returnedDataRange;
 		// User requested a range, so we have to determine which chunks we actually
 		// need to read and also carefully map the range to read on AES-128-CTR
 		// or AES-128-GCM boundaries.
@@ -1371,7 +1372,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				}
 				blocksSeen += chunks[idx].size / readBlockSize;
 			});
-			const returnedDataRange = [
+			returnedDataRange = [
 				scaledRequestedRange[0] * dataBlockSize,
 				scaledRequestedRange[1] * dataBlockSize];
 			truncateLeft = ranges[0][0] - returnedDataRange[0];
@@ -1380,15 +1381,16 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			// here we just need to specify the length of the data we want.
 			truncateRight = ranges[0][1] - ranges[0][0];
 			A.gte(truncateRight, 0);
-			console.error({readBlockSize, dataBlockSize, /*scaledChunkRanges,*/
-				scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight,
-				wantedChunks, wantedRanges});
+			//console.error({readBlockSize, dataBlockSize, /*scaledChunkRanges,*/
+			//	scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight,
+			//	wantedChunks, wantedRanges});
 		} else {
 			wantedChunks = chunks;
 			wantedRanges = chunks.map(chunk => [0, chunk.size]);
 			truncateLeft = null;
 			truncateRight = null;
 			scaledRequestedRange = [0, null];
+			returnedDataRange = [0, Number(row.size)];
 		}
 		A.eq(wantedChunks.length, wantedRanges.length);
 
@@ -1407,11 +1409,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 
 		padded_stream = loadNow(padded_stream);
-		// TODO: make sure we don't try to decrypt the padding if the range exceeds the
-		// actual size of the file?
+		// We need to make sure we don't try to GCM-decrypt the padding
+		const sizeWithoutLeading = Number(row.size) - returnedDataRange[0];
 		if(row.block_size > 0) {
-			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(Number(row.size) / row.block_size);
-			const sizeWithTags = Number(row.size) + sizeOfTags;
+			utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
+			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(sizeWithoutLeading / row.block_size);
+			const sizeWithTags = sizeWithoutLeading + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
 
 			const unpaddedStream = new padded_stream.RightTruncate(sizeWithTags);
@@ -1422,7 +1425,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			dataStream = new gcmer.GCMReader(row.block_size, row.key, scaledRequestedRange[0]);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
-			const unpaddedStream = new padded_stream.RightTruncate(Number(row.size));
+			const unpaddedStream = new padded_stream.RightTruncate(sizeWithoutLeading);
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
 			selfTests.aes();
