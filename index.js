@@ -1413,7 +1413,9 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 
 		padded_stream = loadNow(padded_stream);
-		// We need to make sure we don't try to GCM-decrypt the padding
+		// We need to make sure we don't try to GCM-decrypt any of the padding.
+		// If we go even one byte over, GCMReader will incorrectly assume that byte
+		// is part of the last block, and authentication will fail.
 		const sizeWithoutLeading = Number(row.size) - returnedDataRange[0];
 		utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
 		if(row.block_size > 0) {
