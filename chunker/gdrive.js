@@ -8,6 +8,7 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
+const getProp = utils.getProp;
 const weak = require('../weak');
 const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
@@ -175,8 +176,8 @@ class GDriver {
 
 		yield this._maybeRefreshAndSaveToken();
 
-		const parents = (utils.getProp(opts, 'parents') || []).concat().sort();
-		const mimeType = utils.getProp(opts, 'mimeType') || "application/octet-stream";
+		const parents = (getProp(opts, 'parents') || []).concat().sort();
+		const mimeType = getProp(opts, 'mimeType') || "application/octet-stream";
 
 		const insertOpts = {
 			resource: {
@@ -202,7 +203,10 @@ class GDriver {
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
-					if(err.code === 404 && err.errors[0].reason === 'notFound') {
+					if(getProp(err, 'code') === 404 &&
+					getProp(err, 'errors') instanceof Array &&
+					err.errors.length >= 1 &&
+					err.errors[0].reason === 'notFound') {
 						reject(new UploadError(`googleapis.com returned:\n${err.message}\n\n` +
 							`Make sure that the Google Drive folder you are uploading into exists ` +
 							`("parents" in config), and that you are using credentials for ` +
@@ -359,7 +363,7 @@ class GDriver {
 					);
 				}
 			}
-			const googHash = utils.getProp(res.headers, 'x-goog-hash');
+			const googHash = getProp(res.headers, 'x-goog-hash');
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {

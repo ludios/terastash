@@ -93,12 +93,12 @@ class CustomRetryPolicy extends RetryPolicy {
 class RepeatHostPolicy extends LoadBalancingPolicy {
 	newQueryPlan(keyspace, queryOptions, callback) {
 		const hosts = this.hosts.values();
-		callback(null, {next: function() {
-			return {
+		callback(null, {next: () => (
+			{
 				value: hosts[0],
 				done: false
-			};
-		}});
+			}
+		)});
 	}
 }
 
@@ -1984,13 +1984,13 @@ function getTransitWriter() {
 			handlers: transit.map([
 				cassandra.types.Row,
 				transit.makeWriteHandler({
-					tag: function() { return "Row"; },
-					rep: function(v) { return Object.assign({}, v); }
+					tag: () => "Row",
+					rep: v => Object.assign({}, v)
 				}),
 				cassandra.types.Long,
 				transit.makeWriteHandler({
-					tag: function() { return "Long"; },
-					rep: function(v) { return String(v); }
+					tag: () => "Long",
+					rep: v => String(v)
 				})
 			])
 		});
@@ -2005,12 +2005,12 @@ function getTransitReader() {
 	transit = loadNow(transit);
 	if(!transitReader) {
 		transitReader = transit.reader("json-verbose", {handlers: {
-			"Long": function(v) {
+			"Long": v => {
 				const long = cassandra.types.Long.fromString(v);
 				A.eq(long.toString(), v);
 				return long;
 			},
-			"Row": function(v) { return v; }
+			"Row": v => v
 		}});
 	}
 	return transitReader;
