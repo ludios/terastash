@@ -155,12 +155,136 @@ Continue
   1971-01-01 00:00:00.000000000 +0000
   $ stat -c %y adir/bigfile
   1990-01-01 00:00:00.000000000 +0000
+  $ ts info sample1 adir adir/bigfile
+  {
+    "parent": "00000000000000000000000000000000",
+    "basename": "sample1",
+    "added_host": "test-hostname",
+    "added_time": "1970-01-01T00:00:00.000Z",
+    "added_user": "test-username",
+    "added_version": "test-version",
+    "block_size": null,
+    "chunks_in_mychunks": null,
+    "content": "68656c6c6f0a776f726c640a",
+    "crc32c": "538f55ec",
+    "executable": false,
+    "key": null,
+    "mtime": "1971-01-01T00:00:00.000Z",
+    "size": 12,
+    "type": "f",
+    "uuid": "00000000000000000000000000000006",
+    "version": 3
+  }
+  {
+    "parent": "00000000000000000000000000000000",
+    "basename": "adir",
+    "added_host": "test-hostname",
+    "added_time": "1970-01-01T00:00:00.000Z",
+    "added_user": "test-username",
+    "added_version": "test-version",
+    "block_size": null,
+    "chunks_in_mychunks": null,
+    "content": null,
+    "crc32c": null,
+    "executable": null,
+    "key": null,
+    "mtime": "1995-01-01T00:00:00.000Z",
+    "size": null,
+    "type": "d",
+    "uuid": "00000000000000000000000000000005",
+    "version": 3
+  }
+  {
+    "parent": "00000000000000000000000000000005",
+    "basename": "bigfile",
+    "added_host": "test-hostname",
+    "added_time": "1970-01-01T00:00:00.000Z",
+    "added_user": "test-username",
+    "added_version": "test-version",
+    "block_size": 65520,
+    "chunks_in_mychunks": [
+      {
+        "idx": 0,
+        "file_id": "deterministic-filename-0",
+        "md5": null,
+        "crc32c": "65da012d",
+        "size": 131072
+      },
+      {
+        "idx": 1,
+        "file_id": "deterministic-filename-1",
+        "md5": null,
+        "crc32c": "eb665297",
+        "size": 131072
+      },
+      {
+        "idx": 2,
+        "file_id": "deterministic-filename-2",
+        "md5": null,
+        "crc32c": "0f222689",
+        "size": 131072
+      },
+      {
+        "idx": 3,
+        "file_id": "deterministic-filename-3",
+        "md5": null,
+        "crc32c": "ad10596f",
+        "size": 131072
+      },
+      {
+        "idx": 4,
+        "file_id": "deterministic-filename-4",
+        "md5": null,
+        "crc32c": "30a7c6c6",
+        "size": 131072
+      },
+      {
+        "idx": 5,
+        "file_id": "deterministic-filename-5",
+        "md5": null,
+        "crc32c": "5d732ec0",
+        "size": 131072
+      },
+      {
+        "idx": 6,
+        "file_id": "deterministic-filename-6",
+        "md5": null,
+        "crc32c": "1821bd54",
+        "size": 131072
+      },
+      {
+        "idx": 7,
+        "file_id": "deterministic-filename-7",
+        "md5": null,
+        "crc32c": "270166e0",
+        "size": 131072
+      },
+      {
+        "idx": 8,
+        "file_id": "deterministic-filename-8",
+        "md5": null,
+        "crc32c": "ddb55358",
+        "size": 16384
+      }
+    ],
+    "content": null,
+    "crc32c": null,
+    "executable": false,
+    "key": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "mtime": "1990-01-01T00:00:00.000Z",
+    "size": 1048576,
+    "type": "f",
+    "uuid": "00000000000000000000000000000004",
+    "version": 3
+  }
+  $ ts info -k adir/bigfile | grep '"key"'
+    "key": "00000000000000000000000000000001",
   $ ts export-db | sort > .export
   $ cat .export
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAABQ==","version":3}}
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crc32c":"~bU49V7A==","executable":false,"key":null,"mtime":"~t1971-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAABg==","version":3}}
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crc32c":"~bNos/Jg==","executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAAAw==","version":3}}
-  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAABQ==","basename":"bigfile","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~bZdoBLQ==","size":{"~#Long":"131072"}},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~b62ZSlw==","size":{"~#Long":"131072"}},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~bDyImiQ==","size":{"~#Long":"131072"}},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~brRBZbw==","size":{"~#Long":"131072"}},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~bMKfGxg==","size":{"~#Long":"131072"}},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"131072"}},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~bGCG9VA==","size":{"~#Long":"131072"}},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~bJwFm4A==","size":{"~#Long":"131072"}},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~b3bVTWA==","size":{"~#Long":"16384"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAABA==","version":3}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"adir","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:00.000Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":null,"crc32c":null,"executable":null,"key":null,"mtime":"~t1995-01-01T00:00:00.000Z","size":null,"type":"d","uuid":"~bAAAAAAAAAAAAAAAAAAAABQ==","version":3}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample1","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:00.000Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":"~baGVsbG8Kd29ybGQK","crc32c":"~bU49V7A==","executable":false,"key":null,"mtime":"~t1971-01-01T00:00:00.000Z","size":{"~#Long":"12"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAABg==","version":3}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAAAA==","basename":"sample2","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:00.000Z","added_user":"test-username","added_version":"test-version","block_size":null,"chunks_in_mychunks":null,"content":"~bc2Vjb25kCnNhbXBsZQo=","crc32c":"~bNos/Jg==","executable":true,"key":null,"mtime":"~t1980-01-01T00:00:00.000Z","size":{"~#Long":"14"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAAAw==","version":3}}
+  {"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAABQ==","basename":"bigfile","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:00.000Z","added_user":"test-username","added_version":"test-version","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-0","md5":null,"crc32c":"~bZdoBLQ==","size":{"~#Long":"131072"}},{"idx":1,"file_id":"deterministic-filename-1","md5":null,"crc32c":"~b62ZSlw==","size":{"~#Long":"131072"}},{"idx":2,"file_id":"deterministic-filename-2","md5":null,"crc32c":"~bDyImiQ==","size":{"~#Long":"131072"}},{"idx":3,"file_id":"deterministic-filename-3","md5":null,"crc32c":"~brRBZbw==","size":{"~#Long":"131072"}},{"idx":4,"file_id":"deterministic-filename-4","md5":null,"crc32c":"~bMKfGxg==","size":{"~#Long":"131072"}},{"idx":5,"file_id":"deterministic-filename-5","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"131072"}},{"idx":6,"file_id":"deterministic-filename-6","md5":null,"crc32c":"~bGCG9VA==","size":{"~#Long":"131072"}},{"idx":7,"file_id":"deterministic-filename-7","md5":null,"crc32c":"~bJwFm4A==","size":{"~#Long":"131072"}},{"idx":8,"file_id":"deterministic-filename-8","md5":null,"crc32c":"~b3bVTWA==","size":{"~#Long":"16384"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"1048576"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAABA==","version":3}}
   $ ts destroy unit_tests_a # destroy before importing the .export we made
   Destroyed keyspace and removed config for unit_tests_a.
 
@@ -176,7 +300,7 @@ Continue
 Add a file with size > 4GB to test for Long decoding regression
 
   $ touch /tmp/mychunks/deterministic-filename-FAKEFAKE # need a file for 'ts drop' to unlink later
-  $ echo '{"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAABQ==","basename":"zz_over4gb","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:01.970Z","added_user":"test-username","added_version":"test-version","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-FAKEFAKE","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"7717519360"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"7681243620"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAAzw==","version":3}}' >> .export
+  $ echo '{"~#Row":{"parent":"~bAAAAAAAAAAAAAAAAAAAABQ==","basename":"zz_over4gb","added_host":"test-hostname","added_time":"~t1970-01-01T00:00:00.000Z","added_user":"test-username","added_version":"test-version","block_size":65520,"chunks_in_mychunks":[{"idx":0,"file_id":"deterministic-filename-FAKEFAKE","md5":null,"crc32c":"~bXXMuwA==","size":{"~#Long":"7717519360"}}],"content":null,"crc32c":null,"executable":false,"key":"~bAAAAAAAAAAAAAAAAAAAAAQ==","mtime":"~t1990-01-01T00:00:00.000Z","size":{"~#Long":"7681243620"},"type":"f","uuid":"~bAAAAAAAAAAAAAAAAAAAAzw==","version":3}}' >> .export
   $ cat .export | sort > .export-sorted && mv .export-sorted .export
 
 Continue

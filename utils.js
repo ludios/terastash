@@ -391,7 +391,7 @@ function evalMultiplications(s) {
 
 function dateNow() {
 	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
-		return new Date(1970);
+		return new Date(0);
 	} else {
 		return new Date();
 	}

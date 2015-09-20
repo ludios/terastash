@@ -827,9 +827,8 @@ const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, siz
 	yield fs.chmodAsync(p, withSticky);
 });
 
-const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, p, showKeys) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, showKeys, T.boolean);
-	const dbPath = userPathToDatabasePath(stashInfo.path, p);
+const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, dbPath, showKeys) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, dbPath, T.string, showKeys, T.boolean);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
 	if(row.size !== null) {
 		utils.assertSafeNonNegativeLong(row.size);
@@ -863,7 +862,8 @@ function infoFiles(stashName, paths, showKeys) {
 	return doWithClient(getNewClient(), Promise.coroutine(function* infoFiles$coro(client) {
 		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
-			yield infoFile(client, stashInfo, p, showKeys);
+			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
+			yield infoFile(client, stashInfo, dbPath, showKeys);
 		}
 	}));
 }
