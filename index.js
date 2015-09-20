@@ -1363,7 +1363,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				Math.floor(ranges[0][0] / decodedBlockSize),
 				Math.ceil(ranges[0][1] / decodedBlockSize)];
 			let blocksSeen = 0;
-			scaledChunkRanges.map(function(scaledChunkRange, idx) {
+			scaledChunkRanges.forEach(function(scaledChunkRange, idx) {
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
 				if(intersection !== null) {
 					wantedChunks.push(chunks[idx]);
@@ -1371,10 +1371,15 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 					// relative to the start of each chunk.
 					wantedRanges.push([
 						(intersection[0] - blocksSeen) * encodedBlockSize,
-						(intersection[1] - blocksSeen) * encodedBlockSize]);
+						// Don't exceed the actual size of the last chunk, else we'll
+						// produce a Range: request that has more than we can get back.
+						Math.min((intersection[1] - blocksSeen) * encodedBlockSize, chunks[idx].size)]);
 				}
+				let blocksInChunk = chunks[idx].size / encodedBlockSize;
 				// Last chunk might not be divisible by encodedBlockSize
-				const blocksInChunk = Math.ceil(chunks[idx].size / encodedBlockSize);
+				if(idx === scaledChunkRanges.length - 1) {
+					blocksInChunk = Math.ceil(blocksInChunk);
+				}
 				utils.assertSafeNonNegativeInteger(blocksInChunk);
 				blocksSeen += blocksInChunk;
 			});
