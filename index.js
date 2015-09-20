@@ -1377,8 +1377,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				scaledRequestedRange[1] * dataBlockSize];
 			truncateLeft = ranges[0][0] - returnedDataRange[0];
 			A.gte(truncateLeft, 0);
-			truncateRight = returnedDataRange[1] - ranges[0][1];
+			// left-truncation will already have happened before right-truncation, so
+			// here we just need to specify the length of the data we want.
+			truncateRight = ranges[0][1] - ranges[0][0];
 			A.gte(truncateRight, 0);
+			console.error({readBlockSize, dataBlockSize, scaledChunkRanges,
+				scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight});
 		} else {
 			wantedChunks = chunks;
 			wantedRanges = chunks.map(chunk => [0, chunk.size]);
@@ -1425,12 +1429,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 		if(truncateLeft !== 0) {
 			const _dataStream = dataStream;
-			dataStream = padded_stream.LeftTruncate(truncateLeft);
+			dataStream = new padded_stream.LeftTruncate(truncateLeft);
 			utils.pipeWithErrors(_dataStream, dataStream);
 		}
 		if(truncateRight !== 0) {
 			const _dataStream = dataStream;
-			dataStream = padded_stream.RightTruncate(truncateRight);
+			dataStream = new padded_stream.RightTruncate(truncateRight);
 			utils.pipeWithErrors(_dataStream, dataStream);
 		}
 
@@ -1468,7 +1472,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		if(bytesRead !== expectedBytesRead) {
 			dataStream.emit('error', new Error(
 				`For dbPath=${inspect(dbPath)}, expected length of content to be\n` +
-				`${commaify(row.size)} but was\n` +
+				`${commaify(expectedBytesRead)} but was\n` +
 				`${commaify(bytesRead)}`
 			));
 		}

@@ -49,6 +49,9 @@ Test for 'bytes instead of the expected' regression with 6MB file
   $ md5sum 6MBfile
   75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
   $ rm 6MBfile
+  $ ts cat-ranges 6MBfile/0-1000000 6MBfile/1000000-2000000 6MBfile/2000000-3000000 6MBfile/3000000-4000000 6MBfile/4000000-5000000 6MBfile/5000000-6000000 > 6MBfile
+  $ md5sum 6MBfile
+  75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
   $ ts drop 6MBfile
 
 Continue
