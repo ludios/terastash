@@ -38,7 +38,7 @@ Continue
   $ chmod +x sample2
   $ mkdir adir
 
-Test for 'bytes instead of the expected' regression with 6MB file
+Test for 'bytes instead of the expected' regression with 6MB file, also cat-ranges
 
   $ dd if=/dev/zero of=6MBfile bs=1000000 count=6 2> /dev/null
   $ md5sum 6MBfile
@@ -49,9 +49,10 @@ Test for 'bytes instead of the expected' regression with 6MB file
   $ md5sum 6MBfile
   75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
   $ rm 6MBfile
-  $ ts cat-ranges 6MBfile/0-1000000 6MBfile/1000000-2000000 6MBfile/2000000-3000000 6MBfile/3000000-4000000 6MBfile/4000000-5000000 6MBfile/5000000-6000000 > 6MBfile
-  $ md5sum 6MBfile
-  75c6f06ec40f8063da34fcd7fc2bf17f  6MBfile
+  $ ts cat-ranges 6MBfile/0-1000000 6MBfile/1000000-2000000 6MBfile/2000000-3000000 6MBfile/3000000-4000000 6MBfile/4000000-5000000 6MBfile/5000000-6000000 | md5sum
+  75c6f06ec40f8063da34fcd7fc2bf17f  -
+  $ ts cat-ranges 6MBfile/1-1000000 6MBfile/1000000-2000000 6MBfile/2000000-3000000 6MBfile/3000000-4000000 6MBfile/4000000-5000000 6MBfile/5000000-6000000 | md5sum
+  27cbf3e7a79ab50c4e6b982aa03d7bed  -
   $ ts drop 6MBfile
 
 Continue
