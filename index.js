@@ -1335,6 +1335,8 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 		let wantedChunks;
 		let wantedRanges;
+		let truncateLeft;
+		let truncateRight;
 		// User requested a range, so we have to determine which chunks we actually
 		// need to read and also carefully map the range to read on AES-128-CTR
 		// or AES-128-GCM boundaries.
@@ -1353,8 +1355,15 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				row.block_size > 0 ?
 					(row.block_size + GCM_TAG_SIZE) :
 					aes.BLOCK_SIZE;
+			// The actual amount of data we'll get back per block after decryption
+			const dataBlockSize =
+				row.block_size > 0 ?
+					row.block_size :
+					aes.BLOCK_SIZE;
 			const scaledChunkRanges = chunksToBlockRanges(chunks, readBlockSize);
-			const scaledRequestedRange = [Math.floor(ranges[0][0]), Math.ceil(ranges[0][1])];
+			const scaledRequestedRange = [
+				Math.floor(ranges[0][0] / readBlockSize),
+				Math.ceil(ranges[0][1] / readBlockSize)];
 			scaledChunkRanges.map(function(scaledChunkRange, idx) {
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
 				if(intersection !== null) {
@@ -1363,9 +1372,18 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 						[intersection[0] * readBlockSize, intersection[1] * readBlockSize]));
 				}
 			});
+			const returnedDataRange = [
+				scaledRequestedRange[0] * dataBlockSize,
+				scaledRequestedRange[1] * dataBlockSize];
+			truncateLeft = ranges[0][0] - returnedDataRange[0];
+			A.gte(truncateLeft, 0);
+			truncateRight = returnedDataRange[1] - ranges[0][1];
+			A.gte(truncateRight, 0);
 		} else {
 			wantedChunks = chunks;
 			wantedRanges = chunks.map(chunk => [0, chunk.size]);
+			truncateLeft = 0;
+			truncateRight = 0;
 		}
 		A.eq(wantedChunks.length, wantedRanges.length);
 
@@ -1405,6 +1423,17 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		}
 
+		if(truncateLeft !== 0) {
+			const _dataStream = dataStream;
+			dataStream = padded_stream.LeftTruncate(truncateLeft);
+			utils.pipeWithErrors(_dataStream, dataStream);
+		}
+		if(truncateRight !== 0) {
+			const _dataStream = dataStream;
+			dataStream = padded_stream.RightTruncate(truncateRight);
+			utils.pipeWithErrors(_dataStream, dataStream);
+		}
+
 		dataStream.on('data', function(data) {
 			bytesRead += data.length;
 		});
@@ -1415,8 +1444,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	} else {
 		hasher = loadNow(hasher);
 		sse4_crc32 = loadNow(sse4_crc32);
-		dataStream = streamifier.createReadStream(row.content);
-		bytesRead = row.content.length;
+		const content =
+			ranges ?
+				row.content.slice(ranges[0][0], ranges[0][1]) :
+				row.content;
+		dataStream = streamifier.createReadStream(content);
+		bytesRead = content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
 		if(!crc32c.equals(row.crc32c)) {
