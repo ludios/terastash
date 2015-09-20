@@ -481,19 +481,28 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	Promise.coroutine(function* readChunks$coro() {
 		for(const [chunk, range] of utils.zip(chunks, ranges)) {
 			const [chunkStream, res] = yield gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
-
-			const googHash = res.headers['x-goog-hash'];
-			T(googHash, T.string);
-			A(googHash.startsWith("crc32c="), googHash);
-			const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
-			if(!chunk.crc32c.equals(googCRC)) {
-				throw new BadChunk(
-					`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
-					`expected Google to send crc32c\n` +
-					`${chunk.crc32c.toString('hex')} but got\n` +
-					`${googHash.toString('hex')}`);
+			// Note: even when we're not checking whole-chunk CRC32C, we're still
+			// making sure Google is sending us the correct CRC32C for a file.
+			// Though we don't have the opportunity to do this when we're getting a
+			// range that is not the whole file.
+			const googHash = getProp(res.headers, 'x-goog-hash');
+			if(googHash === undefined) {
+				if(range[1] - range[0] === chunk.size) {
+					throw new Error(`Downloading a whole file, but did not receive ` +
+						`x-goog-hash in headers:\n${inspect(res.headers)}`);
+				}
+			} else {
+				T(googHash, T.string);
+				A(googHash.startsWith("crc32c="), googHash);
+				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				if(!chunk.crc32c.equals(googCRC)) {
+					throw new BadChunk(
+						`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
+						`expected Google to send crc32c\n` +
+						`${chunk.crc32c.toString('hex')} but got\n` +
+						`${googHash.toString('hex')}`);
+				}
 			}
-
 			cipherStream.append(chunkStream);
 			yield new Promise(function(resolve) {
 				chunkStream.once('end', resolve);
