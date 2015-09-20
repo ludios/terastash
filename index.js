@@ -1348,40 +1348,40 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			// bytes before and 15 bytes ahead, but that's totally okay.
 			// For AES-128-GCM, we *have* to "unnecessarily" read up to block_size-1
 			// bytes before and ahead because we must verify the GCM tags.
-			const readBlockSize =
+			const encodedBlockSize =
 				row.block_size > 0 ?
 					(row.block_size + GCM_TAG_SIZE) :
 					aes.BLOCK_SIZE;
 			// The actual amount of data we'll get per block after decryption
-			const dataBlockSize =
+			const decodedBlockSize =
 				row.block_size > 0 ?
 					row.block_size :
 					aes.BLOCK_SIZE;
-			const scaledChunkRanges = chunksToBlockRanges(chunks, readBlockSize);
+			const scaledChunkRanges = chunksToBlockRanges(chunks, encodedBlockSize);
 			scaledRequestedRange = [
-				Math.floor(ranges[0][0] / dataBlockSize),
-				Math.ceil(ranges[0][1] / dataBlockSize)];
+				Math.floor(ranges[0][0] / decodedBlockSize),
+				Math.ceil(ranges[0][1] / decodedBlockSize)];
 			let blocksSeen = 0;
 			scaledChunkRanges.map(function(scaledChunkRange, idx) {
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
 				if(intersection !== null) {
 					wantedChunks.push(chunks[idx]);
 					wantedRanges.push([
-						(intersection[0] - blocksSeen) * readBlockSize,
-						(intersection[1] - blocksSeen) * readBlockSize]);
+						(intersection[0] - blocksSeen) * encodedBlockSize,
+						(intersection[1] - blocksSeen) * encodedBlockSize]);
 				}
-				blocksSeen += chunks[idx].size / readBlockSize;
+				blocksSeen += chunks[idx].size / encodedBlockSize;
 			});
 			returnedDataRange = [
-				scaledRequestedRange[0] * dataBlockSize,
-				scaledRequestedRange[1] * dataBlockSize];
+				scaledRequestedRange[0] * decodedBlockSize,
+				scaledRequestedRange[1] * decodedBlockSize];
 			truncateLeft = ranges[0][0] - returnedDataRange[0];
 			A.gte(truncateLeft, 0);
 			// left-truncation will already have happened before right-truncation, so
 			// here we just need to specify the length of the data we want.
 			truncateRight = ranges[0][1] - ranges[0][0];
 			A.gte(truncateRight, 0);
-			//console.error({readBlockSize, dataBlockSize, /*scaledChunkRanges,*/
+			//console.error({encodedBlockSize, decodedBlockSize, /*scaledChunkRanges,*/
 			//	scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight,
 			//	wantedChunks, wantedRanges});
 		} else {
@@ -1411,8 +1411,8 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		padded_stream = loadNow(padded_stream);
 		// We need to make sure we don't try to GCM-decrypt the padding
 		const sizeWithoutLeading = Number(row.size) - returnedDataRange[0];
+		utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
 		if(row.block_size > 0) {
-			utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
 			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(sizeWithoutLeading / row.block_size);
 			const sizeWithTags = sizeWithoutLeading + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
