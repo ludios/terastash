@@ -1269,11 +1269,6 @@ function chunksToBlockRanges(chunks, blockSize) {
 	return blockRanges;
 }
 
-function normalizeRangeTo0(range) {
-	T(range, utils.RangeType);
-	return [0, range[1] - range[0]];
-}
-
 /**
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
@@ -1337,6 +1332,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		let wantedRanges;
 		let truncateLeft;
 		let truncateRight;
+		let scaledRequestedRange;
 		// User requested a range, so we have to determine which chunks we actually
 		// need to read and also carefully map the range to read on AES-128-CTR
 		// or AES-128-GCM boundaries.
@@ -1355,22 +1351,25 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				row.block_size > 0 ?
 					(row.block_size + GCM_TAG_SIZE) :
 					aes.BLOCK_SIZE;
-			// The actual amount of data we'll get back per block after decryption
+			// The actual amount of data we'll get per block after decryption
 			const dataBlockSize =
 				row.block_size > 0 ?
 					row.block_size :
 					aes.BLOCK_SIZE;
 			const scaledChunkRanges = chunksToBlockRanges(chunks, readBlockSize);
-			const scaledRequestedRange = [
-				Math.floor(ranges[0][0] / readBlockSize),
-				Math.ceil(ranges[0][1] / readBlockSize)];
+			scaledRequestedRange = [
+				Math.floor(ranges[0][0] / dataBlockSize),
+				Math.ceil(ranges[0][1] / dataBlockSize)];
+			let blocksSeen = 0;
 			scaledChunkRanges.map(function(scaledChunkRange, idx) {
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
 				if(intersection !== null) {
 					wantedChunks.push(chunks[idx]);
-					wantedRanges.push(normalizeRangeTo0(
-						[intersection[0] * readBlockSize, intersection[1] * readBlockSize]));
+					wantedRanges.push([
+						(intersection[0] - blocksSeen) * readBlockSize,
+						(intersection[1] - blocksSeen) * readBlockSize]);
 				}
+				blocksSeen += chunks[idx].size / readBlockSize;
 			});
 			const returnedDataRange = [
 				scaledRequestedRange[0] * dataBlockSize,
@@ -1381,13 +1380,15 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			// here we just need to specify the length of the data we want.
 			truncateRight = ranges[0][1] - ranges[0][0];
 			A.gte(truncateRight, 0);
-			console.error({readBlockSize, dataBlockSize, scaledChunkRanges,
-				scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight});
+			console.error({readBlockSize, dataBlockSize, /*scaledChunkRanges,*/
+				scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight,
+				wantedChunks, wantedRanges});
 		} else {
 			wantedChunks = chunks;
 			wantedRanges = chunks.map(chunk => [0, chunk.size]);
-			truncateLeft = 0;
-			truncateRight = 0;
+			truncateLeft = null;
+			truncateRight = null;
+			scaledRequestedRange = [0, null];
 		}
 		A.eq(wantedChunks.length, wantedRanges.length);
 
@@ -1406,6 +1407,8 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 
 		padded_stream = loadNow(padded_stream);
+		// TODO: make sure we don't try to decrypt the padding if the range exceeds the
+		// actual size of the file?
 		if(row.block_size > 0) {
 			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(Number(row.size) / row.block_size);
 			const sizeWithTags = Number(row.size) + sizeOfTags;
@@ -1416,23 +1419,24 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 			gcmer = loadNow(gcmer);
 			selfTests.gcm();
-			dataStream = new gcmer.GCMReader(row.block_size, row.key, 0);
+			dataStream = new gcmer.GCMReader(row.block_size, row.key, scaledRequestedRange[0]);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
 			const unpaddedStream = new padded_stream.RightTruncate(Number(row.size));
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
 			selfTests.aes();
-			dataStream = crypto.createCipheriv('aes-128-ctr', row.key, aes.blockNumberToIv(0));
+			dataStream = crypto.createCipheriv(
+				'aes-128-ctr', row.key, aes.blockNumberToIv(scaledRequestedRange[0]));
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		}
 
-		if(truncateLeft !== 0) {
+		if(truncateLeft !== null) {
 			const _dataStream = dataStream;
 			dataStream = new padded_stream.LeftTruncate(truncateLeft);
 			utils.pipeWithErrors(_dataStream, dataStream);
 		}
-		if(truncateRight !== 0) {
+		if(truncateRight !== null) {
 			const _dataStream = dataStream;
 			dataStream = new padded_stream.RightTruncate(truncateRight);
 			utils.pipeWithErrors(_dataStream, dataStream);
