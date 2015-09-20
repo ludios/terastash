@@ -19,6 +19,10 @@ Terastash works with -n option
   $ cd ..
   $ ts cat -n unit_tests_d x
   hi
+  $ ts cat-ranges -n unit_tests_d x/0-3
+  hi
+  $ ts cat-ranges -n unit_tests_d x/1-3
+  i
   $ ts get -n unit_tests_d x
   $ cat x
   hi

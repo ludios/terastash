@@ -1352,7 +1352,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				row.block_size > 0 ?
 					(row.block_size + GCM_TAG_SIZE) :
 					aes.BLOCK_SIZE;
-			// The actual amount of data we'll get per block after decryption
+			// The actual amount of data we'll get per block after decryption.
 			const decodedBlockSize =
 				row.block_size > 0 ?
 					row.block_size :
@@ -1366,11 +1366,15 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
 				if(intersection !== null) {
 					wantedChunks.push(chunks[idx]);
+					// (- blockSeen) because we need to scale numbers back to ranges
+					// relative to the start of each chunk.
 					wantedRanges.push([
 						(intersection[0] - blocksSeen) * encodedBlockSize,
 						(intersection[1] - blocksSeen) * encodedBlockSize]);
 				}
-				blocksSeen += chunks[idx].size / encodedBlockSize;
+				const blocksInChunk = chunks[idx].size / encodedBlockSize;
+				utils.assertSafeNonNegativeInteger(blocksInChunk);
+				blocksSeen += blocksInChunk;
 			});
 			returnedDataRange = [
 				scaledRequestedRange[0] * decodedBlockSize,
