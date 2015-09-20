@@ -358,7 +358,7 @@ class GDriver {
 				const contentRange = res.headers['content-range'];
 				const expectedContentRange = `bytes ${range[0]}-${range[1] - 1}/`;
 				if(!contentRange.startsWith(expectedContentRange)) {
-					throw new Error(`Expected 'content-range' header to start with`
+					throw new Error(`Expected 'content-range' header to start with` +
 						` ${expectedContentRange} but was ${contentRange}`
 					);
 				}
