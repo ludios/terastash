@@ -1261,7 +1261,8 @@ function chunksToBlockRanges(chunks, blockSize) {
 	const blockRanges = [];
 	let start = 0;
 	for(const c of chunks) {
-		const scaledSize = c.size / blockSize;
+		// Last chunk might not be divisible by blockSize
+		const scaledSize = Math.ceil(c.size / blockSize);
 		utils.assertSafeNonNegativeInteger(scaledSize);
 		blockRanges.push([start, start + scaledSize]);
 		start += scaledSize;
@@ -1372,7 +1373,8 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 						(intersection[0] - blocksSeen) * encodedBlockSize,
 						(intersection[1] - blocksSeen) * encodedBlockSize]);
 				}
-				const blocksInChunk = chunks[idx].size / encodedBlockSize;
+				// Last chunk might not be divisible by encodedBlockSize
+				const blocksInChunk = Math.ceil(chunks[idx].size / encodedBlockSize);
 				utils.assertSafeNonNegativeInteger(blocksInChunk);
 				blocksSeen += blocksInChunk;
 			});
