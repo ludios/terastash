@@ -387,7 +387,7 @@ class GDriver {
 			}
 			return [(hasher ? hasher.stream : res), res];
 		} else {
-			let body = yield utils.streamToBuffer(res);
+			let body = yield utils.readableToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 				try {
 					body = JSON.parse(body);
