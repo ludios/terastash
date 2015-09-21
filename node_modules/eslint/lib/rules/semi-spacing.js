@@ -16,7 +16,8 @@ module.exports = function(context) {
 
     var config = context.options[0],
         requireSpaceBefore = false,
-        requireSpaceAfter = true;
+        requireSpaceAfter = true,
+        sourceCode = context.getSourceCode();
 
     if (typeof config === "object") {
         if (config.hasOwnProperty("before")) {
@@ -34,7 +35,7 @@ module.exports = function(context) {
      */
     function hasLeadingSpace(token) {
         var tokenBefore = context.getTokenBefore(token);
-        return tokenBefore && astUtils.isTokenOnSameLine(tokenBefore, token) && astUtils.isTokenSpaced(tokenBefore, token);
+        return tokenBefore && astUtils.isTokenOnSameLine(tokenBefore, token) && sourceCode.isSpaceBetweenTokens(tokenBefore, token);
     }
 
     /**
@@ -44,7 +45,7 @@ module.exports = function(context) {
      */
     function hasTrailingSpace(token) {
         var tokenAfter = context.getTokenAfter(token);
-        return tokenAfter && astUtils.isTokenOnSameLine(token, tokenAfter) && astUtils.isTokenSpaced(token, tokenAfter);
+        return tokenAfter && astUtils.isTokenOnSameLine(token, tokenAfter) && sourceCode.isSpaceBetweenTokens(token, tokenAfter);
     }
 
     /**
@@ -55,6 +56,30 @@ module.exports = function(context) {
     function isLastTokenInCurrentLine(token) {
         var tokenAfter = context.getTokenAfter(token);
         return !(tokenAfter && astUtils.isTokenOnSameLine(token, tokenAfter));
+    }
+
+    /**
+     * Checks if the given token is the first token in its line
+     * @param {Token} token The token to check.
+     * @returns {boolean} Whether or not the token is the first in its line.
+     */
+    function isFirstTokenInCurrentLine(token) {
+        var tokenBefore = context.getTokenBefore(token);
+        return !(tokenBefore && astUtils.isTokenOnSameLine(token, tokenBefore));
+    }
+
+    /**
+     * Checks if the next token of a given token is a closing parenthesis.
+     * @param {Token} token The token to check.
+     * @returns {boolean} Whether or not the next token of a given token is a closing parenthesis.
+     */
+    function isBeforeClosingParen(token) {
+        var nextToken = context.getTokenAfter(token);
+        return (
+            nextToken &&
+            nextToken.type === "Punctuator" &&
+            (nextToken.value === "}" || nextToken.value === ")")
+        );
     }
 
     /**
@@ -88,7 +113,7 @@ module.exports = function(context) {
                 }
             }
 
-            if (!isLastTokenInCurrentLine(token)) {
+            if (!isFirstTokenInCurrentLine(token) && !isLastTokenInCurrentLine(token) && !isBeforeClosingParen(token)) {
                 if (hasTrailingSpace(token)) {
                     if (!requireSpaceAfter) {
                         context.report(node, location, "Unexpected whitespace after semicolon.");

@@ -13,7 +13,28 @@ var astUtils = require("../ast-utils");
 //------------------------------------------------------------------------------
 
 module.exports = function(context) {
-    var requireSpace = context.options[0] !== "never";
+    var config = context.options[0],
+        sourceCode = context.getSourceCode(),
+        checkFunctions = true,
+        checkKeywords = true;
+
+    if (typeof config === "object") {
+        checkFunctions = config.functions !== "never";
+        checkKeywords = config.keywords !== "never";
+    } else if (config === "never") {
+        checkFunctions = false;
+        checkKeywords = false;
+    }
+
+    /**
+     * Checks whether or not a given token is an arrow operator (=>).
+     *
+     * @param {Token} token - A token to check.
+     * @returns {boolean} `true` if the token is an arrow operator.
+     */
+    function isArrow(token) {
+        return token.type === "Punctuator" && token.value === "=>";
+    }
 
     /**
      * Checks the given BlockStatement node has a preceding space if it doesn’t start on a new line.
@@ -22,18 +43,38 @@ module.exports = function(context) {
      */
     function checkPrecedingSpace(node) {
         var precedingToken = context.getTokenBefore(node),
-            hasSpace;
+            hasSpace,
+            parent,
+            requireSpace;
 
-        if (precedingToken && astUtils.isTokenOnSameLine(precedingToken, node)) {
-            hasSpace = astUtils.isTokenSpaced(precedingToken, node);
+        if (precedingToken && !isArrow(precedingToken) && astUtils.isTokenOnSameLine(precedingToken, node)) {
+            hasSpace = sourceCode.isSpaceBetweenTokens(precedingToken, node);
+            parent = context.getAncestors().pop();
+            if (parent.type === "FunctionExpression" || parent.type === "FunctionDeclaration") {
+                requireSpace = checkFunctions;
+            } else {
+                requireSpace = checkKeywords;
+            }
 
             if (requireSpace) {
                 if (!hasSpace) {
-                    context.report(node, "Missing space before opening brace.");
+                    context.report({
+                        node: node,
+                        message: "Missing space before opening brace.",
+                        fix: function(fixer) {
+                            return fixer.insertTextBefore(node, " ");
+                        }
+                    });
                 }
             } else {
                 if (hasSpace) {
-                    context.report(node, "Unexpected space before opening brace.");
+                    context.report({
+                        node: node,
+                        message: "Unexpected space before opening brace.",
+                        fix: function(fixer) {
+                            return fixer.removeRange([precedingToken.range[1], node.range[0]]);
+                        }
+                    });
                 }
             }
         }
@@ -69,6 +110,22 @@ module.exports = function(context) {
 
 module.exports.schema = [
     {
-        "enum": ["always", "never"]
+        "oneOf": [
+            {
+                "enum": ["always", "never"]
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "enum": ["always", "never"]
+                    },
+                    "functions": {
+                        "enum": ["always", "never"]
+                    }
+                },
+                "additionalProperties": false
+            }
+        ]
     }
 ];

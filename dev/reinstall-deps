@@ -2,7 +2,7 @@
 
 set -e
 
-rm -rf node_modules || true
+rm -rf node_modules
 ./dev/npm install
 ./dev/npm dedupe
 
@@ -12,7 +12,7 @@ rm -rf node_modules/eslint/node_modules/js-yaml/dist
 rm -rf node_modules/eslint/node_modules/js-yaml/node_modules/argparse/node_modules/sprintf-js/dist
 rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.min.js
 rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.map
-rm -rf node_modules/eslint/node_modules/handlebars/dist
+rm -rf node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/test
 rm -f  node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/node_modules/google-p12-pem/node_modules/node-forge/nodejs/ui/test.min.js
 rm -f  node_modules/cassandra-driver/build.yaml
 rm -rf node_modules/request/node_modules/qs/dist

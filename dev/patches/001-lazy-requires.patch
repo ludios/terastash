@@ -35,16 +35,16 @@ index beb4916..82df209 100644
  var fs = require('fs');
  
  var GOOGLE_TOKEN_URL = 'https://accounts.google.com/o/oauth2/token';
-@@ -53,6 +53,9 @@ GoogleToken.prototype.getToken = function(callback) {
-       var mimeType = this._mime.lookup(this.keyFile);
-       if (mimeType === 'application/x-pkcs12') {
-         // detect .p12 file and convert to .pem on the fly
-+        if(!gp12pem) {
-+          gp12pem = require('google-p12-pem');
-+        }
-         gp12pem(this.keyFile, handleKey);
-       } else if (mimeType === 'application/json') {
-         // json file
+@@ -65,6 +65,9 @@
+ 
+         if (mimeType === 'application/x-pkcs12') {
+           // convert to .pem on the fly
++          if(!gp12pem) {
++            gp12pem = require('google-p12-pem');
++          }
+           gp12pem(this.keyFile, handleKey);
+         } else {
+           // assume .pem key otherwise
 @@ -217,6 +220,9 @@ GoogleToken.prototype._requestToken = function(callback) {
   * @param  {Function} callback The callback function.
   */
