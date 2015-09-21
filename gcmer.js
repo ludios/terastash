@@ -112,7 +112,6 @@ class BadData extends Error {
 
 const MODE_DATA = Symbol("MODE_DATA");
 const MODE_TAG = Symbol("MODE_TAG");
-
 const EMPTY_BUF = new Buffer(0);
 
 class GCMReader extends Transform {
