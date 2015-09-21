@@ -80,5 +80,36 @@ describe('Int32BufferDecoder', function() {
 			caught = e;
 		}
 		A(caught instanceof frame_reader.BadData);
+		A(/exceeds max length/.test(caught.toString()));
+	}));
+
+	it("emits error when input ends in the middle of frame data", Promise.coroutine(function*() {
+		const inputBuf = makeFrameLE(crypto.pseudoRandomBytes(1025));
+		const inputStream = realistic_streamifier.createReadStream(inputBuf.slice(0, 1024));
+		const reader = new frame_reader.Int32BufferDecoder("LE", 4096);
+		utils.pipeWithErrors(inputStream, reader);
+		let caught = null;
+		try {
+			const output = yield readableToArray(reader);
+		} catch(e) {
+			caught = e;
+		}
+		A(caught instanceof frame_reader.BadData);
+		A(/ended in the middle of frame data/.test(caught.toString()));
+	}));
+
+	it("emits error when input ends in the middle of a frame length", Promise.coroutine(function*() {
+		const inputBuf = makeFrameLE(crypto.pseudoRandomBytes(1025));
+		const inputStream = realistic_streamifier.createReadStream(inputBuf.slice(0, 3));
+		const reader = new frame_reader.Int32BufferDecoder("LE", 4096);
+		utils.pipeWithErrors(inputStream, reader);
+		let caught = null;
+		try {
+			const output = yield readableToArray(reader);
+		} catch(e) {
+			caught = e;
+		}
+		A(caught instanceof frame_reader.BadData);
+		A(/ended in the middle of a frame length/.test(caught.toString()));
 	}));
 });
