@@ -19,8 +19,13 @@ const MODE_LEN = Symbol("MODE_LEN");
 const EMPTY_BUF = new Buffer(0);
 
 class Int32BufferDecoder extends Transform {
-	constructor(endianness, maxLength) {
-		T(endianness, T.string, maxLength, T.number);
+	/**
+	 * endianness - the endianness of the length int, either "LE" or "BE"
+	 * maxLength - the maximum allowed length of a frame, not including the 4 bytes for the int itself.
+	 * lengthIncludesInt - use true if the length includes the size of the length int itself, else false.
+	 */
+	constructor(endianness, maxLength, lengthIncludesInt) {
+		T(endianness, T.string, maxLength, T.number, lengthIncludesInt, T.boolean);
 		utils.assertSafeNonNegativeInteger(maxLength);
 
 		// Even though we emit buffers, we obviously don't want them joined back
@@ -37,6 +42,7 @@ class Int32BufferDecoder extends Transform {
 		}
 		this._readInt = readInt;
 		this._maxLength = maxLength;
+		this._lengthIncludesInt = lengthIncludesInt;
 		// Use JoinedBuffers because doing Buffer.concat on every _transform
 		// call would exhibit O(N^2) behavior for long frames.
 		this._joined = new JoinedBuffers();
@@ -60,6 +66,15 @@ class Int32BufferDecoder extends Transform {
 			if(this._mode === MODE_LEN) {
 				if(data.length >= 4) {
 					this._currentLength = this._readInt(data.slice(0, 4));
+					if(this._lengthIncludesInt) {
+						if(this._currentLength < 4) {
+							callback(new BadData(
+								`Frame size includes the length integer itself, so it cannot ` +
+								`be less than 4, but was ${commaify(this._currentLength)}`));
+							return;
+						}
+						this._currentLength -= 4;
+					}
 					if(this._currentLength > this._maxLength) {
 						callback(new BadData(
 							`Frame size ${commaify(this._currentLength)} ` +
