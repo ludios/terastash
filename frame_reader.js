@@ -106,4 +106,4 @@ class Int32BufferDecoder extends Transform {
 	}
 }
 
-module.exports = {Int32BufferDecoder};
+module.exports = {Int32BufferDecoder, BadData};
