@@ -75,7 +75,7 @@ describe('Int32BufferDecoder', function() {
 		utils.pipeWithErrors(inputStream, reader);
 		let caught = null;
 		try {
-			const output = yield readableToArray(reader);
+			yield readableToArray(reader);
 		} catch(e) {
 			caught = e;
 		}
@@ -90,7 +90,7 @@ describe('Int32BufferDecoder', function() {
 		utils.pipeWithErrors(inputStream, reader);
 		let caught = null;
 		try {
-			const output = yield readableToArray(reader);
+			yield readableToArray(reader);
 		} catch(e) {
 			caught = e;
 		}
@@ -105,7 +105,7 @@ describe('Int32BufferDecoder', function() {
 		utils.pipeWithErrors(inputStream, reader);
 		let caught = null;
 		try {
-			const output = yield readableToArray(reader);
+			yield readableToArray(reader);
 		} catch(e) {
 			caught = e;
 		}
