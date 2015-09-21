@@ -12,9 +12,15 @@ const realistic_streamifier = require('../realistic_streamifier');
 const crypto = require('crypto');
 const Promise = require('bluebird');
 
-function makeFrame(buf) {
+function makeFrameLE(buf) {
 	const len = new Buffer(4);
 	len.writeUInt32LE(buf.length, 0);
+	return Buffer.concat([len, buf]);
+}
+
+function makeFrameBE(buf) {
+	const len = new Buffer(4);
+	len.writeUInt32BE(buf.length, 0);
 	return Buffer.concat([len, buf]);
 }
 
@@ -46,22 +52,24 @@ describe('Int32BufferDecoder', function() {
 	}));
 
 	it("round-trips any number of frames", Promise.coroutine(function*() {
-		const frameSizes = [0, 1, 2, 4, 5, 10, 200, 400, 800, 10000, 40000, 80000, 200000];
-		const frames = [];
-		for(const s of frameSizes) {
-			frames.push(crypto.pseudoRandomBytes(s));
+		for(const endianness of ["LE", "BE"]) {
+			const frameSizes = [0, 1, 2, 4, 5, 10, 200, 400, 800, 10000, 40000, 80000, 200000];
+			const frames = [];
+			for(const s of frameSizes) {
+				frames.push(crypto.pseudoRandomBytes(s));
+			}
+			A(frames.length, frameSizes.length);
+			const inputBuf = Buffer.concat(frames.map(endianness === "LE" ? makeFrameLE : makeFrameBE));
+			const inputStream = realistic_streamifier.createReadStream(inputBuf);
+			const reader = new frame_reader.Int32BufferDecoder(endianness, 512 * 1024);
+			utils.pipeWithErrors(inputStream, reader);
+			const output = yield readableToArray(reader);
+			assert.deepStrictEqual(output, frames);
 		}
-		A(frames.length, frameSizes.length);
-		const inputBuf = Buffer.concat(frames.map(makeFrame));
-		const inputStream = realistic_streamifier.createReadStream(inputBuf);
-		const reader = new frame_reader.Int32BufferDecoder("LE", 512 * 1024);
-		utils.pipeWithErrors(inputStream, reader);
-		const output = yield readableToArray(reader);
-		assert.deepStrictEqual(output, frames);
 	}));
 
 	it("emits error when given a too-long frame", Promise.coroutine(function*() {
-		const inputBuf = makeFrame(crypto.pseudoRandomBytes(1025));
+		const inputBuf = makeFrameLE(crypto.pseudoRandomBytes(1025));
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const reader = new frame_reader.Int32BufferDecoder("LE", 1024);
 		utils.pipeWithErrors(inputStream, reader);
