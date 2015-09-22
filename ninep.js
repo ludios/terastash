@@ -43,7 +43,7 @@ for(const p of Object.keys(packets)) {
 }
 
 function readString(frame, offset) {
-	const size = frame.readUInt16LE(frame, offset);
+	const size = frame.readUInt16LE(offset);
 	return frame.slice(offset + 2, offset + 2 + size);
 }
 
@@ -59,6 +59,7 @@ function reply(client, type, tag, bufs) {
 	preBuf.writeUInt32LE(7 + length, 0);
 	preBuf.writeUInt8(type, 4);
 	preBuf.writeUInt16LE(tag, 5);
+	console.error(preBuf, bufs);
 	client.cork();
 	client.write(preBuf);
 	for(const buf of bufs) {
@@ -95,21 +96,25 @@ function listen(socketPath) {
 		const decoder = new frame_reader.Int32BufferDecoder("LE", ourMax, true);
 		utils.pipeWithErrors(client, decoder);
 		decoder.on('data', function(frame) {
-			const type = frame.readUInt8(frame, 0);
-			const tag = frame.readUInt16LE(frame, 1);
+			console.error({frame});
+			const type = frame.readUInt8(0);
+			const tag = frame.readUInt16LE(1);
+			console.error(frame.slice(1, 3), tag);
 			if(type === Type.Tversion) {
-				const msize = frame.readUInt32LE(frame, 3);
+				const msize = frame.readUInt32LE(3);
 				const version = readString(frame, 7);
 				console.error("->", packets[type].name, {tag, msize, version});
 				// http://man.cat-v.org/plan_9/5/version - we must respond
 				// with an equal or smaller msize.  Note that msize includes
 				// the size int itself.
 				const replyMsize = Math.min(msize, ourMax + 4);
-				console.error("<- Rversion", {tag, replyMsize, version});
 				reply(client, Type.Rversion, tag, [uint32(replyMsize)].concat(string(version)));
 			} else {
 				console.error("-> Unknown message", {frame, type, tag});
 			}
+		});
+		decoder.on('error', function(err) {
+			console.error(err);
 		});
 	});
 	server.listen(socketPath);
