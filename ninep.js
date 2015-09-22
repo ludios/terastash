@@ -9,6 +9,7 @@ const inspect = require('util').inspect;
 const utils = require('./utils');
 const frame_reader = require('./frame_reader');
 
+// Note: fmt: is for documentation only
 const packets = {
 	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
 	101: {name: "Rversion", fmt: ["i4:msize", "S2:version"]},
@@ -42,11 +43,6 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
-function readString(frame, offset) {
-	const size = frame.readUInt16LE(offset);
-	return frame.slice(offset + 2, offset + 2 + size);
-}
-
 const BuffersType = T.list(Buffer);
 
 function reply(client, type, tag, bufs) {
@@ -59,14 +55,13 @@ function reply(client, type, tag, bufs) {
 	preBuf.writeUInt32LE(7 + length, 0);
 	preBuf.writeUInt8(type, 4);
 	preBuf.writeUInt16LE(tag, 5);
-	console.error(preBuf, bufs);
 	client.cork();
 	client.write(preBuf);
 	for(const buf of bufs) {
 		client.write(buf);
 	}
 	client.uncork();
-	console.error("<-", packets[type].name, {tag, bufs});
+	console.error("<-", packets[type].name, {tag});
 }
 
 function uint32(n) {
@@ -89,20 +84,52 @@ function string(b) {
 	return [uint16(b.length), b];
 }
 
+class FrameReader {
+	constructor(frame) {
+		this._frame = frame;
+		this._offset = 0;
+	}
+
+	string() {
+		const size = this._frame.readUInt16LE(this._offset);
+		this._offset += 2;
+		const string = this._frame.slice(this._offset, this._offset + size);
+		this._offset += size;
+		return string;
+	}
+
+	uint32() {
+		const int = this._frame.readUInt32LE(this._offset);
+		this._offset += 4;
+		return int;
+	}
+
+	uint16() {
+		const int = this._frame.readUInt16LE(this._offset);
+		this._offset += 2;
+		return int;
+	}
+
+	uint8() {
+		const int = this._frame.readUInt8(this._offset);
+		this._offset += 1;
+		return int;
+	}
+}
+
 function listen(socketPath) {
 	T(socketPath, T.string);
 	const ourMax = (64 * 1024 * 1024) - 4;
 	const server = net.createServer(function(client) {
 		const decoder = new frame_reader.Int32BufferDecoder("LE", ourMax, true);
 		utils.pipeWithErrors(client, decoder);
-		decoder.on('data', function(frame) {
-			console.error({frame});
-			const type = frame.readUInt8(0);
-			const tag = frame.readUInt16LE(1);
-			console.error(frame.slice(1, 3), tag);
+		decoder.on('data', function(frameBuf) {
+			const frame = new FrameReader(frameBuf);
+			const type = frame.uint8();
+			const tag = frame.uint16();
 			if(type === Type.Tversion) {
-				const msize = frame.readUInt32LE(3);
-				const version = readString(frame, 7);
+				const msize = frame.uint32();
+				const version = frame.string();
 				console.error("->", packets[type].name, {tag, msize, version});
 				// http://man.cat-v.org/plan_9/5/version - we must respond
 				// with an equal or smaller msize.  Note that msize includes
