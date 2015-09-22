@@ -455,6 +455,7 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
+		utils.weakFill(options, ['chunkSize']);
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		}
@@ -469,6 +470,19 @@ program
 	.action(a(function(storeName) {
 		T(storeName, T.string);
 		catchAndLog(terastash.authorizeGDrive(storeName));
+	}));
+
+program
+	.command('9p')
+	.description(d(`
+		Start a 9P server.`))
+	.option('--socket <socket>', 'Create the Unix domain socket at this path')
+	.action(a(function(socket) {
+		if(socket === undefined) {
+			console.error("--socket PATH is required");
+			process.exit(ERROR_EXIT_CODE);
+		}
+		require('../ninep').listen(socket);
 	}));
 
 program
