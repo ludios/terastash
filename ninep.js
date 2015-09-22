@@ -58,14 +58,14 @@ for(const p of Object.keys(packets)) {
 }
 
 const QIDType = {
-	DIR: 0x80, // File is a directory
-	APPEND: 0x40, // File is append-only
-	EXCL: 0x20, // File can only be open exactly once
-	MOUNT: 0x10, // File describes a mount
-	AUTH: 0x08, // File is an authorization ticket
-	TMP: 0x04, // File is temporary
-	LINK: 0x02, // Symlink
-	FILE: 0x00 // Regular file
+	DIR: 0x80, // directory
+	APPEND: 0x40, // append-only file
+	EXCL: 0x20, // exclusive use file
+	MOUNT: 0x10, // mounted channel
+	AUTH: 0x08, // authentication file
+	TMP: 0x04, // non-backed-up file
+	LINK: 0x02, // symbolic link
+	FILE: 0x00 // regular file
 }
 
 const BuffersType = T.list(Buffer);
@@ -247,7 +247,7 @@ function listen(socketPath) {
 					wnames.push(frame.string());
 				}
 				// TODO: support non-0
-				A.eq(nwname, 0);
+				//A.eq(nwname, 0);
 				console.error("->", packets[type].name, {tag, fid, newfid, nwname, wnames});
 				const nqids = 0;
 				reply(client, Type.Rwalk, tag, [uint16(nqids)]);
@@ -266,7 +266,8 @@ function listen(socketPath) {
 				const Rcount = 0;
 				reply(client, Type.Rreaddir, tag, [uint32(Rcount)]);
 			} else {
-				console.error("-> Unknown message", {frameBuf, type, tag});
+				console.error("-> Unsupported message", {frameBuf, type, tag});
+				reply(client, Type.Rerror, tag, string(new Buffer("Unsupported message type")));
 			}
 		});
 		decoder.on('error', function(err) {
