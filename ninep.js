@@ -11,6 +11,13 @@ const frame_reader = require('./frame_reader');
 
 // Note: fmt: is for documentation only
 const packets = {
+	// https://github.com/chaos/diod/blob/master/protocol.md
+	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
+	25: {name: "Rgetattr"}, // tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
+                 // rdev[8] size[8] blksize[8] blocks[8]
+                 // atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
+                 // ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
+                 // gen[8] data_version[8]
 	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
 	101: {name: "Rversion", fmt: ["i4:msize", "S2:version"]},
 	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
@@ -43,6 +50,17 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
+const QIDType = {
+	DIR: 0x80, // File is a directory
+	APPEND: 0x40, // File is append-only
+	EXCL: 0x20, // File can only be open exactly once
+	MOUNT: 0x10, // File describes a mount
+	AUTH: 0x08, // File is an authorization ticket
+	TMP: 0x04, // File is temporary
+	LINK: 0x02, // Symlink
+	FILE: 0x00 // Regular file
+}
+
 const BuffersType = T.list(Buffer);
 
 function reply(client, type, tag, bufs) {
@@ -61,7 +79,7 @@ function reply(client, type, tag, bufs) {
 		client.write(buf);
 	}
 	client.uncork();
-	console.error("<-", packets[type].name, {tag});
+	console.error("<-", packets[type].name, {tag, bufs});
 }
 
 function uint32(n) {
@@ -78,10 +96,23 @@ function uint16(n) {
 	return buf;
 }
 
+function uint8(n) {
+	T(n, T.number);
+	const buf = new Buffer(1);
+	buf.writeUInt8(n, 0);
+	return buf;
+}
+
 function string(b) {
 	T(b, Buffer);
 	A.lte(b.length, 64 * 1024);
 	return [uint16(b.length), b];
+}
+
+function qid(type, version, path) {
+	T(type, T.number, version, T.number, path, Buffer);
+	A.eq(path.length, 8);
+	return [uint8(type), uint32(version), path];
 }
 
 class FrameReader {
@@ -115,6 +146,12 @@ class FrameReader {
 		this._offset += 1;
 		return int;
 	}
+
+	buffer(length) {
+		const buf = this._frame.slice(this._offset, this._offset + length);
+		this._offset += length;
+		return buf;
+	}
 }
 
 function listen(socketPath) {
@@ -136,12 +173,33 @@ function listen(socketPath) {
 				// the size int itself.
 				const replyMsize = Math.min(msize, ourMax + 4);
 				reply(client, Type.Rversion, tag, [uint32(replyMsize)].concat(string(version)));
+			} else if(type === Type.Tattach) {
+				const fid = frame.uint32();
+				const afid = frame.uint32();
+				const uname = frame.string();
+				const aname = frame.string();
+				console.error("->", packets[type].name, {tag, fid, afid, uname, aname});
+				reply(client, Type.Rattach, tag, qid(QIDType.DIR, 0, new Buffer(8).fill(0)));
+			} else if(type === Type.Tgetattr) {
+				const fid = frame.uint32();
+				const requestMask = frame.buffer(8);
+				console.error("->", packets[type].name, {tag, fid, requestMask});
+				// TODO: respond with stats instead of error
+				reply(client, Type.Rerror, tag, string(new Buffer("boom")));
+			} else if(type === Type.Tclunk) {
+				const fid = frame.uint32();
+				console.error("->", packets[type].name, {tag, fid});
+				// TODO: clunk something
+				reply(client, Type.Rclunk, tag, []);
 			} else {
-				console.error("-> Unknown message", {frame, type, tag});
+				console.error("-> Unknown message", {frameBuf, type, tag});
 			}
 		});
 		decoder.on('error', function(err) {
 			console.error(err);
+		});
+		decoder.on('end', function() {
+			console.log('Disconnected');
 		});
 	});
 	server.listen(socketPath);
