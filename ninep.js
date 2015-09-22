@@ -12,12 +12,19 @@ const frame_reader = require('./frame_reader');
 // Note: fmt: is for documentation only
 const packets = {
 	// https://github.com/chaos/diod/blob/master/protocol.md
+	12: {name: "Tlopen"}, // fid[4] flags[4]
+	13: {name: "Rlopen"}, // qid[13] iounit[4]
 	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
-	25: {name: "Rgetattr"}, // tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
+	25: {name: "Rgetattr"},
+			// tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
                  // rdev[8] size[8] blksize[8] blocks[8]
                  // atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
                  // ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
                  // gen[8] data_version[8]
+	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
+	31: {name: "Rxattrwalk"}, // size[8]
+	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
+	41: {name: "Rreaddir"}, // count[4] data[count]
 	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
 	101: {name: "Rversion", fmt: ["i4:msize", "S2:version"]},
 	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
@@ -109,7 +116,7 @@ function string(b) {
 	return [uint16(b.length), b];
 }
 
-function qid(type, version, path) {
+function makeQID(type, version, path) {
 	T(type, T.number, version, T.number, path, Buffer);
 	A.eq(path.length, 8);
 	return [uint8(type), uint32(version), path];
@@ -167,6 +174,7 @@ function listen(socketPath) {
 			if(type === Type.Tversion) {
 				const msize = frame.uint32();
 				const version = frame.string();
+				// TODO: ensure version is 9P2000.L
 				console.error("->", packets[type].name, {tag, msize, version});
 				// http://man.cat-v.org/plan_9/5/version - we must respond
 				// with an equal or smaller msize.  Note that msize includes
@@ -179,18 +187,84 @@ function listen(socketPath) {
 				const uname = frame.string();
 				const aname = frame.string();
 				console.error("->", packets[type].name, {tag, fid, afid, uname, aname});
-				reply(client, Type.Rattach, tag, qid(QIDType.DIR, 0, new Buffer(8).fill(0)));
+				reply(client, Type.Rattach, tag, makeQID(QIDType.DIR, 0, new Buffer(8).fill(0)));
 			} else if(type === Type.Tgetattr) {
 				const fid = frame.uint32();
 				const requestMask = frame.buffer(8);
 				console.error("->", packets[type].name, {tag, fid, requestMask});
-				// TODO: respond with stats instead of error
-				reply(client, Type.Rerror, tag, string(new Buffer("boom")));
+
+				// valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
+	                 // rdev[8] size[8] blksize[8] blocks[8]
+	                 // atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
+	                 // ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
+	                 // gen[8] data_version[8]
+
+				const valid = new Buffer(8).fill(0);
+				const qid = new Buffer(13).fill(0);
+				const mode = new Buffer(4).fill(0);
+				const uid = new Buffer(4).fill(0);
+				const gid = new Buffer(4).fill(0);
+				const nlink = new Buffer(8).fill(0);
+				const rdev = new Buffer(8).fill(0);
+				const size = new Buffer(8).fill(0);
+				const blksize = new Buffer(8).fill(0);
+				const blocks = new Buffer(8).fill(0);
+				const atime_sec = new Buffer(8).fill(0);
+				const atime_nsec = new Buffer(8).fill(0);
+				const mtime_sec = new Buffer(8).fill(0);
+				const mtime_nsec = new Buffer(8).fill(0);
+				const ctime_sec = new Buffer(8).fill(0);
+				const ctime_nsec = new Buffer(8).fill(0);
+				const btime_sec = new Buffer(8).fill(0);
+				const btime_nsec = new Buffer(8).fill(0);
+				const gen = new Buffer(8).fill(0);
+				const data_version = new Buffer(8).fill(0);
+
+				reply(client, Type.Rgetattr, tag, [
+					valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
+					atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
+					ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
 			} else if(type === Type.Tclunk) {
 				const fid = frame.uint32();
 				console.error("->", packets[type].name, {tag, fid});
 				// TODO: clunk something
 				reply(client, Type.Rclunk, tag, []);
+			} else if(type === Type.Txattrwalk) {
+				// fid[4] newfid[4] name[s]
+				const fid = frame.uint32();
+				const newfid = frame.uint32();
+				const name = frame.string();
+				console.error("->", packets[type].name, {tag, fid, newfid, name});
+				// We have no xattrs
+				reply(client, Type.Rxattrwalk, tag, [new Buffer(8).fill(0)]);
+			} else if(type === Type.Twalk) {
+				const fid = frame.uint32();
+				const newfid = frame.uint32();
+				const nwname = frame.uint16();
+				const wnames = [];
+				let n = nwname;
+				while(n--) {
+					wnames.push(frame.string());
+				}
+				// TODO: support non-0
+				A.eq(nwname, 0);
+				console.error("->", packets[type].name, {tag, fid, newfid, nwname, wnames});
+				const nqids = 0;
+				reply(client, Type.Rwalk, tag, [uint16(nqids)]);
+			} else if(type === Type.Tlopen) {
+				const fid = frame.uint32();
+				const flags = frame.uint32();
+				console.error("->", packets[type].name, {tag, fid, flags});
+				const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
+				const iounit = 8 * 1024 * 1024;
+				reply(client, Type.Rlopen, tag, qid.concat(uint32(iounit)));
+			} else if(type === Type.Treaddir) {
+				const fid = frame.uint32();
+				const offset = frame.buffer(8);
+				const count = frame.uint32();
+				console.error("->", packets[type].name, {tag, fid, offset, count});
+				const Rcount = 0;
+				reply(client, Type.Rreaddir, tag, [uint32(Rcount)]);
 			} else {
 				console.error("-> Unknown message", {frameBuf, type, tag});
 			}
