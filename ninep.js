@@ -337,7 +337,7 @@ class Terastash9P {
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
 		} else if(msg.type === Type.Tclunk) {
-			// TODO: clunk something
+			this._fidMap.delete(msg.fid);
 			reply(this._peer, Type.Rclunk, msg.tag, []);
 		} else if(msg.type === Type.Txattrwalk) {
 			// We have no xattrs
@@ -347,6 +347,7 @@ class Terastash9P {
 			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nqids)]);
 		} else if(msg.type === Type.Tlopen) {
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
+			this._fidMap.set(msg.fid, qid);
 			const iounit = 8 * 1024 * 1024;
 			reply(this._peer, Type.Rlopen, msg.tag, [qid].concat(uint32(iounit)));
 		} else if(msg.type === Type.Treaddir) {
@@ -370,6 +371,7 @@ class Terastash9P {
 				const offsetBuf = new Buffer(8).fill(0);
 				offsetBuf.writeUInt32LE(offset);
 				data.push(qid, offsetBuf, uint8(typeBuf), string(new Buffer(row.basename, 'utf-8')));
+				offset += 1;
 			}
 			let count = 0;
 			for(const buf of data) {
