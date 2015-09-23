@@ -45,7 +45,7 @@ const packets = {
 	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
 	103: {name: "Rauth", fmt: ["b13:aqid"]},
 	104: {name: "Tattach", fmt: ["i4:fid", "i4:afid", "S2:uname", "S2:aname"]},
-	105: {name: "Rattach", fmt: ["b13:qid"]},
+	105: {name: "Rattach", enc: ["qid", _qid]},
 	107: {name: "Rerror", fmt: ["S2:ename"]},
 	108: {name: "Tflush", fmt: ["i2:oldtag"]},
 	109: {name: "Rflush", fmt: []},
@@ -72,7 +72,7 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
-const QIDType = {
+const QT = {
 	DIR: 0x80, // directory
 	APPEND: 0x40, // append-only file
 	EXCL: 0x20, // exclusive use file
@@ -129,6 +129,13 @@ function string(b) {
 	T(b, Buffer);
 	A.lte(b.length, 64 * 1024);
 	return Buffer.concat([uint16(b.length), b]);
+}
+
+const QIDType = T.shape({type: T.string, version: T.number, path: Buffer});
+
+function _qid(obj) {
+	T(obj, QIDType);
+	return Buffer.concat([uint8(QT[obj.type]), uint32(obj.version), obj.path]);
 }
 
 function makeQID(type, version, path) {
@@ -339,15 +346,14 @@ class Terastash9P {
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
 			const msize = Math.min(msg.msize, this._ourMax + 4);
-			//reply(this._peer, Type.Rversion, msg.tag);
 			this.replyEx(msg, {msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
 			this._stashName = msg.aname.toString('utf-8');
-			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
-			// 0000... is the root of the stash
-			this._qidMap.set(qid.toString('hex'), new Buffer(128/8).fill(0));
-			this._fidMap.set(msg.fid, qid);
-			reply(this._peer, Type.Rattach, msg.tag, [qid]);
+			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
+			// UUID 0000... is the root of the stash
+			this._qidMap.set(_qid(qid).toString('hex'), new Buffer(128/8).fill(0));
+			this._fidMap.set(msg.fid, _qid(qid));
+			this.replyEx(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
@@ -402,7 +408,7 @@ class Terastash9P {
 					break;
 				}
 				parent = row.uuid;
-				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
+				const typeBuf = row.type === "f" ? QT.FILE : QT.DIR;
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = makeQID(typeBuf, 0, qidPath);
 				this._qidMap.set(qid.toString('hex'), row.uuid);
@@ -415,7 +421,7 @@ class Terastash9P {
 				this._fidMap.set(msg.newfid, wqids[wqids.length - 1]);
 			}
 			const nwqid = wqids.length;
-			console.error({fidMap: this._fidMap, qidMap: this._qidMap});
+			//console.error({fidMap: this._fidMap, qidMap: this._qidMap});
 			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids));
 		} else if(msg.type === Type.Tlopen) {
 			const qid = this._fidMap.get(msg.fid);
@@ -439,7 +445,7 @@ class Terastash9P {
 			const data = [new Buffer(0)];
 			let offset = 0;
 			for(const row of rows) {
-				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
+				const typeBuf = row.type === "f" ? QT.FILE : QT.DIR;
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = makeQID(typeBuf, 0, qidPath);
 				this._qidMap.set(qid.toString('hex'), row.uuid);
