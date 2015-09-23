@@ -60,6 +60,18 @@ utils.weakFill(process.env, [
 
 const ERROR_EXIT_CODE = 255;
 
+let client;
+function shutdownCassandraClient() {
+	if(client) {
+		try {
+			client.shutdown();
+		} catch(e) {
+			console.error("client.shutdown() failed:");
+			console.error(e.stack);
+		}
+	}
+}
+
 /**
  * Attaches a logging .catch to a Promise.  If an error is caught,
  * print it and exit with exit code 255.  We use 255 because we
@@ -68,9 +80,11 @@ const ERROR_EXIT_CODE = 255;
  *
  * Some known errors are handled without printing a stack trace.
  */
-function catchAndLog(p) {
+const catchAndLog = Promise.coroutine(function* catchAndLog$coro(p) {
 	T(p, EitherPromise);
-	return p.catch(function(err) {
+	try {
+		yield p;
+	} catch(err) {
 		if(
 		err instanceof terastash.DirectoryNotEmptyError ||
 		err instanceof terastash.NoSuchPathError ||
@@ -87,8 +101,10 @@ function catchAndLog(p) {
 			console.error(err.stack);
 		}
 		process.exit(ERROR_EXIT_CODE);
-	});
-}
+	} finally {
+		shutdownCassandraClient();
+	}
+});
 
 // Ugly hack to avoid getting Function
 function stringOrNull(o) {
@@ -374,6 +390,7 @@ program
 			paths[0] = '.';
 		}
 		catchAndLog(terastash.lsPath(
+			client = terastash.getNewClient(),
 			name, {
 				justNames: options.justNames,
 				reverse: options.reverse,

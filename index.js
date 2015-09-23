@@ -242,6 +242,37 @@ function userPathToDatabasePath(base, p) {
 	}
 }
 
+class DifferentStashesError extends Error {
+	get name() {
+		return this.constructor.name;
+	}
+}
+
+const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
+	// Make sure all paths are in the same stash
+	const stashInfos = [];
+	// Don't use Promise.all to avoid having too many file handles open
+	for(const p of paths) {
+		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
+	}
+	const stashNames = stashInfos.map(utils.prop('name'));
+	if(!utils.allIdentical(stashNames)) {
+		throw new DifferentStashesError(
+			`All paths used in command must be in the same stash;` +
+			` stashes were ${inspect(stashNames)}`);
+	}
+	return stashInfos[0];
+});
+
+const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string));
+	if(stashName !== null) {
+		return yield getStashInfoByName(stashName);
+	} else {
+		return yield getStashInfoForPaths(paths);
+	}
+});
+
 /**
  * If stashName === null, convert p to database path, else just return p.
  */
@@ -298,7 +329,7 @@ function doWithClient(client, f) {
 		try {
 			client.shutdown();
 		} catch(e) {
-			console.log("client.shutdown() failed:");
+			console.error("client.shutdown() failed:");
 			console.error(e.stack);
 		}
 		return ret;
@@ -365,12 +396,6 @@ class NoSuchPathError extends Error {
 }
 
 class NotAFileError extends Error {
-	get name() {
-		return this.constructor.name;
-	}
-}
-
-class DifferentStashesError extends Error {
 	get name() {
 		return this.constructor.name;
 	}
@@ -460,44 +485,42 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 	});
 });
 
-function lsPath(stashName, options, p) {
-	return doWithClient(getNewClient(), function lsPath$doWithClient(client) {
-		return doWithPath(stashName, p, Promise.coroutine(function* lsPath$coro(stashInfo, dbPath, parentPath) {
-			const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
-			const rows = yield getChildrenForParent(
-				client, stashInfo.name, parent,
-				["basename", "type", "size", "mtime", "executable"]
+const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, options, p) {
+	const stashInfo = yield getStashInfoForNameOrPaths(stashName, [p]);
+	const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
+	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
+	const rows = yield getChildrenForParent(
+		client, stashInfo.name, parent,
+		["basename", "type", "size", "mtime", "executable"]
+	);
+	if(options.sortByMtime) {
+		rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
+	} else if(options.sortBySize) {
+		rows.sort(options.reverse ? sizeSorterAsc : sizeSorterDesc);
+	} else {
+		rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
+	}
+	for(const row of rows) {
+		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
+		if(options.justNames) {
+			console.log(row.basename);
+		} else {
+			let decoratedName = row.basename;
+			if(row.type === 'd') {
+				decoratedName = chalk.bold.blue(decoratedName);
+				decoratedName += '/';
+			} else if(row.executable) {
+				decoratedName = chalk.bold.green(decoratedName);
+				decoratedName += '*';
+			}
+			console.log(
+				utils.pad(commaify((row.size || 0).toString()), 18) + " " +
+				utils.shortISO(row.mtime) + " " +
+				decoratedName
 			);
-			if(options.sortByMtime) {
-				rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
-			} else if(options.sortBySize) {
-				rows.sort(options.reverse ? sizeSorterAsc : sizeSorterDesc);
-			} else {
-				rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
-			}
-			for(const row of rows) {
-				A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
-				if(options.justNames) {
-					console.log(row.basename);
-				} else {
-					let decoratedName = row.basename;
-					if(row.type === 'd') {
-						decoratedName = chalk.bold.blue(decoratedName);
-						decoratedName += '/';
-					} else if(row.executable) {
-						decoratedName = chalk.bold.green(decoratedName);
-						decoratedName += '*';
-					}
-					console.log(
-						utils.pad(commaify((row.size || 0).toString()), 18) + " " +
-						utils.shortISO(row.mtime) + " " +
-						decoratedName
-					);
-				}
-			}
-		}));
-	});
-}
+		}
+	}
+});
 
 let listRecursively;
 listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, ...args) {
@@ -525,7 +548,7 @@ listRecursively = Promise.coroutine(function* listRecursively$coro(client, stash
 // Like "find" utility
 function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
-	return doWithClient(getNewClient(), function lsPath$doWithClient(client) {
+	return doWithClient(getNewClient(), function findPath$doWithClient(client) {
 		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
 			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
 		}));
@@ -714,31 +737,6 @@ selfTests = {
 		selfTests.gcm = noop;
 	}
 };
-
-const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
-	// Make sure all paths are in the same stash
-	const stashInfos = [];
-	// Don't use Promise.all to avoid having too many file handles open
-	for(const p of paths) {
-		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
-	}
-	const stashNames = stashInfos.map(utils.prop('name'));
-	if(!utils.allIdentical(stashNames)) {
-		throw new DifferentStashesError(
-			`All paths used in command must be in the same stash;` +
-			` stashes were ${inspect(stashNames)}`);
-	}
-	return stashInfos[0];
-});
-
-const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
-	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	if(stashName !== null) {
-		return yield getStashInfoByName(stashName);
-	} else {
-		return yield getStashInfoForPaths(paths);
-	}
-});
 
 const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
@@ -2285,7 +2283,7 @@ function importDb(outCtx, stashName, dumpFile) {
 }
 
 module.exports = {
-	TERASTASH_VERSION,
+	TERASTASH_VERSION, getNewClient,
 	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, getFile, getFiles, catFile, catFiles, catRangedFiles, dropFile, dropFiles,
