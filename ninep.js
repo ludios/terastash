@@ -31,6 +31,19 @@ const QT = {
 	FILE: 0x00 // regular file
 };
 
+/* VFS types from dirent.h */
+const DT = {
+	 UNKNOWN: 0
+	,FIFO: 1
+	,CHR: 2
+	,DIR: 4
+	,BLK: 6
+	,REG: 8
+	,LNK: 10
+	,SOCK: 12
+	,WHT: 14
+}
+
 //console.error({fidMap: this._fidMap, qidMap: this._qidMap});
 
 function _enc_Rwalk(obj) {
@@ -38,11 +51,16 @@ function _enc_Rwalk(obj) {
 	return [uint16(wqids.length)].concat(wqids.map(_qid));
 }
 
-function _enc_Rreaddir(entries) {
+function _enc_Rreaddir(obj) {
 	const bufs = [null];
 	let count = 0;
-	for(const entry of entries) {
-		const buf = Buffer.concat([_qid(entry.qid), uint64(entry.offset), uint8(QT[entry.type]), string(entry.name)]);
+	for(const entry of obj.entries) {
+		const buf = Buffer.concat([
+			_qid(entry.qid),
+			uint64(entry.offset),
+			uint8(entry.type === "FILE" ? DT.REG : DT.DIR),
+			string(entry.name)
+		]);
 		bufs.push(buf);
 		count += buf.length;
 	}
@@ -387,10 +405,10 @@ class Terastash9P {
 	}
 
 	replyOK(msg, obj) {
-		T(msg, T.object, obj, T.any);
+		T(msg, T.object, obj, T.object);
 		const tag = msg.tag;
 		const type = msg.type + 1;
-		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(obj)}`));
+		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(Object.assign(obj, {tag}))}`));
 
 		let bufs = [];
 		if(packets[type].enc instanceof Array) {
@@ -521,7 +539,7 @@ class Terastash9P {
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
-			this.replyOK(msg, entries);
+			this.replyOK(msg, {entries});
 		} else {
 			console.error("-> Unsupported message", msg);
 			this.replyError(msg, "Unsupported message");
