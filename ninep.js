@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const getProp = utils.getProp;
 const terastash = require('./');
 const frame_reader = require('./frame_reader');
+const chalk = require('chalk');
 
 // Note: fmt: is for documentation only
 const packets = {
@@ -40,7 +41,7 @@ const packets = {
 	72: {name: "Tmkdir"},
 	73: {name: "Rmkdir"},
 	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
-	101: {name: "Rversion", fmt: ["i4:msize", "S2:version"]},
+	101: {name: "Rversion", enc: ["msize", uint32, "version", string]},
 	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
 	103: {name: "Rauth", fmt: ["b13:aqid"]},
 	104: {name: "Tattach", fmt: ["i4:fid", "i4:afid", "S2:uname", "S2:aname"]},
@@ -272,6 +273,14 @@ function decodeMessage(frameBuf) {
 	}
 }
 
+const S_IFDIR = 0x0040000; /* Directory */
+const S_IFCHR = 0x0020000; /* Character device */
+const S_IFBLK = 0x0060000; /* Block device */
+const S_IFREG = 0x0100000; /* Regular file */
+const S_IFIFO = 0x0010000; /* FIFO */
+const S_IFLNK = 0x0120000; /* Symbolic link */
+const S_IFSOCK = 0x0140000; /* Socket */
+
 class Terastash9P {
 	constructor(peer) {
 		this._peer = peer;
@@ -294,16 +303,44 @@ class Terastash9P {
 		});
 	}
 
+	replyEx(msg, obj) {
+		T(msg, T.object, obj, T.object);
+		const tag = msg.tag;
+		const type = msg.type + 1;
+		const preBuf = new Buffer(7);
+		console.error(chalk.red(`<- ${packets[type].name} ${inspect(obj)}`));
+
+		const bufs = [];
+		let length = 0;
+		for(let i=0; i < packets[type].enc.length; i+=2) {
+			const field = packets[type].enc[i];
+			const encFn = packets[type].enc[i + 1];
+			const buf = encFn(obj[field]);
+			length += buf.length;
+			bufs.push(buf);
+		}
+		preBuf.writeUInt32LE(7 + length, 0);
+		preBuf.writeUInt8(type, 4);
+		preBuf.writeUInt16LE(tag, 5);
+		this._peer.cork();
+		this._peer.write(preBuf);
+		for(const buf of bufs) {
+			this._peer.write(buf);
+		}
+		this._peer.uncork();
+	}
+
 	*handleFrame(frameBuf) {
 		const msg = decodeMessage(frameBuf);
-		console.error("->", getProp(packets, String(msg.type), {name: "?"}).name, msg);
+		console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name} ${inspect(msg)}`));
 		if(msg.type === Type.Tversion) {
 			// TODO: ensure version is 9P2000.L
 			// http://man.cat-v.org/plan_9/5/version - we must respond
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
-			const replyMsize = Math.min(msg.msize, this._ourMax + 4);
-			reply(this._peer, Type.Rversion, msg.tag, [uint32(replyMsize), string(msg.version)]);
+			const msize = Math.min(msg.msize, this._ourMax + 4);
+			//reply(this._peer, Type.Rversion, msg.tag);
+			this.replyEx(msg, {msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
@@ -313,14 +350,20 @@ class Terastash9P {
 			reply(this._peer, Type.Rattach, msg.tag, [qid]);
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
-			const qid = new Buffer(13).fill(0);
-			const mode = new Buffer(4).fill(0);
+			valid.writeUInt32LE(0x000007FF);
+			const qid = this._fidMap.get(msg.fid);
+			A.eq(qid.length, 13);
+			// TODO
+			const mode = uint32(S_IFREG | 0x1FF);
 			const uid = new Buffer(4).fill(0);
 			const gid = new Buffer(4).fill(0);
 			const nlink = new Buffer(8).fill(0);
+			nlink.writeUInt32LE(1);
 			const rdev = new Buffer(8).fill(0);
 			const size = new Buffer(8).fill(0);
 			const blksize = new Buffer(8).fill(0);
+			// TODO
+			blksize.writeUInt32LE(8 * 1024 * 1024);
 			const blocks = new Buffer(8).fill(0);
 			const atime_sec = new Buffer(8).fill(0);
 			const atime_nsec = new Buffer(8).fill(0);
@@ -344,7 +387,6 @@ class Terastash9P {
 			// We have no xattrs
 			reply(this._peer, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
 		} else if(msg.type === Type.Twalk) {
-			console.error({fidMap: this._fidMap, qidMap: this._qidMap});
 			const qid = this._fidMap.get(msg.fid);
 			let parent = this._qidMap.get(qid.toString('hex'));
 			const wqids = [];
@@ -373,11 +415,11 @@ class Terastash9P {
 				this._fidMap.set(msg.newfid, wqids[wqids.length - 1]);
 			}
 			const nwqid = wqids.length;
+			console.error({fidMap: this._fidMap, qidMap: this._qidMap});
 			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids));
 		} else if(msg.type === Type.Tlopen) {
-			// TODO: wtf we want a real qid
-			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
-			this._fidMap.set(msg.fid, qid);
+			const qid = this._fidMap.get(msg.fid);
+			A(qid.length, 13);
 			const iounit = 8 * 1024 * 1024;
 			reply(this._peer, Type.Rlopen, msg.tag, [qid, uint32(iounit)]);
 		} else if(msg.type === Type.Treaddir) {
