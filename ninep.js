@@ -13,6 +13,36 @@ const terastash = require('./');
 const frame_reader = require('./frame_reader');
 const chalk = require('chalk');
 
+function _buf(size) {
+	return function(buf) {
+		A.eq(buf.length, size);
+		return buf;
+	};
+}
+
+const QT = {
+	DIR: 0x80, // directory
+	APPEND: 0x40, // append-only file
+	EXCL: 0x20, // exclusive use file
+	MOUNT: 0x10, // mounted channel
+	AUTH: 0x08, // authentication file
+	TMP: 0x04, // non-backed-up file
+	LINK: 0x02, // symbolic link
+	FILE: 0x00 // regular file
+};
+
+function _direntries(entries) {
+	const bufs = [null];
+	let count = 0;
+	for(const entry of entries) {
+		const buf = Buffer.concat([_qid(entry.qid), uint64(entry.offset), uint8(QT[entry.type]), string(entry.name)]);
+		bufs.push(buf);
+		count += buf.length;
+	}
+	bufs[0] = uint32(count);
+	return bufs;
+}
+
 // Note: fmt: is for documentation only
 const packets = {
 	// https://github.com/chaos/diod/blob/master/protocol.md
@@ -20,7 +50,7 @@ const packets = {
 	8: {name: "Tstatfs"},
 	9: {name: "Rstatfs"},
 	12: {name: "Tlopen"}, // fid[4] flags[4]
-	13: {name: "Rlopen"}, // qid[13] iounit[4]
+	13: {name: "Rlopen", enc: ["qid", _qid, "iounit", uint32]},
 	14: {name: "Tlcreate"},
 	15: {name: "Rlcreate"},
 	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
@@ -33,9 +63,9 @@ const packets = {
 	26: {name: "Tsetattr"},
 	27: {name: "Rsetattr"},
 	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
-	31: {name: "Rxattrwalk"}, // size[8]
+	31: {name: "Rxattrwalk", enc: ["size", _buf(8)]},
 	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
-	41: {name: "Rreaddir"}, // count[4] data[count]
+	41: {name: "Rreaddir", enc: _direntries}, // count[4] data[count]
 	50: {name: "Tfsync"},
 	51: {name: "Rfsync"},
 	72: {name: "Tmkdir"},
@@ -60,7 +90,7 @@ const packets = {
 	118: {name: "Twrite", fmt: ["i4:fid", "i8:offset", "S4:data"]},
 	119: {name: "Rwrite", fmt: ["i4:count"]},
 	120: {name: "Tclunk", fmt: ["i4:fid"]},
-	121: {name: "Rclunk", fmt: []},
+	121: {name: "Rclunk", enc: []},
 	122: {name: "Tremove", fmt: ["i4:fid"]},
 	124: {name: "Tstat", fmt: ["i4:fid"]},
 	125: {name: "Rstat", fmt: ["S2:stat"]},
@@ -71,17 +101,6 @@ const Type = {};
 for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
-
-const QT = {
-	DIR: 0x80, // directory
-	APPEND: 0x40, // append-only file
-	EXCL: 0x20, // exclusive use file
-	MOUNT: 0x10, // mounted channel
-	AUTH: 0x08, // authentication file
-	TMP: 0x04, // non-backed-up file
-	LINK: 0x02, // symbolic link
-	FILE: 0x00 // regular file
-};
 
 const BuffersType = T.list(Buffer);
 
@@ -104,8 +123,20 @@ function reply(client, type, tag, bufs) {
 	console.error("<-", packets[type].name, {tag, bufs});
 }
 
+function uint64(n) {
+	T(n, T.number);
+	A.gte(n, 0);
+	// TODO: support for 64-bit-wide
+	A.lte(n, Math.pow(2, 32));
+	const buf = new Buffer(8).fill(0);
+	buf.writeUInt32LE(n);
+	return buf;
+}
+
 function uint32(n) {
 	T(n, T.number);
+	A.gte(n, 0);
+	A.lte(n, Math.pow(2, 32));
 	const buf = new Buffer(4);
 	buf.writeUInt32LE(n, 0);
 	return buf;
@@ -113,6 +144,8 @@ function uint32(n) {
 
 function uint16(n) {
 	T(n, T.number);
+	A.gte(n, 0);
+	A.lte(n, Math.pow(2, 16));
 	const buf = new Buffer(2);
 	buf.writeUInt16LE(n, 0);
 	return buf;
@@ -120,6 +153,8 @@ function uint16(n) {
 
 function uint8(n) {
 	T(n, T.number);
+	A.gte(n, 0);
+	A.lte(n, Math.pow(2, 8));
 	const buf = new Buffer(1);
 	buf.writeUInt8(n, 0);
 	return buf;
@@ -311,21 +346,29 @@ class Terastash9P {
 	}
 
 	replyEx(msg, obj) {
-		T(msg, T.object, obj, T.object);
+		T(msg, T.object, obj, T.any);
 		const tag = msg.tag;
 		const type = msg.type + 1;
 		const preBuf = new Buffer(7);
-		console.error(chalk.red(`<- ${packets[type].name} ${inspect(obj)}`));
+		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(obj)}`));
 
 		const bufs = [];
 		let length = 0;
-		for(let i=0; i < packets[type].enc.length; i+=2) {
-			const field = packets[type].enc[i];
-			const encFn = packets[type].enc[i + 1];
-			const buf = encFn(obj[field]);
-			length += buf.length;
-			bufs.push(buf);
+		if(packets[type].enc instanceof Array) {
+			for(let i=0; i < packets[type].enc.length; i+=2) {
+				const field = packets[type].enc[i];
+				const encFn = packets[type].enc[i + 1];
+				const buf = encFn(obj[field]);
+				length += buf.length;
+				bufs.push(buf);
+			}
+		} else {
+			for(const b of packets[type].enc(obj)) {
+				bufs.push(b);
+				length += b.length;
+			}
 		}
+		//console.error({bufs});
 		preBuf.writeUInt32LE(7 + length, 0);
 		preBuf.writeUInt8(type, 4);
 		preBuf.writeUInt16LE(tag, 5);
@@ -339,7 +382,7 @@ class Terastash9P {
 
 	*handleFrame(frameBuf) {
 		const msg = decodeMessage(frameBuf);
-		console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name} ${inspect(msg)}`));
+		console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name}\n${inspect(msg)}`));
 		if(msg.type === Type.Tversion) {
 			// TODO: ensure version is 9P2000.L
 			// http://man.cat-v.org/plan_9/5/version - we must respond
@@ -352,12 +395,12 @@ class Terastash9P {
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
 			this._qidMap.set(_qid(qid).toString('hex'), new Buffer(128/8).fill(0));
-			this._fidMap.set(msg.fid, _qid(qid));
+			this._fidMap.set(msg.fid, qid);
 			this.replyEx(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
-			const qid = this._fidMap.get(msg.fid);
+			const qid = _qid(this._fidMap.get(msg.fid));
 			A.eq(qid.length, 13);
 			// TODO
 			const mode = uint32(S_IFREG | 0x1FF);
@@ -388,13 +431,13 @@ class Terastash9P {
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
-			reply(this._peer, Type.Rclunk, msg.tag, []);
+			this.replyEx(msg, {});
 		} else if(msg.type === Type.Txattrwalk) {
 			// We have no xattrs
-			reply(this._peer, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
+			this.replyEx(msg, {size: new Buffer(8).fill(0)});
 		} else if(msg.type === Type.Twalk) {
 			const qid = this._fidMap.get(msg.fid);
-			let parent = this._qidMap.get(qid.toString('hex'));
+			let parent = this._qidMap.get(_qid(qid).toString('hex'));
 			const wqids = [];
 			for(const wname of msg.wnames) {
 				let row;
@@ -408,10 +451,10 @@ class Terastash9P {
 					break;
 				}
 				parent = row.uuid;
-				const typeBuf = row.type === "f" ? QT.FILE : QT.DIR;
+				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
-				const qid = makeQID(typeBuf, 0, qidPath);
-				this._qidMap.set(qid.toString('hex'), row.uuid);
+				const qid = {type, version: 0, path: qidPath};
+				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
 				console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
@@ -422,44 +465,37 @@ class Terastash9P {
 			}
 			const nwqid = wqids.length;
 			//console.error({fidMap: this._fidMap, qidMap: this._qidMap});
-			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids));
+			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids.map(_qid)));
 		} else if(msg.type === Type.Tlopen) {
 			const qid = this._fidMap.get(msg.fid);
-			A(qid.length, 13);
 			const iounit = 8 * 1024 * 1024;
-			reply(this._peer, Type.Rlopen, msg.tag, [qid, uint32(iounit)]);
+			this.replyEx(msg, {qid, iounit});
 		} else if(msg.type === Type.Treaddir) {
 			// TODO: support 64-bit offset
 			// TODO: temporarily remember the rows and return more data for non-0 offset
 			let rows = [];
 			if(msg.offset.readUInt32LE() === 0) {
 				const qid = this._fidMap.get(msg.fid);
-				T(qid, Buffer);
-				const parent = this._qidMap.get(qid.toString('hex'));
+				const parent = this._qidMap.get(_qid(qid).toString('hex'));
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
 					this._client, this._stashName, parent,
 					["basename", "type", "uuid"]
 				);
 			}
-			const data = [new Buffer(0)];
+			const entries = [];
 			let offset = 0;
 			for(const row of rows) {
-				const typeBuf = row.type === "f" ? QT.FILE : QT.DIR;
+				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
-				const qid = makeQID(typeBuf, 0, qidPath);
-				this._qidMap.set(qid.toString('hex'), row.uuid);
-				const offsetBuf = new Buffer(8).fill(0);
-				offsetBuf.writeUInt32LE(offset);
-				data.push(qid, offsetBuf, uint8(typeBuf), string(new Buffer(row.basename, 'utf-8')));
+				const qid = {type, version: 0, path: qidPath};
+				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
+				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
-			let count = 0;
-			for(const buf of data) {
-				count += buf.length;
-			}
-			data[0] = uint32(count);
-			reply(this._peer, Type.Rreaddir, msg.tag, data);
+
+			//reply(this._peer, Type.Rreaddir, msg.tag, data);
+			this.replyEx(msg, entries);
 		} else {
 			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
 			reply(this._peer, Type.Rerror, msg.tag, [string(new Buffer("Unsupported message type"))]);
