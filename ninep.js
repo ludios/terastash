@@ -20,6 +20,7 @@ function _buf(size) {
 	};
 }
 
+/* 9P2000.L types */
 const QT = {
 	DIR: 0x80, // directory
 	APPEND: 0x40, // append-only file
@@ -42,6 +43,17 @@ const DT = {
 	,LNK: 10
 	,SOCK: 12
 	,WHT: 14
+}
+
+/* stat mode bits from http://osxr.org/glibc/source/sysdeps/unix/sysv/linux/x86/bits/stat.h#0182 */
+const STAT = {
+	 IFDIR: 0o0040000 /* Directory */
+	,IFCHR: 0o0020000 /* Character device */
+	,IFBLK: 0o0060000 /* Block device */
+	,IFREG: 0o0100000 /* Regular file */
+	,IFIFO: 0o0010000 /* FIFO */
+	,IFLNK: 0o0120000 /* Symbolic link */
+	,IFSOCK: 0o0140000 /* Socket */
 }
 
 //console.error({fidMap: this._fidMap, qidMap: this._qidMap});
@@ -356,14 +368,6 @@ function decodeMessage(frameBuf) {
 	}
 }
 
-const S_IFDIR = 0o0040000; /* Directory */
-const S_IFCHR = 0o0020000; /* Character device */
-const S_IFBLK = 0o0060000; /* Block device */
-const S_IFREG = 0o0100000; /* Regular file */
-const S_IFIFO = 0o0010000; /* FIFO */
-const S_IFLNK = 0o0120000; /* Symbolic link */
-const S_IFSOCK = 0o0140000; /* Socket */
-
 
 class Terastash9P {
 	constructor(peer) {
@@ -372,6 +376,7 @@ class Terastash9P {
 		this._qidMap = new Map();
 		this._fidMap = new Map();
 		this._ourMax = (64 * 1024 * 1024) - 4;
+		this._msize = null;
 		this._client = terastash.getNewClient();
 	}
 
@@ -394,7 +399,9 @@ class Terastash9P {
 			length += buf.length;
 		}
 		const preBuf = new Buffer(4 + 1 + 2);
-		preBuf.writeUInt32LE(4 + 1 + 2 + length, 0);
+		const totalLength = 4 + 1 + 2 + length;
+		A.lte(totalLength, this._msize);
+		preBuf.writeUInt32LE(totalLength, 0);
 		preBuf.writeUInt8(type, 4);
 		preBuf.writeUInt16LE(tag, 5);
 		this._peer.cork();
@@ -438,8 +445,8 @@ class Terastash9P {
 			// http://man.cat-v.org/plan_9/5/version - we must respond
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
-			const msize = Math.min(msg.msize, this._ourMax + 4);
-			this.replyOK(msg, {msize, version: msg.version});
+			this._msize = Math.min(msg.msize, this._ourMax + 4);
+			this.replyOK(msg, {msize: this._msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
@@ -448,13 +455,12 @@ class Terastash9P {
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
-			// TODO: maybe it's absolutely forbidden to send things we weren't asked for?
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
 			console.error({fid: msg.fid, qid});
 			// TODO
-			const mode = S_IFDIR;
+			const mode = STAT.IFDIR;
 			const uid = 0;
 			const gid = 0;
 			const nlink = 1;
@@ -574,3 +580,8 @@ function listen(socketPath) {
 }
 
 module.exports = {listen};
+
+// TODO: show correct type in directory listing
+// TODO: give user all permissions
+// TODO: make large directory listings work - stay under the msize
+// TODO: implement file reads
