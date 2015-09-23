@@ -356,13 +356,14 @@ function decodeMessage(frameBuf) {
 	}
 }
 
-const S_IFDIR = 0x0040000; /* Directory */
-const S_IFCHR = 0x0020000; /* Character device */
-const S_IFBLK = 0x0060000; /* Block device */
-const S_IFREG = 0x0100000; /* Regular file */
-const S_IFIFO = 0x0010000; /* FIFO */
-const S_IFLNK = 0x0120000; /* Symbolic link */
-const S_IFSOCK = 0x0140000; /* Socket */
+const S_IFDIR = 0o0040000; /* Directory */
+const S_IFCHR = 0o0020000; /* Character device */
+const S_IFBLK = 0o0060000; /* Block device */
+const S_IFREG = 0o0100000; /* Regular file */
+const S_IFIFO = 0o0010000; /* FIFO */
+const S_IFLNK = 0o0120000; /* Symbolic link */
+const S_IFSOCK = 0o0140000; /* Socket */
+
 
 class Terastash9P {
 	constructor(peer) {
@@ -451,8 +452,9 @@ class Terastash9P {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
+			console.error({fid: msg.fid, qid});
 			// TODO
-			const mode = S_IFREG | 0x1FF;
+			const mode = S_IFDIR;
 			const uid = 0;
 			const gid = 0;
 			const nlink = 1;
@@ -473,7 +475,8 @@ class Terastash9P {
 			const gen = new Buffer(8).fill(0);
 			const data_version = new Buffer(8).fill(0);
 
-			this.replyOK(msg, {valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
+			this.replyOK(msg, {
+				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version});
 		} else if(msg.type === Type.Tclunk) {
@@ -535,7 +538,6 @@ class Terastash9P {
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
-				// TODO: is the 'type' we use actually correct in this context?
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
