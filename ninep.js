@@ -259,81 +259,96 @@ function decodeMessage(frameBuf) {
 	}
 }
 
-function listen(socketPath) {
-	T(socketPath, T.string);
-	const ourMax = (64 * 1024 * 1024) - 4;
-	const server = net.createServer(function(client) {
-		const decoder = new frame_reader.Int32BufferDecoder("LE", ourMax, true);
-		utils.pipeWithErrors(client, decoder);
-		const qidMap = new Map();
-		decoder.on('data', function(frameBuf) {
-			const msg = decodeMessage(frameBuf);
-			console.error("->", getProp(packets, String(msg.type), {name: "?"}).name, msg);
-			if(msg.type === Type.Tversion) {
-				// TODO: ensure version is 9P2000.L
-				// http://man.cat-v.org/plan_9/5/version - we must respond
-				// with an equal or smaller msize.  Note that msize includes
-				// the size int itself.
-				const replyMsize = Math.min(msg.msize, ourMax + 4);
-				reply(client, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
-			} else if(msg.type === Type.Tattach) {
-				const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
-				// null mean the root of the stash
-				qidMap.set(qid.toString('hex'), null);
-				reply(client, Type.Rattach, msg.tag, qid);
-			} else if(msg.type === Type.Tgetattr) {
-				const valid = new Buffer(8).fill(0);
-				const qid = new Buffer(13).fill(0);
-				const mode = new Buffer(4).fill(0);
-				const uid = new Buffer(4).fill(0);
-				const gid = new Buffer(4).fill(0);
-				const nlink = new Buffer(8).fill(0);
-				const rdev = new Buffer(8).fill(0);
-				const size = new Buffer(8).fill(0);
-				const blksize = new Buffer(8).fill(0);
-				const blocks = new Buffer(8).fill(0);
-				const atime_sec = new Buffer(8).fill(0);
-				const atime_nsec = new Buffer(8).fill(0);
-				const mtime_sec = new Buffer(8).fill(0);
-				const mtime_nsec = new Buffer(8).fill(0);
-				const ctime_sec = new Buffer(8).fill(0);
-				const ctime_nsec = new Buffer(8).fill(0);
-				const btime_sec = new Buffer(8).fill(0);
-				const btime_nsec = new Buffer(8).fill(0);
-				const gen = new Buffer(8).fill(0);
-				const data_version = new Buffer(8).fill(0);
+class Terastash9P {
+	constructor(client) {
+		this._client = client;
+		this._stash = null;
+		this._qidMap = new Map();
+		this._fidMap = new Map();
+		this._ourMax = (64 * 1024 * 1024) - 4;
+	}
 
-				reply(client, Type.Rgetattr, msg.tag, [
-					valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
-					atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
-					ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
-			} else if(msg.type === Type.Tclunk) {
-				// TODO: clunk something
-				reply(client, Type.Rclunk, msg.tag, []);
-			} else if(msg.type === Type.Txattrwalk) {
-				// We have no xattrs
-				reply(client, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
-			} else if(msg.type === Type.Twalk) {
-				const nqids = 0;
-				reply(client, Type.Rwalk, msg.tag, [uint16(nqids)]);
-			} else if(msg.type === Type.Tlopen) {
-				const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
-				const iounit = 8 * 1024 * 1024;
-				reply(client, Type.Rlopen, msg.tag, qid.concat(uint32(iounit)));
-			} else if(msg.type === Type.Treaddir) {
-				const Rcount = 0;
-				reply(client, Type.Rreaddir, msg.tag, [uint32(Rcount)]);
-			} else {
-				console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
-				reply(client, Type.Rerror, msg.tag, string(new Buffer("Unsupported message type")));
-			}
-		});
+	init() {
+		const decoder = new frame_reader.Int32BufferDecoder("LE", this._ourMax, true);
+		utils.pipeWithErrors(this._client, decoder);
+		decoder.on('data', this.handleFrame.bind(this));
 		decoder.on('error', function(err) {
 			console.error(err);
 		});
 		decoder.on('end', function() {
 			console.log('Disconnected');
 		});
+	}
+
+	handleFrame(frameBuf) {
+		const msg = decodeMessage(frameBuf);
+		console.error("->", getProp(packets, String(msg.type), {name: "?"}).name, msg);
+		if(msg.type === Type.Tversion) {
+			// TODO: ensure version is 9P2000.L
+			// http://man.cat-v.org/plan_9/5/version - we must respond
+			// with an equal or smaller msize.  Note that msize includes
+			// the size int itself.
+			const replyMsize = Math.min(msg.msize, this._ourMax + 4);
+			reply(this._client, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
+		} else if(msg.type === Type.Tattach) {
+			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
+			// null mean the root of the stash
+			this._qidMap.set(qid.toString('hex'), null);
+			reply(this._client, Type.Rattach, msg.tag, qid);
+		} else if(msg.type === Type.Tgetattr) {
+			const valid = new Buffer(8).fill(0);
+			const qid = new Buffer(13).fill(0);
+			const mode = new Buffer(4).fill(0);
+			const uid = new Buffer(4).fill(0);
+			const gid = new Buffer(4).fill(0);
+			const nlink = new Buffer(8).fill(0);
+			const rdev = new Buffer(8).fill(0);
+			const size = new Buffer(8).fill(0);
+			const blksize = new Buffer(8).fill(0);
+			const blocks = new Buffer(8).fill(0);
+			const atime_sec = new Buffer(8).fill(0);
+			const atime_nsec = new Buffer(8).fill(0);
+			const mtime_sec = new Buffer(8).fill(0);
+			const mtime_nsec = new Buffer(8).fill(0);
+			const ctime_sec = new Buffer(8).fill(0);
+			const ctime_nsec = new Buffer(8).fill(0);
+			const btime_sec = new Buffer(8).fill(0);
+			const btime_nsec = new Buffer(8).fill(0);
+			const gen = new Buffer(8).fill(0);
+			const data_version = new Buffer(8).fill(0);
+
+			reply(this._client, Type.Rgetattr, msg.tag, [
+				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
+				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
+				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
+		} else if(msg.type === Type.Tclunk) {
+			// TODO: clunk something
+			reply(this._client, Type.Rclunk, msg.tag, []);
+		} else if(msg.type === Type.Txattrwalk) {
+			// We have no xattrs
+			reply(this._client, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
+		} else if(msg.type === Type.Twalk) {
+			const nqids = 0;
+			reply(this._client, Type.Rwalk, msg.tag, [uint16(nqids)]);
+		} else if(msg.type === Type.Tlopen) {
+			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
+			const iounit = 8 * 1024 * 1024;
+			reply(this._client, Type.Rlopen, msg.tag, qid.concat(uint32(iounit)));
+		} else if(msg.type === Type.Treaddir) {
+			const Rcount = 0;
+			reply(this._client, Type.Rreaddir, msg.tag, [uint32(Rcount)]);
+		} else {
+			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
+			reply(this._client, Type.Rerror, msg.tag, string(new Buffer("Unsupported message type")));
+		}
+	}
+}
+
+function listen(socketPath) {
+	T(socketPath, T.string);
+	const server = net.createServer(function(client) {
+		const ts = new Terastash9P(client);
+		ts.init();
 	});
 	server.listen(socketPath);
 	console.log(`9P server started, listening on UNIX domain socket at ${inspect(socketPath)}`);
