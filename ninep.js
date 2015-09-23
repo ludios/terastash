@@ -7,7 +7,6 @@ const Promise = require('bluebird');
 const net = require('net');
 const inspect = require('util').inspect;
 const utils = require('./utils');
-const crypto = require('crypto');
 const getProp = utils.getProp;
 const terastash = require('./');
 const frame_reader = require('./frame_reader');
@@ -43,7 +42,7 @@ const DT = {
 	,LNK: 10
 	,SOCK: 12
 	,WHT: 14
-}
+};
 
 /* stat mode bits from http://osxr.org/glibc/source/sysdeps/unix/sysv/linux/x86/bits/stat.h#0182 */
 const STAT = {
@@ -54,7 +53,7 @@ const STAT = {
 	,IFIFO: 0o0010000 /* FIFO */
 	,IFLNK: 0o0120000 /* Symbolic link */
 	,IFSOCK: 0o0140000 /* Socket */
-}
+};
 
 //console.error({fidMap: this._fidMap, qidMap: this._qidMap});
 
@@ -155,27 +154,6 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
-const BuffersType = T.list(Buffer);
-
-function reply(client, type, tag, bufs) {
-	T(client, T.object, type, T.number, tag, T.number, bufs, BuffersType);
-	const preBuf = new Buffer(7);
-	let length = 0;
-	for(const buf of bufs) {
-		length += buf.length;
-	}
-	preBuf.writeUInt32LE(7 + length, 0);
-	preBuf.writeUInt8(type, 4);
-	preBuf.writeUInt16LE(tag, 5);
-	client.cork();
-	client.write(preBuf);
-	for(const buf of bufs) {
-		client.write(buf);
-	}
-	client.uncork();
-	console.error("<-", packets[type].name, {tag, bufs});
-}
-
 function uint64(n) {
 	T(n, T.number);
 	A.gte(n, 0);
@@ -224,12 +202,6 @@ const QIDType = T.shape({type: T.string, version: T.number, path: Buffer});
 function _qid(obj) {
 	T(obj, QIDType);
 	return Buffer.concat([uint8(QT[obj.type]), uint32(obj.version), obj.path]);
-}
-
-function makeQID(type, version, path) {
-	T(type, T.number, version, T.number, path, Buffer);
-	A.eq(path.length, 8);
-	return Buffer.concat([uint8(type), uint32(version), path]);
 }
 
 class FrameReader {
