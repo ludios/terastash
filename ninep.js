@@ -31,7 +31,14 @@ const QT = {
 	FILE: 0x00 // regular file
 };
 
-function _direntries(entries) {
+//console.error({fidMap: this._fidMap, qidMap: this._qidMap});
+
+function _enc_Rwalk(obj) {
+	const wqids = obj.wqids;
+	return [uint16(wqids.length)].concat(wqids.map(_qid));
+}
+
+function _enc_Rreaddir(entries) {
 	const bufs = [null];
 	let count = 0;
 	for(const entry of entries) {
@@ -65,7 +72,7 @@ const packets = {
 	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
 	31: {name: "Rxattrwalk", enc: ["size", _buf(8)]},
 	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
-	41: {name: "Rreaddir", enc: _direntries}, // count[4] data[count]
+	41: {name: "Rreaddir", enc: _enc_Rreaddir}, // count[4] data[count]
 	50: {name: "Tfsync"},
 	51: {name: "Rfsync"},
 	72: {name: "Tmkdir"},
@@ -80,7 +87,7 @@ const packets = {
 	108: {name: "Tflush", fmt: ["i2:oldtag"]},
 	109: {name: "Rflush", fmt: []},
 	110: {name: "Twalk", fmt: ["i4:fid", "i4:newfid", "i2:nwname", "R:wname"]},
-	111: {name: "Rwalk", fmt: ["i2:nqid", "R:qids"]},
+	111: {name: "Rwalk", enc: _enc_Rwalk},
 	112: {name: "Topen", fmt: ["i4:fid", "i1:mode"]},
 	113: {name: "Ropen", fmt: ["b13:qid", "i4:iounit"]},
 	114: {name: "Tcreate", fmt: ["i4:fid", "S2:name", "i4:perm", "i1:mode"]},
@@ -345,31 +352,14 @@ class Terastash9P {
 		});
 	}
 
-	replyEx(msg, obj) {
-		T(msg, T.object, obj, T.any);
-		const tag = msg.tag;
-		const type = msg.type + 1;
-		const preBuf = new Buffer(7);
-		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(obj)}`));
-
-		const bufs = [];
+	replyAny(tag, type, bufs) {
+		T(tag, T.number, type, T.number, bufs, T.list(Buffer));
 		let length = 0;
-		if(packets[type].enc instanceof Array) {
-			for(let i=0; i < packets[type].enc.length; i+=2) {
-				const field = packets[type].enc[i];
-				const encFn = packets[type].enc[i + 1];
-				const buf = encFn(obj[field]);
-				length += buf.length;
-				bufs.push(buf);
-			}
-		} else {
-			for(const b of packets[type].enc(obj)) {
-				bufs.push(b);
-				length += b.length;
-			}
+		for(const buf of bufs) {
+			length += buf.length;
 		}
-		//console.error({bufs});
-		preBuf.writeUInt32LE(7 + length, 0);
+		const preBuf = new Buffer(4 + 1 + 2);
+		preBuf.writeUInt32LE(4 + 1 + 2 + length, 0);
 		preBuf.writeUInt8(type, 4);
 		preBuf.writeUInt16LE(tag, 5);
 		this._peer.cork();
@@ -378,6 +368,32 @@ class Terastash9P {
 			this._peer.write(buf);
 		}
 		this._peer.uncork();
+	}
+
+	replyOK(msg, obj) {
+		T(msg, T.object, obj, T.any);
+		const tag = msg.tag;
+		const type = msg.type + 1;
+		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(obj)}`));
+
+		let bufs = [];
+		if(packets[type].enc instanceof Array) {
+			for(let i=0; i < packets[type].enc.length; i+=2) {
+				const field = packets[type].enc[i];
+				const encFn = packets[type].enc[i + 1];
+				const buf = encFn(obj[field]);
+				bufs.push(buf);
+			}
+		} else {
+			bufs = packets[type].enc(obj);
+		}
+		this.replyAny(tag, type, bufs);
+	}
+
+	replyError(msg, reason) {
+		const type = Type.Rerror;
+		console.error(chalk.bold(chalk.red(`<- ${packets[type].name} ${inspect(reason)}`)));
+		this.replyAny(msg.tag, type, [string(new Buffer(reason))]);
 	}
 
 	*handleFrame(frameBuf) {
@@ -389,14 +405,14 @@ class Terastash9P {
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
 			const msize = Math.min(msg.msize, this._ourMax + 4);
-			this.replyEx(msg, {msize, version: msg.version});
+			this.replyOK(msg, {msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
 			this._qidMap.set(_qid(qid).toString('hex'), new Buffer(128/8).fill(0));
 			this._fidMap.set(msg.fid, qid);
-			this.replyEx(msg, {qid});
+			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
@@ -431,10 +447,10 @@ class Terastash9P {
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
-			this.replyEx(msg, {});
+			this.replyOK(msg, {});
 		} else if(msg.type === Type.Txattrwalk) {
 			// We have no xattrs
-			this.replyEx(msg, {size: new Buffer(8).fill(0)});
+			this.replyOK(msg, {size: new Buffer(8).fill(0)});
 		} else if(msg.type === Type.Twalk) {
 			const qid = this._fidMap.get(msg.fid);
 			let parent = this._qidMap.get(_qid(qid).toString('hex'));
@@ -455,7 +471,7 @@ class Terastash9P {
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
-				console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
+				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
 			if(!msg.wnames.length) {
@@ -463,13 +479,11 @@ class Terastash9P {
 			} else if(wqids.length) {
 				this._fidMap.set(msg.newfid, wqids[wqids.length - 1]);
 			}
-			const nwqid = wqids.length;
-			//console.error({fidMap: this._fidMap, qidMap: this._qidMap});
-			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids.map(_qid)));
+			this.replyOK(msg, {wqids});
 		} else if(msg.type === Type.Tlopen) {
 			const qid = this._fidMap.get(msg.fid);
 			const iounit = 8 * 1024 * 1024;
-			this.replyEx(msg, {qid, iounit});
+			this.replyOK(msg, {qid, iounit});
 		} else if(msg.type === Type.Treaddir) {
 			// TODO: support 64-bit offset
 			// TODO: temporarily remember the rows and return more data for non-0 offset
@@ -493,12 +507,10 @@ class Terastash9P {
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
-
-			//reply(this._peer, Type.Rreaddir, msg.tag, data);
-			this.replyEx(msg, entries);
+			this.replyOK(msg, entries);
 		} else {
 			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
-			reply(this._peer, Type.Rerror, msg.tag, [string(new Buffer("Unsupported message type"))]);
+			this.replyError(msg, "Unsupported message");
 		}
 	}
 }
