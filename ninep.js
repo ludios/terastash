@@ -309,6 +309,7 @@ class Terastash9P {
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			// 0000... is the root of the stash
 			this._qidMap.set(qid.toString('hex'), new Buffer(128/8).fill(0));
+			this._fidMap.set(msg.fid, qid);
 			reply(this._peer, Type.Rattach, msg.tag, [qid]);
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
@@ -343,16 +344,45 @@ class Terastash9P {
 			// We have no xattrs
 			reply(this._peer, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
 		} else if(msg.type === Type.Twalk) {
-			const nqids = 0;
-			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nqids)]);
+			console.error({fidMap: this._fidMap, qidMap: this._qidMap});
+			const qid = this._fidMap.get(msg.fid);
+			let parent = this._qidMap.get(qid.toString('hex'));
+			const wqids = [];
+			for(const wname of msg.wnames) {
+				let row;
+				try {
+					row = yield terastash.getRowByParentBasename(
+						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type']);
+				} catch(err) {
+					if(!(err instanceof terastash.NoSuchPathError)) {
+						throw err;
+					}
+					break;
+				}
+				parent = row.uuid;
+				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
+				const qidPath = row.uuid.slice(0, 64/8); // UGH
+				const qid = makeQID(typeBuf, 0, qidPath);
+				this._qidMap.set(qid.toString('hex'), row.uuid);
+				console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
+				wqids.push(qid);
+			}
+			if(!msg.wnames.length) {
+				this._fidMap.set(msg.newfid, this._fidMap.get(msg.fid));
+			} else if(wqids.length) {
+				this._fidMap.set(msg.newfid, wqids[wqids.length - 1]);
+			}
+			const nwqid = wqids.length;
+			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nwqid)].concat(wqids));
 		} else if(msg.type === Type.Tlopen) {
+			// TODO: wtf we want a real qid
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			this._fidMap.set(msg.fid, qid);
 			const iounit = 8 * 1024 * 1024;
 			reply(this._peer, Type.Rlopen, msg.tag, [qid, uint32(iounit)]);
 		} else if(msg.type === Type.Treaddir) {
 			// TODO: support 64-bit offset
-			// TODO: return more data as needed
+			// TODO: temporarily remember the rows and return more data for non-0 offset
 			let rows = [];
 			if(msg.offset.readUInt32LE() === 0) {
 				const qid = this._fidMap.get(msg.fid);
@@ -361,17 +391,16 @@ class Terastash9P {
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
 					this._client, this._stashName, parent,
-					["basename", "type"]
+					["basename", "type", "uuid"]
 				);
 			}
 			const data = [new Buffer(0)];
 			let offset = 0;
 			for(const row of rows) {
 				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
-				const qidPath = crypto.randomBytes(8);
+				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = makeQID(typeBuf, 0, qidPath);
-				// TODO: use correct parent uuid
-				this._qidMap.set(qid.toString('hex'), [new Buffer(128/8).fill(0), row.basename]);
+				this._qidMap.set(qid.toString('hex'), row.uuid);
 				const offsetBuf = new Buffer(8).fill(0);
 				offsetBuf.writeUInt32LE(offset);
 				data.push(qid, offsetBuf, uint8(typeBuf), string(new Buffer(row.basename, 'utf-8')));
