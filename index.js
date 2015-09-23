@@ -486,6 +486,7 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 });
 
 const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, options, p) {
+	T(client, CassandraClientType, stashName, T.maybe(T.string), options, T.object, p, T.string);
 	const stashInfo = yield getStashInfoForNameOrPaths(stashName, [p]);
 	const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
@@ -2292,5 +2293,5 @@ module.exports = {
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	checkChunkSize, chunksToBlockRanges
+	checkChunkSize, chunksToBlockRanges, getChildrenForParent
 };

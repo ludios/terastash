@@ -7,14 +7,21 @@ const Promise = require('bluebird');
 const net = require('net');
 const inspect = require('util').inspect;
 const utils = require('./utils');
+const crypto = require('crypto');
 const getProp = utils.getProp;
+const terastash = require('./');
 const frame_reader = require('./frame_reader');
 
 // Note: fmt: is for documentation only
 const packets = {
 	// https://github.com/chaos/diod/blob/master/protocol.md
+	// http://lxr.free-electrons.com/source/include/net/9p/9p.h
+	8: {name: "Tstatfs"},
+	9: {name: "Rstatfs"},
 	12: {name: "Tlopen"}, // fid[4] flags[4]
 	13: {name: "Rlopen"}, // qid[13] iounit[4]
+	14: {name: "Tlcreate"},
+	15: {name: "Rlcreate"},
 	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
 	25: {name: "Rgetattr"},
 			// tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
@@ -22,10 +29,16 @@ const packets = {
 			// atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
 			// ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
 			// gen[8] data_version[8]
+	26: {name: "Tsetattr"},
+	27: {name: "Rsetattr"},
 	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
 	31: {name: "Rxattrwalk"}, // size[8]
 	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
 	41: {name: "Rreaddir"}, // count[4] data[count]
+	50: {name: "Tfsync"},
+	51: {name: "Rfsync"},
+	72: {name: "Tmkdir"},
+	73: {name: "Rmkdir"},
 	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
 	101: {name: "Rversion", fmt: ["i4:msize", "S2:version"]},
 	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
@@ -114,13 +127,13 @@ function uint8(n) {
 function string(b) {
 	T(b, Buffer);
 	A.lte(b.length, 64 * 1024);
-	return [uint16(b.length), b];
+	return Buffer.concat([uint16(b.length), b]);
 }
 
 function makeQID(type, version, path) {
 	T(type, T.number, version, T.number, path, Buffer);
 	A.eq(path.length, 8);
-	return [uint8(type), uint32(version), path];
+	return Buffer.concat([uint8(type), uint32(version), path]);
 }
 
 class FrameReader {
@@ -260,17 +273,18 @@ function decodeMessage(frameBuf) {
 }
 
 class Terastash9P {
-	constructor(client) {
-		this._client = client;
-		this._stash = null;
+	constructor(peer) {
+		this._peer = peer;
+		this._stashName = null;
 		this._qidMap = new Map();
 		this._fidMap = new Map();
 		this._ourMax = (64 * 1024 * 1024) - 4;
+		this._client = terastash.getNewClient();
 	}
 
 	init() {
 		const decoder = new frame_reader.Int32BufferDecoder("LE", this._ourMax, true);
-		utils.pipeWithErrors(this._client, decoder);
+		utils.pipeWithErrors(this._peer, decoder);
 		decoder.on('data', this.handleFrame.bind(this));
 		decoder.on('error', function(err) {
 			console.error(err);
@@ -280,7 +294,7 @@ class Terastash9P {
 		});
 	}
 
-	handleFrame(frameBuf) {
+	*handleFrame(frameBuf) {
 		const msg = decodeMessage(frameBuf);
 		console.error("->", getProp(packets, String(msg.type), {name: "?"}).name, msg);
 		if(msg.type === Type.Tversion) {
@@ -289,13 +303,13 @@ class Terastash9P {
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
 			const replyMsize = Math.min(msg.msize, this._ourMax + 4);
-			reply(this._client, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
+			reply(this._peer, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
 		} else if(msg.type === Type.Tattach) {
-			this._stash = msg.aname.toString('utf-8');
+			this._stashName = msg.aname.toString('utf-8');
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			// null mean the root of the stash
 			this._qidMap.set(qid.toString('hex'), null);
-			reply(this._client, Type.Rattach, msg.tag, qid);
+			reply(this._peer, Type.Rattach, msg.tag, [qid]);
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			const qid = new Buffer(13).fill(0);
@@ -318,32 +332,58 @@ class Terastash9P {
 			const gen = new Buffer(8).fill(0);
 			const data_version = new Buffer(8).fill(0);
 
-			reply(this._client, Type.Rgetattr, msg.tag, [
+			reply(this._peer, Type.Rgetattr, msg.tag, [
 				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
 		} else if(msg.type === Type.Tclunk) {
 			// TODO: clunk something
-			reply(this._client, Type.Rclunk, msg.tag, []);
+			reply(this._peer, Type.Rclunk, msg.tag, []);
 		} else if(msg.type === Type.Txattrwalk) {
 			// We have no xattrs
-			reply(this._client, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
+			reply(this._peer, Type.Rxattrwalk, msg.tag, [new Buffer(8).fill(0)]);
 		} else if(msg.type === Type.Twalk) {
 			const nqids = 0;
-			reply(this._client, Type.Rwalk, msg.tag, [uint16(nqids)]);
+			reply(this._peer, Type.Rwalk, msg.tag, [uint16(nqids)]);
 		} else if(msg.type === Type.Tlopen) {
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			const iounit = 8 * 1024 * 1024;
-			reply(this._client, Type.Rlopen, msg.tag, qid.concat(uint32(iounit)));
+			reply(this._peer, Type.Rlopen, msg.tag, [qid].concat(uint32(iounit)));
 		} else if(msg.type === Type.Treaddir) {
-			const Rcount = 0;
-			reply(this._client, Type.Rreaddir, msg.tag, [uint32(Rcount)]);
+			// TODO: support 64-bit offset
+			// TODO: return more data as needed
+			let rows = [];
+			if(msg.offset.readUInt32LE() === 0) {
+				rows = yield terastash.getChildrenForParent(
+					this._client, this._stashName, new Buffer(128/8).fill(0),
+					["basename", "type"]
+				);
+			}
+			const data = [];
+			let offset = 0;
+			for(const row of rows) {
+				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
+				const qidPath = crypto.randomBytes(8);
+				const qid = makeQID(typeBuf, 0, qidPath);
+				// TODO: use correct parent uuid
+				this._qidMap.set(qid.toString('hex'), [new Buffer(128/8).fill(0), row.basename]);
+				const offsetBuf = new Buffer(8).fill(0);
+				offsetBuf.writeUInt32LE(offset);
+				data.push(qid, offsetBuf, uint8(typeBuf), string(new Buffer(row.basename, 'utf-8')));
+			}
+			let count = 0;
+			for(const buf of data) {
+				count += buf.length;
+			}
+			reply(this._peer, Type.Rreaddir, msg.tag, [uint32(count)].concat(data));
 		} else {
 			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
-			reply(this._client, Type.Rerror, msg.tag, string(new Buffer("Unsupported message type")));
+			reply(this._peer, Type.Rerror, msg.tag, string(new Buffer("Unsupported message type")));
 		}
 	}
 }
+
+Terastash9P.prototype.handleFrame = Promise.coroutine(Terastash9P.prototype.handleFrame);
 
 function listen(socketPath) {
 	T(socketPath, T.string);
