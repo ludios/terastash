@@ -18,10 +18,10 @@ const packets = {
 	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
 	25: {name: "Rgetattr"},
 			// tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
-                 // rdev[8] size[8] blksize[8] blocks[8]
-                 // atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
-                 // ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
-                 // gen[8] data_version[8]
+			// rdev[8] size[8] blksize[8] blocks[8]
+			// atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
+			// ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
+			// gen[8] data_version[8]
 	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
 	31: {name: "Rxattrwalk"}, // size[8]
 	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
@@ -67,7 +67,7 @@ const QIDType = {
 	TMP: 0x04, // non-backed-up file
 	LINK: 0x02, // symbolic link
 	FILE: 0x00 // regular file
-}
+};
 
 const BuffersType = T.list(Buffer);
 
@@ -132,9 +132,9 @@ class FrameReader {
 	string() {
 		const size = this._frame.readUInt16LE(this._offset);
 		this._offset += 2;
-		const string = this._frame.slice(this._offset, this._offset + size);
+		const s = this._frame.slice(this._offset, this._offset + size);
 		this._offset += size;
-		return string;
+		return s;
 	}
 
 	uint32() {
@@ -234,17 +234,17 @@ function decodeMessage(frameBuf) {
 		const gid = frame.uint32();
 		return {type, tag, dfid, name, mode, gid};
 	} else if(type === Type.Tsetattr) {
-           const fid = frame.uint32();
-           const valid = frame.uint32();
-           const mode = frame.uint32();
-           const uid = frame.uint32();
-           const gid = frame.uint32();
-           const size = frame.buffer(8);
-           const atime_sec = frame.buffer(8);
-           const atime_nsec = frame.buffer(8);
-           const mtime_sec = frame.buffer(8);
-           const mtime_nsec = frame.buffer(8);
-           return {type, tag, fid, valid, mode, uid, gid, size, atime_sec, atime_nsec, mtime_sec, mtime_nsec};
+		const fid = frame.uint32();
+		const valid = frame.uint32();
+		const mode = frame.uint32();
+		const uid = frame.uint32();
+		const gid = frame.uint32();
+		const size = frame.buffer(8);
+		const atime_sec = frame.buffer(8);
+		const atime_nsec = frame.buffer(8);
+		const mtime_sec = frame.buffer(8);
+		const mtime_nsec = frame.buffer(8);
+		return {type, tag, fid, valid, mode, uid, gid, size, atime_sec, atime_nsec, mtime_sec, mtime_nsec};
 	} else if(type === Type.Tfsync) {
 		const fid = frame.uint32();
 		return {type, tag, fid};
@@ -291,6 +291,7 @@ class Terastash9P {
 			const replyMsize = Math.min(msg.msize, this._ourMax + 4);
 			reply(this._client, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
 		} else if(msg.type === Type.Tattach) {
+			this._stash = msg.aname.toString('utf-8');
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			// null mean the root of the stash
 			this._qidMap.set(qid.toString('hex'), null);
