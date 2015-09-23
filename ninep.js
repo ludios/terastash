@@ -61,12 +61,28 @@ const packets = {
 	14: {name: "Tlcreate"},
 	15: {name: "Rlcreate"},
 	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
-	25: {name: "Rgetattr"},
-			// tag[2] valid[8] qid[13] mode[4] uid[4] gid[4] nlink[8]
-			// rdev[8] size[8] blksize[8] blocks[8]
-			// atime_sec[8] atime_nsec[8] mtime_sec[8] mtime_nsec[8]
-			// ctime_sec[8] ctime_nsec[8] btime_sec[8] btime_nsec[8]
-			// gen[8] data_version[8]
+	25: {name: "Rgetattr", enc: [
+		"valid", _buf(8),
+		"qid", _qid,
+		"mode", uint32,
+		"uid", uint32,
+		"gid", uint32,
+		"nlink", uint64,
+		"rdev", _buf(8),
+		"size", _buf(8),
+		"blksize", _buf(8),
+		"blocks", _buf(8),
+		"atime_sec", _buf(8),
+		"atime_nsec", _buf(8),
+		"mtime_sec", _buf(8),
+		"mtime_nsec", _buf(8),
+		"ctime_sec", _buf(8),
+		"ctime_nsec", _buf(8),
+		"btime_sec", _buf(8),
+		"btime_nsec", _buf(8),
+		"gen", _buf(8),
+		"data_version", _buf(8)
+	]},
 	26: {name: "Tsetattr"},
 	27: {name: "Rsetattr"},
 	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
@@ -396,8 +412,7 @@ class Terastash9P {
 		this.replyAny(msg.tag, type, [string(new Buffer(reason))]);
 	}
 
-	*handleFrame(frameBuf) {
-		const msg = decodeMessage(frameBuf);
+	*handleMessage(msg) {
 		console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name}\n${inspect(msg)}`));
 		if(msg.type === Type.Tversion) {
 			// TODO: ensure version is 9P2000.L
@@ -414,16 +429,15 @@ class Terastash9P {
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
+			// TODO: maybe it's absolutely forbidden to send things we weren't asked for?
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
-			const qid = _qid(this._fidMap.get(msg.fid));
-			A.eq(qid.length, 13);
+			const qid = this._fidMap.get(msg.fid);
 			// TODO
-			const mode = uint32(S_IFREG | 0x1FF);
-			const uid = new Buffer(4).fill(0);
-			const gid = new Buffer(4).fill(0);
-			const nlink = new Buffer(8).fill(0);
-			nlink.writeUInt32LE(1);
+			const mode = S_IFREG | 0x1FF;
+			const uid = 0;
+			const gid = 0;
+			const nlink = 1;
 			const rdev = new Buffer(8).fill(0);
 			const size = new Buffer(8).fill(0);
 			const blksize = new Buffer(8).fill(0);
@@ -441,10 +455,9 @@ class Terastash9P {
 			const gen = new Buffer(8).fill(0);
 			const data_version = new Buffer(8).fill(0);
 
-			reply(this._peer, Type.Rgetattr, msg.tag, [
-				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
+			this.replyOK(msg, {valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
-				ctime_nsec, btime_sec, btime_nsec, gen, data_version]);
+				ctime_nsec, btime_sec, btime_nsec, gen, data_version});
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
 			this.replyOK(msg, {});
@@ -504,18 +517,31 @@ class Terastash9P {
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
+				// TODO: is the 'type' we use actually correct in this context?
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
 			this.replyOK(msg, entries);
 		} else {
-			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
+			console.error("-> Unsupported message", msg);
 			this.replyError(msg, "Unsupported message");
+		}
+	}
+
+	*handleFrame(frameBuf) {
+		const msg = decodeMessage(frameBuf);
+		try {
+			yield this.handleMessage(msg);
+		} catch(err) {
+			console.error(`Errored while processing ${inspect(msg)}:`);
+			console.error(err.stack);
+			this.replyError(msg, "Internal error");
 		}
 	}
 }
 
 Terastash9P.prototype.handleFrame = Promise.coroutine(Terastash9P.prototype.handleFrame);
+Terastash9P.prototype.handleMessage = Promise.coroutine(Terastash9P.prototype.handleMessage);
 
 function listen(socketPath) {
 	T(socketPath, T.string);
