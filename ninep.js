@@ -303,12 +303,12 @@ class Terastash9P {
 			// with an equal or smaller msize.  Note that msize includes
 			// the size int itself.
 			const replyMsize = Math.min(msg.msize, this._ourMax + 4);
-			reply(this._peer, Type.Rversion, msg.tag, [uint32(replyMsize)].concat(string(msg.version)));
+			reply(this._peer, Type.Rversion, msg.tag, [uint32(replyMsize), string(msg.version)]);
 		} else if(msg.type === Type.Tattach) {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
-			// null mean the root of the stash
-			this._qidMap.set(qid.toString('hex'), null);
+			// 0000... is the root of the stash
+			this._qidMap.set(qid.toString('hex'), new Buffer(128/8).fill(0));
 			reply(this._peer, Type.Rattach, msg.tag, [qid]);
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
@@ -349,18 +349,22 @@ class Terastash9P {
 			const qid = makeQID(QIDType.DIR, 0, new Buffer(8).fill(0));
 			this._fidMap.set(msg.fid, qid);
 			const iounit = 8 * 1024 * 1024;
-			reply(this._peer, Type.Rlopen, msg.tag, [qid].concat(uint32(iounit)));
+			reply(this._peer, Type.Rlopen, msg.tag, [qid, uint32(iounit)]);
 		} else if(msg.type === Type.Treaddir) {
 			// TODO: support 64-bit offset
 			// TODO: return more data as needed
 			let rows = [];
 			if(msg.offset.readUInt32LE() === 0) {
+				const qid = this._fidMap.get(msg.fid);
+				T(qid, Buffer);
+				const parent = this._qidMap.get(qid.toString('hex'));
+				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
-					this._client, this._stashName, new Buffer(128/8).fill(0),
+					this._client, this._stashName, parent,
 					["basename", "type"]
 				);
 			}
-			const data = [];
+			const data = [new Buffer(0)];
 			let offset = 0;
 			for(const row of rows) {
 				const typeBuf = row.type === "f" ? QIDType.FILE : QIDType.DIR;
@@ -377,10 +381,11 @@ class Terastash9P {
 			for(const buf of data) {
 				count += buf.length;
 			}
-			reply(this._peer, Type.Rreaddir, msg.tag, [uint32(count)].concat(data));
+			data[0] = uint32(count);
+			reply(this._peer, Type.Rreaddir, msg.tag, data);
 		} else {
 			console.error("-> Unsupported message", {frameBuf, type: msg.type, tag: msg.tag});
-			reply(this._peer, Type.Rerror, msg.tag, string(new Buffer("Unsupported message type")));
+			reply(this._peer, Type.Rerror, msg.tag, [string(new Buffer("Unsupported message type"))]);
 		}
 	}
 }
