@@ -1273,9 +1273,9 @@ function chunksToBlockRanges(chunks, blockSize) {
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
-const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, dbPath, ...args) {
+const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, parent, basename, ...args) {
 	const [ranges] = args;
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
+	T(client, CassandraClientType, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	if(ranges) {
 		A.eq(ranges.length, 1, "Only support 1 range right now");
 		utils.assertSafeNonNegativeInteger(ranges[0][0]);
@@ -1289,7 +1289,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 	let row;
 	try {
-		row = yield getRowByPath(client, stashInfo.name, dbPath,
+		row = yield getRowByParentBasename(client, stashInfo.name, parent, basename,
 			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	} catch(err) {
@@ -1297,21 +1297,27 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
-		row = yield getRowByPath(client, stashInfo.name, dbPath,
+		row = yield getRowByParentBasename(client, stashInfo.name, parent, basename,
 			["size", "type", "key", "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	}
+
+	function describe() {
+		return `parent=${parent.toString('hex')} basename=${inspect(basename)}`;
+	}
+
 	if(row.type !== 'f') {
-		throw new NotAFileError(`Path ${inspect(dbPath)} in stash ${inspect(stashInfo.name)} is not a file`);
+		throw new NotAFileError(
+			`Object ${describe()} in stash ${inspect(stashInfo.name)} is not a file; got type ${inspect(row.type)}`);
 	}
 
 	utils.assertSafeNonNegativeInteger(row.version);
 	if(row.version < MIN_SUPPORTED_VERSION) {
-		throw new Error(`File ${inspect(dbPath)} has version ${row.version}; ` +
+		throw new Error(`File ${describe()} has version ${row.version}; ` +
 			`min supported version is ${MIN_SUPPORTED_VERSION}.`);
 	}
 	if(row.version > MAX_SUPPORTED_VERSION) {
-		throw new Error(`File ${inspect(dbPath)} has version ${row.version}; ` +
+		throw new Error(`File ${describe()} has version ${row.version}; ` +
 			`max supported version is ${MAX_SUPPORTED_VERSION}.`);
 	}
 
@@ -1477,7 +1483,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		// Note: only in-db content has a crc32c for entire file content
 		if(!crc32c.equals(row.crc32c)) {
 			dataStream.emit('error', new Error(
-				`For dbPath=${inspect(dbPath)}, CRC32C is allegedly\n` +
+				`For ${describe()}, CRC32C is allegedly\n` +
 				`${row.crc32c.toString('hex')} but CRC32C of data is\n` +
 				`${crc32c.toString('hex')}`
 			));
@@ -1490,7 +1496,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				Number(row.size);
 		if(bytesRead !== expectedBytesRead) {
 			dataStream.emit('error', new Error(
-				`For dbPath=${inspect(dbPath)}, expected length of content to be\n` +
+				`For ${describe()}, expected length of content to be\n` +
 				`${commaify(expectedBytesRead)} but was\n` +
 				`${commaify(bytesRead)}`
 			));
@@ -1516,7 +1522,8 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 		const row = yield getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
 		yield makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
-		const [row, readStream] = yield streamFile(client, stashInfo, dbPath);
+		const parent = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
 		yield new Promise(function getFiles$Promise(resolve, reject) {
@@ -1562,7 +1569,8 @@ function getFiles(stashName, paths, fake) {
 const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath, ...args) {
 	const [ranges] = args;
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
-	const [row, readStream] = yield streamFile(client, stashInfo, dbPath, ranges);
+	const parent = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+	const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
 	utils.pipeWithErrors(readStream, process.stdout);
 	yield new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
@@ -2294,5 +2302,5 @@ module.exports = {
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
 	checkChunkSize, chunksToBlockRanges, getChildrenForParent,
-	getRowByParentBasename
+	getRowByParentBasename, getStashInfoByName
 };

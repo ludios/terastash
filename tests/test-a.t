@@ -122,7 +122,7 @@ Continue
   sample1
   sample2
   $ ts cat adir
-  Path 'adir' in stash 'unit_tests_a' is not a file
+  Object parent=00000000000000000000000000000000 basename='adir' in stash 'unit_tests_a' is not a file; got type 'd'
   [255]
   $ ts cat sample1
   hello

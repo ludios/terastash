@@ -11,6 +11,7 @@ const getProp = utils.getProp;
 const terastash = require('./');
 const frame_reader = require('./frame_reader');
 const chalk = require('chalk');
+const cassandra = require('cassandra-driver');
 
 const DEBUG_9P = Boolean(Number(utils.getProp(process.env, 'TERASTASH_DEBUG_9P', '0')));
 
@@ -154,6 +155,13 @@ const Type = {};
 for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
+
+function uint64BufferToNumber(buf) {
+	const low = buf.readUInt32LE(0);
+	const high = buf.readUInt32LE(4);
+	return high * Math.pow(2, 32) + low;
+}
+A.eq(uint64BufferToNumber(uint64(Math.pow(2, 40) + 10)), Math.pow(2, 40) + 10);
 
 const LongLikeType = T.shape({
 	low: T.number,
@@ -358,7 +366,7 @@ function decodeMessage(frameBuf) {
 class Terastash9P {
 	constructor(peer) {
 		this._peer = peer;
-		this._stashName = null;
+		this._stashInfo = null;
 		this._qidMap = new Map();
 		this._fidMap = new Map();
 		this._ourMax = (64 * 1024 * 1024) - 4;
@@ -441,7 +449,8 @@ class Terastash9P {
 			this._msize = Math.min(msg.msize, this._ourMax + 4);
 			this.replyOK(msg, {msize: this._msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
-			this._stashName = msg.aname.toString('utf-8');
+			const stashName = msg.aname.toString('utf-8');
+			this._stashInfo = yield terastash.getStashInfoByName(stashName);
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
 			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d", executable: false, size: 0});
@@ -489,6 +498,11 @@ class Terastash9P {
 				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version});
+		} else if(msg.type === Type.Tread) {
+			const qid = this._fidMap.get(msg.fid);
+			const offset = uint64BufferToNumber(msg.offset);
+			const count = msg.count;
+			//terastash.streamFile(this._client, this._stashInfo, );
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
 			this.replyOK(msg, {});
@@ -503,7 +517,7 @@ class Terastash9P {
 				let row;
 				try {
 					row = yield terastash.getRowByParentBasename(
-						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable', 'parent', 'basename', 'size']);
+						this._client, this._stashInfo.name, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable', 'parent', 'basename', 'size']);
 				} catch(err) {
 					if(!(err instanceof terastash.NoSuchPathError)) {
 						throw err;
@@ -538,7 +552,7 @@ class Terastash9P {
 				const parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
-					this._client, this._stashName, parent,
+					this._client, this._stashInfo.name, parent,
 					["basename", "type", "uuid", "parent", "size", "executable"]
 				);
 			}
