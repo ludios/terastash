@@ -610,6 +610,11 @@ function listen(socketPath) {
 
 module.exports = {listen};
 
+// TODO: don't get streamFile a range larger than the actual file?  Hitting this assert:
+//Error: For parent=16fc2b528c139e05221253971c218412 basename='Torrent downloaded from Demonoid.me.txt', expected length of content to be
+//8,192 but was
+//46
+//    at streamFile$end (/mnt/devdrive/NodeProjects/terastash/index.js:1498:29)
 // TODO: show correct mtime for a file
 // TODO: make large directory listings work - stay under the msize
 // TODO: implement readahead - if we keep getting subsequent reads on a file, keep doubling the request size up to a maximum
