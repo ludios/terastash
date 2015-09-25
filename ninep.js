@@ -156,7 +156,11 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
-const LongLikeType = T.shape({low: T.number, high: T.number, unsigned: T.number});
+const LongLikeType = T.shape({
+	low: T.number,
+	high: T.number,
+	unsigned: T.boolean
+});
 
 function uint64(n) {
 	T(n, T.union([T.number, LongLikeType]));
@@ -167,7 +171,8 @@ function uint64(n) {
 		A.lte(n, Math.pow(2, 32));
 		buf.writeUInt32LE(n);
 	} else {
-		A.eq(n.unsigned, true);
+		// This *should* be true, but cassandra-driver is not setting it?
+		//A.eq(n.unsigned, true);
 		buf.writeUInt32LE(n.low);
 		buf.writeUInt32LE(n.high, 4);
 	}
@@ -510,7 +515,6 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				console.error("row.size", row.size);
 				this._qidMap.set(_qid(qid).toString('hex'), {
 					uuid: row.uuid, type: row.type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
@@ -545,7 +549,6 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				console.error("row.size", row.size);
 				this._qidMap.set(_qid(qid).toString('hex'), {
 					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
