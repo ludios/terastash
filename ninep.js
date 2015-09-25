@@ -12,6 +12,8 @@ const terastash = require('./');
 const frame_reader = require('./frame_reader');
 const chalk = require('chalk');
 
+const DEBUG_9P = Boolean(Number(utils.getProp(process.env, 'TERASTASH_DEBUG_9P', '0')));
+
 function _buf(size) {
 	return function(buf) {
 		A.eq(buf.length, size);
@@ -98,7 +100,7 @@ const packets = {
 		"gid", uint32,
 		"nlink", uint64,
 		"rdev", _buf(8),
-		"size", _buf(8),
+		"size", uint64,
 		"blksize", _buf(8),
 		"blocks", _buf(8),
 		"atime_sec", _buf(8),
@@ -154,13 +156,21 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
+const LongLikeType = T.shape({low: T.number, high: T.number, unsigned: T.number});
+
 function uint64(n) {
-	T(n, T.number);
-	A.gte(n, 0);
-	// TODO: support for 64-bit-wide
-	A.lte(n, Math.pow(2, 32));
+	T(n, T.union([T.number, LongLikeType]));
 	const buf = new Buffer(8).fill(0);
-	buf.writeUInt32LE(n);
+	if(typeof n === 'number') {
+		A.gte(n, 0);
+		// TODO: support for up to 53 bits
+		A.lte(n, Math.pow(2, 32));
+		buf.writeUInt32LE(n);
+	} else {
+		A.eq(n.unsigned, true);
+		buf.writeUInt32LE(n.low);
+		buf.writeUInt32LE(n.high, 4);
+	}
 	return buf;
 }
 
@@ -389,7 +399,9 @@ class Terastash9P {
 		T(msg, T.object, obj, T.object);
 		const tag = msg.tag;
 		const type = msg.type + 1;
-		console.error(chalk.red(`<- ${packets[type].name}\n${inspect(Object.assign(obj, {tag}))}`));
+		if(DEBUG_9P) {
+			console.error(chalk.red(`<- ${packets[type].name}\n${inspect(Object.assign(obj, {tag}))}`));
+		}
 
 		let bufs = [];
 		if(packets[type].enc instanceof Array) {
@@ -407,12 +419,16 @@ class Terastash9P {
 
 	replyError(msg, reason) {
 		const type = Type.Rerror;
-		console.error(chalk.bold(chalk.red(`<- ${packets[type].name} ${inspect(reason)}`)));
+		if(DEBUG_9P) {
+			console.error(chalk.bold(chalk.red(`<- ${packets[type].name} ${inspect(reason)}`)));
+		}
 		this.replyAny(msg.tag, type, [string(new Buffer(reason))]);
 	}
 
 	*handleMessage(msg) {
-		console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name}\n${inspect(msg)}`));
+		if(DEBUG_9P) {
+			console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name}\n${inspect(msg)}`));
+		}
 		if(msg.type === Type.Tversion) {
 			// TODO: ensure version is 9P2000.L
 			// http://man.cat-v.org/plan_9/5/version - we must respond
@@ -424,15 +440,17 @@ class Terastash9P {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
-			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d", executable: false});
+			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d", executable: false, size: 0});
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
-			const {type, uuid, executable} = this._qidMap.get(_qid(qid).toString('hex'));
-			console.error({fid: msg.fid, qid});
+			let {type, uuid, executable, size} = this._qidMap.get(_qid(qid).toString('hex'));
+			if(DEBUG_9P) {
+				console.error({fid: msg.fid, qid});
+			}
 			let mode =
 				type === "d" ?
 					STAT.IFDIR | 0o770 :
@@ -444,13 +462,16 @@ class Terastash9P {
 			const gid = 0;
 			const nlink = 1;
 			const rdev = new Buffer(8).fill(0);
-			const size = new Buffer(8).fill(0);
+			if(type === "d") {
+				size = 0;
+			}
 			const blksize = new Buffer(8).fill(0);
 			// TODO
 			blksize.writeUInt32LE(8 * 1024 * 1024);
 			const blocks = new Buffer(8).fill(0);
 			const atime_sec = new Buffer(8).fill(0);
 			const atime_nsec = new Buffer(8).fill(0);
+			// TODO
 			const mtime_sec = new Buffer(8).fill(0);
 			const mtime_nsec = new Buffer(8).fill(0);
 			const ctime_sec = new Buffer(8).fill(0);
@@ -478,7 +499,7 @@ class Terastash9P {
 				let row;
 				try {
 					row = yield terastash.getRowByParentBasename(
-						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable']);
+						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable', 'parent', 'basename', 'size']);
 				} catch(err) {
 					if(!(err instanceof terastash.NoSuchPathError)) {
 						throw err;
@@ -489,7 +510,9 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: row.type, executable: row.executable});
+				console.error("row.size", row.size);
+				this._qidMap.set(_qid(qid).toString('hex'), {
+					uuid: row.uuid, type: row.type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
@@ -513,7 +536,7 @@ class Terastash9P {
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
 					this._client, this._stashName, parent,
-					["basename", "type", "uuid", "executable"]
+					["basename", "type", "uuid", "parent", "size", "executable"]
 				);
 			}
 			const entries = [];
@@ -522,7 +545,9 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: type, executable: row.executable});
+				console.error("row.size", row.size);
+				this._qidMap.set(_qid(qid).toString('hex'), {
+					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
