@@ -32,3 +32,4 @@ for patchfile in ./dev/patches/???-*.patch; do
 	patch -p1 < "$patchfile"
 done
 rm -f node_modules/request/request.js.orig
+rm -f node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/lib/index.js.orig
