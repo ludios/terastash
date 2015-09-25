@@ -560,7 +560,6 @@ function listen(socketPath) {
 
 module.exports = {listen};
 
-// TODO: show correct type in directory listing
-// TODO: give user all permissions
+// TODO: show correct mtime for a file
 // TODO: make large directory listings work - stay under the msize
 // TODO: implement file reads
