@@ -239,6 +239,7 @@ program
 program
 	.command('shoo <path...>')
 	.option('-c, --continue-on-error', "Keep going on mtime/size mismatches and no-such-path-in-db errors")
+	.option('-r, --rm', "Don't write fakes, just remove.")
 	.description(d(`
 		Removes a file in the working directory and replaces it with a 'fake'
 		(a zero'ed sparse file of the same length).  File must already be in the
@@ -252,8 +253,8 @@ program
 		contain real content.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		utils.weakFill(options, ['continueOnError']);
-		catchAndLog(terastash.shooFiles(files, options.continueOnError));
+		utils.weakFill(options, ['rm', 'continueOnError']);
+		catchAndLog(terastash.shooFiles(files, options.rm, options.continueOnError));
 	}));
 
 program
@@ -261,13 +262,14 @@ program
 	.option('-d, --drop-old-if-different',
 		"If path already exists in the db, and (mtime, size, executable) of " +
 		"new file is different, drop the old file instead of throwing 'already exists'")
+	.option('-r, --rm', "Don't write fakes, just remove.")
 	.option('-c, --continue-on-exists', "Keep going on 'already exists' errors")
 	.description(d(`
 		Add a file to the database, then shoo it.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		utils.weakFill(options, ['continueOnExists', 'dropOldIfDifferent']);
-		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, true));
+		utils.weakFill(options, ['rm', 'continueOnExists', 'dropOldIfDifferent']);
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, true, true));
 	}));
 
 program

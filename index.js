@@ -867,8 +867,8 @@ function infoFiles(stashName, paths, showKeys) {
 	}));
 }
 
-const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string);
+const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p, justRemove) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean));
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
 	if(row.type === 'd') {
@@ -890,20 +890,24 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p)
 				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
 			);
 		}
-		yield makeFakeFile(p, stat.size, row.mtime);
+		if(justRemove) {
+			yield utils.tryUnlink(p);
+		} else {
+			yield makeFakeFile(p, stat.size, row.mtime);
+		}
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
 });
 
 function shooFiles(paths, ...args) {
-	const [continueOnError] =args;
-	T(paths, T.list(T.string), continueOnError, T.optional(T.boolean));
+	const [justRemove, continueOnError] = args;
+	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean));
 	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
 			try {
-				yield shooFile(client, stashInfo, p);
+				yield shooFile(client, stashInfo, p, justRemove);
 			} catch(err) {
 				if(!(err instanceof UnexpectedFileError ||
 					err instanceof NoSuchPathError)
@@ -1183,13 +1187,14 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
  * Put files or directories into the Cassandra database.
  */
 function addFiles(outCtx, paths, ...args) {
-	const [continueOnExists, dropOldIfDifferent, thenShoo] = args;
+	const [continueOnExists, dropOldIfDifferent, thenShoo, justRemove] = args;
 	T(
 		outCtx, OutputContextType,
 		paths, T.list(T.string),
 		continueOnExists, T.optional(T.boolean),
 		dropOldIfDifferent, T.optional(T.boolean),
-		thenShoo, T.optional(T.boolean)
+		thenShoo, T.optional(T.boolean),
+		justRemove, T.optional(T.boolean)
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1225,7 +1230,7 @@ function addFiles(outCtx, paths, ...args) {
 					console.error(chalk.red(err.message));
 				}
 				if(thenShoo && !error) {
-					yield shooFile(client, stashInfo, p);
+					yield shooFile(client, stashInfo, p, justRemove);
 				}
 				if(stopNow) {
 					break;
