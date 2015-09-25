@@ -350,6 +350,7 @@ class Terastash9P {
 		this._ourMax = (64 * 1024 * 1024) - 4;
 		this._msize = null;
 		this._client = terastash.getNewClient();
+		this._myUID = process.getuid();
 	}
 
 	init() {
@@ -432,8 +433,8 @@ class Terastash9P {
 			const qid = this._fidMap.get(msg.fid);
 			console.error({fid: msg.fid, qid});
 			// TODO
-			const mode = STAT.IFDIR;
-			const uid = 0;
+			const mode = STAT.IFDIR | 0o770;
+			const uid = this._myUID;
 			const gid = 0;
 			const nlink = 1;
 			const rdev = new Buffer(8).fill(0);
