@@ -424,16 +424,17 @@ class Terastash9P {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
-			this._qidMap.set(_qid(qid).toString('hex'), new Buffer(128/8).fill(0));
+			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d"});
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
+			const {type, uuid} = this._qidMap.get(_qid(qid).toString('hex'));
 			console.error({fid: msg.fid, qid});
 			// TODO
-			const mode = STAT.IFDIR | 0o770;
+			const mode = (type === "d" ? STAT.IFDIR : STAT.IFREG) | 0o770;
 			const uid = this._myUID;
 			const gid = 0;
 			const nlink = 1;
@@ -466,7 +467,7 @@ class Terastash9P {
 			this.replyOK(msg, {size: new Buffer(8).fill(0)});
 		} else if(msg.type === Type.Twalk) {
 			const qid = this._fidMap.get(msg.fid);
-			let parent = this._qidMap.get(_qid(qid).toString('hex'));
+			let parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 			const wqids = [];
 			for(const wname of msg.wnames) {
 				let row;
@@ -483,7 +484,7 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
+				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: row.type});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
@@ -503,7 +504,7 @@ class Terastash9P {
 			let rows = [];
 			if(msg.offset.readUInt32LE() === 0) {
 				const qid = this._fidMap.get(msg.fid);
-				const parent = this._qidMap.get(_qid(qid).toString('hex'));
+				const parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
 					this._client, this._stashName, parent,
@@ -516,7 +517,7 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), row.uuid);
+				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: type});
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
