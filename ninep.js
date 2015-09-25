@@ -65,6 +65,10 @@ function _enc_Rwalk(obj) {
 	return [uint16(wqids.length)].concat(wqids.map(_qid));
 }
 
+function _enc_Rread(obj) {
+	return [uint32(obj.data.length), obj.data];
+}
+
 function _enc_Rreaddir(obj) {
 	const bufs = [null];
 	let count = 0;
@@ -140,7 +144,7 @@ const packets = {
 	114: {name: "Tcreate"},
 	115: {name: "Rcreate"},
 	116: {name: "Tread"},
-	117: {name: "Rread"},
+	117: {name: "Rread", enc: _enc_Rread},
 	118: {name: "Twrite"},
 	119: {name: "Rwrite"},
 	120: {name: "Tclunk"},
@@ -156,13 +160,6 @@ for(const p of Object.keys(packets)) {
 	Type[packets[p].name] = Number(p);
 }
 
-function uint64BufferToNumber(buf) {
-	const low = buf.readUInt32LE(0);
-	const high = buf.readUInt32LE(4);
-	return high * Math.pow(2, 32) + low;
-}
-A.eq(uint64BufferToNumber(uint64(Math.pow(2, 40) + 10)), Math.pow(2, 40) + 10);
-
 const LongLikeType = T.shape({
 	low: T.number,
 	high: T.number,
@@ -174,17 +171,26 @@ function uint64(n) {
 	const buf = new Buffer(8).fill(0);
 	if(typeof n === 'number') {
 		A.gte(n, 0);
-		// TODO: support for up to 53 bits
-		A.lte(n, Math.pow(2, 32));
-		buf.writeUInt32LE(n);
-	} else {
-		// This *should* be true, but cassandra-driver is not setting it?
-		//A.eq(n.unsigned, true);
-		buf.writeUInt32LE(n.low);
-		buf.writeUInt32LE(n.high, 4);
+		if(n <= Math.pow(2, 32)) {
+			buf.writeUInt32LE(n);
+			return buf;
+		} else {
+			n = cassandra.types.Long.fromNumber(n, true);
+		}
 	}
+	// This *should* be true, but cassandra-driver is not setting it?
+	//A.eq(n.unsigned, true);
+	buf.writeUInt32LE(n.low);
+	buf.writeUInt32LE(n.high, 4);
 	return buf;
 }
+
+function uint64BufferToNumber(buf) {
+	const low = buf.readUInt32LE(0);
+	const high = buf.readUInt32LE(4);
+	return high * Math.pow(2, 32) + low;
+}
+A.eq(uint64BufferToNumber(uint64(Math.pow(2, 40) + 10)), Math.pow(2, 40) + 10);
 
 function uint32(n) {
 	T(n, T.number);
@@ -355,7 +361,7 @@ function decodeMessage(frameBuf) {
 		const fid = frame.uint32();
 		return {type, tag, fid};
 	} else if(type === Type.Tflush) {
-		const oldtag = frame.uint32();
+		const oldtag = frame.uint16();
 		return {type, tag, oldtag};
 	} else {
 		return {type, tag, decode_error: "Unsupported message"};
@@ -500,9 +506,12 @@ class Terastash9P {
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version});
 		} else if(msg.type === Type.Tread) {
 			const qid = this._fidMap.get(msg.fid);
+			const {parent, basename} = this._qidMap.get(_qid(qid).toString('hex'));
 			const offset = uint64BufferToNumber(msg.offset);
 			const count = msg.count;
-			//terastash.streamFile(this._client, this._stashInfo, );
+			const [row, readStream] = yield terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
+			const data = yield utils.readableToBuffer(readStream);
+			this.replyOK(msg, {data});
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
 			this.replyOK(msg, {});
