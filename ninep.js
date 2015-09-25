@@ -180,8 +180,8 @@ function uint64(n) {
 	}
 	// This *should* be true, but cassandra-driver is not setting it?
 	//A.eq(n.unsigned, true);
-	buf.writeUInt32LE(n.low);
-	buf.writeUInt32LE(n.high, 4);
+	buf.writeInt32LE(n.low);
+	buf.writeInt32LE(n.high, 4);
 	return buf;
 }
 
