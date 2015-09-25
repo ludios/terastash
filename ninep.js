@@ -81,17 +81,16 @@ function _enc_Rreaddir(obj) {
 	return bufs;
 }
 
-// Note: fmt: is for documentation only
 const packets = {
 	// https://github.com/chaos/diod/blob/master/protocol.md
 	// http://lxr.free-electrons.com/source/include/net/9p/9p.h
 	8: {name: "Tstatfs"},
 	9: {name: "Rstatfs"},
-	12: {name: "Tlopen"}, // fid[4] flags[4]
+	12: {name: "Tlopen"},
 	13: {name: "Rlopen", enc: ["qid", _qid, "iounit", uint32]},
 	14: {name: "Tlcreate"},
 	15: {name: "Rlcreate"},
-	24: {name: "Tgetattr"}, // tag[2] fid[4] request_mask[8]
+	24: {name: "Tgetattr"},
 	25: {name: "Rgetattr", enc: [
 		"valid", _buf(8),
 		"qid", _qid,
@@ -116,39 +115,39 @@ const packets = {
 	]},
 	26: {name: "Tsetattr"},
 	27: {name: "Rsetattr"},
-	30: {name: "Txattrwalk"}, // fid[4] newfid[4] name[s]
+	30: {name: "Txattrwalk"},
 	31: {name: "Rxattrwalk", enc: ["size", _buf(8)]},
-	40: {name: "Treaddir"}, // fid[4] offset[8] count[4]
-	41: {name: "Rreaddir", enc: _enc_Rreaddir}, // count[4] data[count]
+	40: {name: "Treaddir"},
+	41: {name: "Rreaddir", enc: _enc_Rreaddir},
 	50: {name: "Tfsync"},
 	51: {name: "Rfsync"},
 	72: {name: "Tmkdir"},
 	73: {name: "Rmkdir"},
-	100: {name: "Tversion", fmt: ["i4:msize", "S2:version"]},
+	100: {name: "Tversion"},
 	101: {name: "Rversion", enc: ["msize", uint32, "version", string]},
-	102: {name: "Tauth", fmt: ["S2:uname", "S2:aname"]},
-	103: {name: "Rauth", fmt: ["b13:aqid"]},
-	104: {name: "Tattach", fmt: ["i4:fid", "i4:afid", "S2:uname", "S2:aname"]},
+	102: {name: "Tauth"},
+	103: {name: "Rauth"},
+	104: {name: "Tattach"},
 	105: {name: "Rattach", enc: ["qid", _qid]},
-	107: {name: "Rerror", fmt: ["S2:ename"]},
-	108: {name: "Tflush", fmt: ["i2:oldtag"]},
-	109: {name: "Rflush", fmt: []},
-	110: {name: "Twalk", fmt: ["i4:fid", "i4:newfid", "i2:nwname", "R:wname"]},
+	107: {name: "Rerror"},
+	108: {name: "Tflush"},
+	109: {name: "Rflush"},
+	110: {name: "Twalk"},
 	111: {name: "Rwalk", enc: _enc_Rwalk},
-	112: {name: "Topen", fmt: ["i4:fid", "i1:mode"]},
-	113: {name: "Ropen", fmt: ["b13:qid", "i4:iounit"]},
-	114: {name: "Tcreate", fmt: ["i4:fid", "S2:name", "i4:perm", "i1:mode"]},
-	115: {name: "Rcreate", fmt:["i13:qid", "i4:iounit"]},
-	116: {name: "Tread", fmt: ["i4:fid", "i8:offset", "i4:count"]},
-	117: {name: "Rread", fmt: ["S4:data"]},
-	118: {name: "Twrite", fmt: ["i4:fid", "i8:offset", "S4:data"]},
-	119: {name: "Rwrite", fmt: ["i4:count"]},
-	120: {name: "Tclunk", fmt: ["i4:fid"]},
+	112: {name: "Topen"},
+	113: {name: "Ropen"},
+	114: {name: "Tcreate"},
+	115: {name: "Rcreate"},
+	116: {name: "Tread"},
+	117: {name: "Rread"},
+	118: {name: "Twrite"},
+	119: {name: "Rwrite"},
+	120: {name: "Tclunk"},
 	121: {name: "Rclunk", enc: []},
-	122: {name: "Tremove", fmt: ["i4:fid"]},
-	124: {name: "Tstat", fmt: ["i4:fid"]},
-	125: {name: "Rstat", fmt: ["S2:stat"]},
-	126: {name: "Twstat", fmt: ["i4:fid", "S2:stat"]}
+	122: {name: "Tremove"},
+	124: {name: "Tstat"},
+	125: {name: "Rstat"},
+	126: {name: "Twstat"}
 };
 
 const Type = {};
