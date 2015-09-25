@@ -517,7 +517,7 @@ class Terastash9P {
 				);
 			}
 			const entries = [];
-			let offset = 0;
+			let offset = 1;
 			for(const row of rows) {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
