@@ -612,4 +612,5 @@ module.exports = {listen};
 
 // TODO: show correct mtime for a file
 // TODO: make large directory listings work - stay under the msize
-// TODO: implement file reads
+// TODO: implement readahead - if we keep getting subsequent reads on a file, keep doubling the request size up to a maximum
+//	Fulfill read as soon as possible even while we wait for the rest to arrive into the cache
