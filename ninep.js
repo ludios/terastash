@@ -610,6 +610,7 @@ function listen(socketPath) {
 
 module.exports = {listen};
 
+// TODO: handle Tflush
 // TODO: don't get streamFile a range larger than the actual file?  Hitting this assert:
 //Error: For parent=16fc2b528c139e05221253971c218412 basename='Torrent downloaded from Demonoid.me.txt', expected length of content to be
 //8,192 but was
