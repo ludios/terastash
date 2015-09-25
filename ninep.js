@@ -424,17 +424,22 @@ class Terastash9P {
 			this._stashName = msg.aname.toString('utf-8');
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
-			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d"});
+			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d", executable: false});
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
 			const valid = new Buffer(8).fill(0);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
-			const {type, uuid} = this._qidMap.get(_qid(qid).toString('hex'));
+			const {type, uuid, executable} = this._qidMap.get(_qid(qid).toString('hex'));
 			console.error({fid: msg.fid, qid});
-			// TODO
-			const mode = (type === "d" ? STAT.IFDIR : STAT.IFREG) | 0o770;
+			let mode =
+				type === "d" ?
+					STAT.IFDIR | 0o770 :
+					STAT.IFREG | 0o660;
+			if(executable) {
+				mode |= 0o770;
+			}
 			const uid = this._myUID;
 			const gid = 0;
 			const nlink = 1;
@@ -473,7 +478,7 @@ class Terastash9P {
 				let row;
 				try {
 					row = yield terastash.getRowByParentBasename(
-						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type']);
+						this._client, this._stashName, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable']);
 				} catch(err) {
 					if(!(err instanceof terastash.NoSuchPathError)) {
 						throw err;
@@ -484,7 +489,7 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: row.type});
+				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: row.type, executable: row.executable});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
@@ -508,7 +513,7 @@ class Terastash9P {
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
 					this._client, this._stashName, parent,
-					["basename", "type", "uuid"]
+					["basename", "type", "uuid", "executable"]
 				);
 			}
 			const entries = [];
@@ -517,7 +522,7 @@ class Terastash9P {
 				const type = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: type});
+				this._qidMap.set(_qid(qid).toString('hex'), {uuid: row.uuid, type: type, executable: row.executable});
 				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
 				offset += 1;
 			}
