@@ -269,7 +269,7 @@ program
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
 		utils.weakFill(options, ['rm', 'continueOnExists', 'dropOldIfDifferent']);
-		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, true, true));
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, true, options.rm));
 	}));
 
 program
