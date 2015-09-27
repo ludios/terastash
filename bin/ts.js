@@ -494,7 +494,21 @@ program
 program
 	.command('9p')
 	.description(d(`
-		Start a 9P server.`))
+		Start a 9P server.
+
+		Do *not* connect to this 9P server from a Linux 3.13 kernel (i.e., the version that
+		Ubuntu 14.04 ships with.)  The kernel will lock up if the 9P server is killed during
+		a read.  Linux 3.19 and 4.3-rc3 were tested to not lock up.  On Ubuntu 14.04,
+		install a new-enough kernel with:
+
+		apt-get install linux-image-generic-lts-vivid linux-headers-generic-lts-vivid
+		(Linux 3.19)
+
+		or:
+
+		apt-get install linux-image-generic-lts-wily linux-headers-generic-lts-wily
+		(Linux 4.2)
+		`))
 	.option('--socket <socket>', 'Create the Unix domain socket at this path')
 	.action(a(function(socket) {
 		if(socket === undefined) {
