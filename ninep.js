@@ -9,7 +9,7 @@ const inspect = require('util').inspect;
 const utils = require('./utils');
 const getProp = utils.getProp;
 const terastash = require('./');
-const frame_reader = require('./frame_reader');
+const intreader = require('intreader');
 const chalk = require('chalk');
 const cassandra = require('cassandra-driver');
 
@@ -382,7 +382,7 @@ class Terastash9P {
 	}
 
 	init() {
-		const decoder = new frame_reader.Int32BufferDecoder("LE", this._ourMax, true);
+		const decoder = new intreader.Int32Reader("LE", this._ourMax, true);
 		utils.pipeWithErrors(this._peer, decoder);
 		decoder.on('data', this.handleFrame.bind(this));
 		decoder.on('error', function(err) {
