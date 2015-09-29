@@ -28,7 +28,7 @@ function readJson(file, log_, strict_, cb_) {
 	cb = arguments[arguments.length - 1];
 
 	// We replace cb with our own callback that modifies
-	// data.{dependencies, devDependencies} first
+	// data.{dependencies, devDependencies, scripts} first
 	_readJson(file, log, strict, function(err, data) {
 		// Don't serve fake deps when reading from ~/.npm; that
 		// would be bad because it would affect projects that don't
@@ -36,20 +36,31 @@ function readJson(file, log_, strict_, cb_) {
 		const inDotNpm = /[\/\\]\.npm[\/\\]/.test(file);
 
 		const depsBlacklist = process.env.DEPS_BLACKLIST;
-		if(!inDotNpm && isObject(data) && depsBlacklist) {
-			for(const entry of depsBlacklist.split(' ')) {
-				if(!entry) {
-					continue;
-				}
-				const _ = entry.split('/');
-				const depender = _[0];
-				const dependee = _[1];
-				if(depender === data.name) {
-					if(isObject(data.dependencies)) {
-						delete data.dependencies[dependee];
+		const removePrebuild = Boolean(Number(process.env.REMOVE_PREBUILD));
+		if(!inDotNpm && isObject(data)) {
+			if(depsBlacklist) {
+				for(const entry of depsBlacklist.split(' ')) {
+					if(!entry) {
+						continue;
 					}
-					if(isObject(data.devDependencies)) {
-						delete data.devDependencies[dependee];
+					const _ = entry.split('/');
+					const depender = _[0];
+					const dependee = _[1];
+					if(depender === data.name) {
+						if(isObject(data.dependencies)) {
+							delete data.dependencies[dependee];
+						}
+						if(isObject(data.devDependencies)) {
+							delete data.devDependencies[dependee];
+						}
+					}
+				}
+			}
+			if(removePrebuild && isObject(data.scripts)) {
+				for(const k of Object.keys(data.scripts)) {
+					const v = data.scripts[k];
+					if(typeof v === "string" && v.startsWith("prebuild ")) {
+						delete data.scripts[k];
 					}
 				}
 			}
