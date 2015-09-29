@@ -459,7 +459,7 @@ class Terastash9P {
 			this._stashInfo = yield terastash.getStashInfoByName(stashName);
 			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
 			// UUID 0000... is the root of the stash
-			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "d", executable: false, size: 0});
+			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "DIR", executable: false, size: 0});
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
@@ -471,7 +471,7 @@ class Terastash9P {
 				console.error({fid: msg.fid, qid});
 			}
 			let mode =
-				type === "d" ?
+				type === "DIR" ?
 					STAT.IFDIR | 0o770 :
 					STAT.IFREG | 0o660;
 			if(executable) {
@@ -481,8 +481,10 @@ class Terastash9P {
 			const gid = 0;
 			const nlink = 1;
 			const rdev = new Buffer(8).fill(0);
-			if(type === "d") {
+			if(type === "DIR") {
 				size = 0;
+			} else {
+				A.neq(size, null, `Size for qid ${inspect(qid)} was null; type=${inspect(type)}`);
 			}
 			const blksize = new Buffer(8).fill(0);
 			// TODO
@@ -538,7 +540,7 @@ class Terastash9P {
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
 				const qid = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), {
-					uuid: row.uuid, type: row.type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
+					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
 				wqids.push(qid);
 			}
