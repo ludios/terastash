@@ -1198,6 +1198,17 @@ function addFiles(outCtx, paths, ...args) {
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
+		// Sort files from smallest -> largest, so that the cloud storage provider has
+		// a harder time inferring what content was stored.  If we didn't sort,
+		// they would have additional information based on the sizes of the
+		// alphanumerically sorted files, rather than just sizes from smallest
+		// to largest.  For best results, also use a larger -n with xargs.
+		const pathsWithSize = [];
+		for(const p of paths) {
+			pathsWithSize.push({path: p, size: (yield fs.statAsync(p)).size});
+		}
+		pathsWithSize.sort(sizeSorterAsc);
+		paths = pathsWithSize.map(utils.prop("path"));
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
 		// we want to avoid leaving around unreferenced chunks in our chunk stores.
