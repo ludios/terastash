@@ -1202,7 +1202,7 @@ function addFiles(outCtx, paths, ...args) {
 		// a harder time inferring what content was stored.  If we didn't sort,
 		// they would have additional information based on the sizes of the
 		// alphanumerically sorted files, rather than just sizes from smallest
-		// to largest.  For best results, also use a larger -n with xargs.
+		// to largest.  For best results, also use a larger -n / -s with xargs.
 		const pathsWithSize = [];
 		for(const p of paths) {
 			pathsWithSize.push({path: p, size: (yield fs.statAsync(p)).size});
