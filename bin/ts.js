@@ -140,7 +140,7 @@ function getOutputContext() {
 	const env = utils.weakFill(weak.object(process.env), ['TERASTASH_OUTPUT_MODE']);
 	if(env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
 		mode = env.TERASTASH_OUTPUT_MODE;
-	} else if(process.stdout.clearLine) {
+	} else if(utils.hasKey(process.stdout, 'clearLine')) {
 		mode = 'terminal';
 	} else {
 		mode = 'log';
