@@ -697,6 +697,21 @@ function* zip(...iterables) {
 	}
 }
 
+/**
+ * Randomize array element order in-place.
+ * Using Durstenfeld shuffle algorithm.
+ */
+function shuffleArray(arr) {
+	T(arr, T.list(T.any));
+	for(let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		const temp = arr[i];
+		arr[i] = arr[j];
+		arr[j] = temp;
+	}
+	return arr;
+}
+
 module.exports = {
 	LazyModule, loadNow, OutputContextType,
 
@@ -710,5 +725,6 @@ module.exports = {
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
 	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer,
-	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip
+	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip,
+	shuffleArray
 };

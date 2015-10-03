@@ -1198,23 +1198,18 @@ function addFiles(outCtx, paths, ...args) {
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
-		// Sort files from smallest -> largest, so that the cloud storage provider has
-		// a harder time inferring what content was stored.  If we didn't sort,
-		// they would have additional information based on the sizes of the
-		// alphanumerically sorted files, rather than just sizes from smallest
-		// to largest.  For best results, also use a larger -n / -s with xargs.
+		// Shuffle the files so that the cloud storage provider has a harder time
+		// inferring what content was stored.  If we didn't shuffle, they would have
+		// additional information based on the sizes of the alphanumerically sorted
+		// files, rather than just a set of sizes.  For best results, also use a larger
+		// -n / -s with xargs.
 		//
-		// Actually, sort largest -> smallest half the time, so that when multiple
-		// ts add processes are started, some are uploading large files instead
-		// of small files.  This helps both 1) reduce "Error: User rate limit exceeded"
-		// because large files take more time to upload (the limit is on request/sec),
-		// and 2) reduce the sawtooth pattern in our upstream bandwidth use.
-		const pathsWithSize = [];
-		for(const p of paths) {
-			pathsWithSize.push({path: p, size: (yield fs.statAsync(p)).size});
+		// Shuffling instead of sorting helps both 1) reduce "Error: User rate limit exceeded"
+		// that happens when uploading a lot of small files and 2) reduce the
+		// sawtooth pattern in our upstream bandwidth use.
+		if(!Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+			utils.shuffleArray(paths);
 		}
-		pathsWithSize.sort(Math.random() > 0.5 ? sizeSorterAsc : sizeSorterDesc);
-		paths = pathsWithSize.map(utils.prop("path"));
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
 		// we want to avoid leaving around unreferenced chunks in our chunk stores.
