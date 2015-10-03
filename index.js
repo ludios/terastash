@@ -867,8 +867,8 @@ function infoFiles(stashName, paths, showKeys) {
 	}));
 }
 
-const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p, justRemove) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean));
+const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p, justRemove, ignoreMtime) {
+	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
 	if(row.type === 'd') {
@@ -876,12 +876,14 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p,
 	} else if(row.type === 'f') {
 		const stat = yield fs.statAsync(p);
 		T(stat.mtime, Date);
-		if(stat.mtime.getTime() !== Number(row.mtime)) {
-			throw new UnexpectedFileError(
-				`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
-				` but mtime for dbPath=${inspect(dbPath)} is` +
-				`\n${new Date(Number(row.mtime)).toISOString()}`
-			);
+		if(!ignoreMtime) {
+			if(stat.mtime.getTime() !== Number(row.mtime)) {
+				throw new UnexpectedFileError(
+					`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
+					` but mtime for dbPath=${inspect(dbPath)} is` +
+					`\n${new Date(Number(row.mtime)).toISOString()}`
+				);
+			}
 		}
 		T(stat.size, T.number);
 		if(stat.size !== Number(row.size)) {
@@ -901,13 +903,13 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p,
 });
 
 function shooFiles(paths, ...args) {
-	const [justRemove, continueOnError] = args;
-	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean));
+	const [justRemove, continueOnError, ignoreMtime] = args;
+	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
 		for(const p of paths) {
 			try {
-				yield shooFile(client, stashInfo, p, justRemove);
+				yield shooFile(client, stashInfo, p, justRemove, ignoreMtime);
 			} catch(err) {
 				if(!(err instanceof UnexpectedFileError ||
 					err instanceof NoSuchPathError)

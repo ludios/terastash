@@ -239,6 +239,7 @@ program
 program
 	.command('shoo <path...>')
 	.option('-c, --continue-on-error', "Keep going on mtime/size mismatches and no-such-path-in-db errors")
+	.option('--ignore-mtime', "Ignore mtime when checking that local file is equivalent to db file")
 	.option('-r, --rm', "Don't write fakes, just remove.")
 	.description(d(`
 		Removes a file in the working directory and replaces it with a 'fake'
@@ -253,8 +254,8 @@ program
 		contain real content.`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		utils.weakFill(options, ['rm', 'continueOnError']);
-		catchAndLog(terastash.shooFiles(files, options.rm, options.continueOnError));
+		utils.weakFill(options, ['rm', 'continueOnError', 'ignoreMtime']);
+		catchAndLog(terastash.shooFiles(files, options.rm, options.continueOnError, options.ignoreMtime));
 	}));
 
 program
