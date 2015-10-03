@@ -1203,11 +1203,17 @@ function addFiles(outCtx, paths, ...args) {
 		// they would have additional information based on the sizes of the
 		// alphanumerically sorted files, rather than just sizes from smallest
 		// to largest.  For best results, also use a larger -n / -s with xargs.
+		//
+		// Actually, sort largest -> smallest half the time, so that when multiple
+		// ts add processes are started, some are uploading large files instead
+		// of small files.  This helps both 1) reduce "Error: User rate limit exceeded"
+		// because large files take more time to upload (the limit is on request/sec),
+		// and 2) reduce the sawtooth pattern in our upstream bandwidth use.
 		const pathsWithSize = [];
 		for(const p of paths) {
 			pathsWithSize.push({path: p, size: (yield fs.statAsync(p)).size});
 		}
-		pathsWithSize.sort(sizeSorterAsc);
+		pathsWithSize.sort(Math.random() > 0.5 ? sizeSorterAsc : sizeSorterDesc);
 		paths = pathsWithSize.map(utils.prop("path"));
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
