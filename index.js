@@ -1244,7 +1244,7 @@ function addFiles(outCtx, paths, ...args) {
 					console.error(chalk.red(err.message));
 				}
 				if(thenShoo && !error) {
-					yield shooFile(client, stashInfo, p, justRemove);
+					yield shooFile(client, stashInfo, p, justRemove, /*ignoreMtime=*/false);
 				}
 				if(stopNow) {
 					break;
