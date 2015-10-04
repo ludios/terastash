@@ -228,12 +228,13 @@ program
 		"If path already exists in the db, and (mtime, size, executable) of " +
 		"new file is different, drop the old file instead of throwing 'already exists'")
 	.option('-c, --continue-on-exists', "Keep going on 'already exists' errors")
+	.option('--ignore-mtime', "Ignore mtime when checking that local file is equivalent to db file")
 	.description(d(`
 		Add a file to the database`))
 	.action(a(function(files, options) {
 		T(files, T.list(T.string), options, T.object);
-		utils.weakFill(options, ['continueOnExists', 'dropOldIfDifferent']);
-		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent));
+		utils.weakFill(options, ['continueOnExists', 'dropOldIfDifferent', 'ignoreMtime']);
+		catchAndLog(terastash.addFiles(getOutputContext(), files, options.continueOnExists, options.dropOldIfDifferent, /*thenShoo=*/false, /*justRemove=*/false, options.ignoreMtime));
 	}));
 
 program

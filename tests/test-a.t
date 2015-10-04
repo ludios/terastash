@@ -72,6 +72,9 @@ Continue
   Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
   [255]
   $ touch --date=1971-01-01 sample1
+  $ ts add --ignore-mtime -d sample1
+  Cannot add to database: 'sample1' in stash 'unit_tests_a' already exists as a file
+  [255]
   $ ts add -d sample1 # different now, can replace
   Notice: replacing 'sample1' in db
   ┌───────┬─────────────────────────────────────────┬──────┬────────────┐

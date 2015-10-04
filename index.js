@@ -943,13 +943,14 @@ function checkChunkSize(size) {
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
 const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, ...args) {
-	const [dropOldIfDifferent] = args;
+	const [dropOldIfDifferent, ignoreMtime] = args;
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
 		p, T.string,
 		dbPath, T.string,
-		dropOldIfDifferent, T.optional(T.boolean)
+		dropOldIfDifferent, T.optional(T.boolean),
+		ignoreMtime, T.optional(T.boolean)
 	);
 	checkDbPath(dbPath);
 
@@ -957,7 +958,10 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	const throwIfAlreadyInDb = Promise.coroutine(function* throwIfAlreadyInDb$coro() {
 		let caught = false;
 		try {
-			oldRow = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type', 'executable']);
+			oldRow = yield getRowByPath(client, stashInfo.name, dbPath,
+				ignoreMtime ?
+					['size', 'type', 'executable'] :
+					['size', 'type', 'executable', 'mtime']);
 		} catch(e) {
 			if(!(e instanceof NoSuchPathError)) {
 				throw e;
@@ -995,7 +999,12 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			throw e;
 		}
 		// User wants to replace old file in db, but only if new file is different
-		const newFile = {type: 'f', mtime, executable, size: stat.size};
+		let newFile;
+		if(ignoreMtime) {
+			newFile = {type: 'f', executable, size: stat.size};
+		} else {
+			newFile = {type: 'f', mtime, executable, size: stat.size};
+		}
 		oldRow.size = Number(oldRow.size);
 		//console.log({newFile, oldRow});
 		if(!deepEqual(newFile, oldRow)) {
@@ -1189,14 +1198,15 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
  * Put files or directories into the Cassandra database.
  */
 function addFiles(outCtx, paths, ...args) {
-	const [continueOnExists, dropOldIfDifferent, thenShoo, justRemove] = args;
+	const [continueOnExists, dropOldIfDifferent, thenShoo, justRemove, ignoreMtime] = args;
 	T(
 		outCtx, OutputContextType,
 		paths, T.list(T.string),
 		continueOnExists, T.optional(T.boolean),
 		dropOldIfDifferent, T.optional(T.boolean),
 		thenShoo, T.optional(T.boolean),
-		justRemove, T.optional(T.boolean)
+		justRemove, T.optional(T.boolean),
+		ignoreMtime, T.optional(T.boolean)
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1233,7 +1243,7 @@ function addFiles(outCtx, paths, ...args) {
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
 				let error = null;
 				try {
-					yield addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent);
+					yield addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent, ignoreMtime);
 				} catch(err) {
 					if(!(err instanceof PathAlreadyExistsError ||
 						err instanceof UnexpectedFileError /* was sticky */)
