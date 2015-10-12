@@ -999,21 +999,25 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			throw e;
 		}
 		// User wants to replace old file in db, but only if new file is different
-		let newFile;
-		if(ignoreMtime) {
-			newFile = {type: 'f', executable, size: stat.size};
-		} else {
-			newFile = {type: 'f', mtime, executable, size: stat.size};
-		}
+		const newFile = ignoreMtime ?
+			{type: 'f', executable, size: stat.size} :
+			{type: 'f', mtime, executable, size: stat.size};
 		oldRow.size = Number(oldRow.size);
 		//console.log({newFile, oldRow});
 		if(!deepEqual(newFile, oldRow)) {
 			const table = new Table({
 				chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''},
-				head: ['which', 'mtime', 'size', 'executable']
+				head: ignoreMtime ?
+					['which', 'size', 'executable'] :
+					['which', 'mtime', 'size', 'executable']
 			});
-			table.push(['old', String(oldRow.mtime), commaify(oldRow.size), oldRow.executable]);
-			table.push(['new', String(mtime), commaify(stat.size), executable]);
+			if(ignoreMtime) {
+				table.push(['old', commaify(oldRow.size), oldRow.executable]);
+				table.push(['new', commaify(stat.size), executable]);
+			} else {
+				table.push(['old', String(oldRow.mtime), commaify(oldRow.size), oldRow.executable]);
+				table.push(['new', String(mtime), commaify(stat.size), executable]);
+			}
 			console.log(`Notice: replacing ${inspect(dbPath)} in db\n${table.toString()}`);
 			yield dropFile(client, stashInfo, dbPath);
 		} else {
