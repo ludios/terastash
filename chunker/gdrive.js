@@ -23,7 +23,8 @@ function getTokenFiles() {
 	let tokenFiles = null;
 	try {
 		// google-tokens/ for multiple accounts
-		tokenFiles = fs.readdirSync(basedir.configPath(path.join("terastash", "google-tokens")));
+		const dir = basedir.configPath(path.join("terastash", "google-tokens"));
+		tokenFiles = fs.readdirSync(dir).map(f => `${dir}/${f}`);
 	} catch(e) {}
 	return tokenFiles;
 }

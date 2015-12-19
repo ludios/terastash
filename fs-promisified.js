@@ -23,5 +23,6 @@ module.exports = {
 
 	readFileSync: fs.readFileSync,
 	writeFileSync: fs.writeFileSync,
-	existsSync: fs.existsSync
+	existsSync: fs.existsSync,
+	readdirSync: fs.readdirSync
 };
