@@ -1929,6 +1929,15 @@ const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	console.log("OK, saved the refresh token and access token.");
 });
 
+const updateGoogleTokens = Promise.coroutine(function* updateGoogleTokens$coro(tokensFilename, clientId, clientSecret) {
+	gdrive = loadNow(gdrive);
+	const gdriver = new gdrive.GDriver(clientId, clientSecret);
+	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
+	gdriver._oauth2Client.setCredentials(credentials);
+	yield gdriver.refreshAccessToken();
+	fs.writeFileSync(tokensFilename, JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2));
+});
+
 function assertName(name) {
 	T(name, T.string);
 	A(name, "Name must not be empty");
@@ -2326,7 +2335,7 @@ function importDb(outCtx, stashName, dumpFile) {
 
 module.exports = {
 	TERASTASH_VERSION, getNewClient,
-	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive,
+	initStash, destroyStash, getStashes, getChunkStores, authorizeGDrive, updateGoogleTokens,
 	listTerastashKeyspaces, listChunkStores, defineChunkStore, configChunkStore,
 	addFile, addFiles, streamFile, getFile, getFiles, catFile, catFiles, catRangedFiles,
 	dropFile, dropFiles, shooFile, shooFiles, moveFiles, makeDirectories, lsPath,

@@ -14,13 +14,37 @@ const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
 const chalk = require('chalk');
+const path = require('path');
+const fs = require('../fs-promisified');
+const basedir = require('xdg').basedir;
 
-const getAllCredentials = utils.makeConfigFileInitializer(
+
+function getTokenFiles() {
+	let tokenFiles = null;
+	try {
+		// google-tokens/ for multiple accounts
+		tokenFiles = fs.readdirSync(basedir.configPath(path.join("terastash", "google-tokens")));
+	} catch(e) {}
+	return tokenFiles;
+}
+
+const getAllCredentialsOneFile = utils.makeConfigFileInitializer(
 	"google-tokens.json", {
 		credentials: {},
 		_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
 	}
 );
+
+const getAllCredentials = Promise.coroutine(function* getAllCredentials$coro() {
+	const tokenFiles = getTokenFiles();
+	if(tokenFiles) {
+		const tokenFile = tokenFiles[Math.floor(Math.random() * tokenFiles.length)];
+		const buf = yield fs.readFileAsync(tokenFile);
+		return JSON.parse(buf);
+	} else {
+		return getAllCredentialsOneFile();
+	}
+});
 
 const idProp = utils.prop('id');
 
@@ -142,6 +166,11 @@ class GDriver {
 	}
 
 	*_maybeRefreshAndSaveToken() {
+		// If we have a google-tokens/, don't update the tokens because another process
+		// is responsible for updating them.
+		if(getTokenFiles()) {
+			return;
+		}
 		// Access tokens last for 60 minutes; make sure we have at least 50 minutes
 		// left on the clock, in case our upload takes a while.
 		const minMinutes = 50;

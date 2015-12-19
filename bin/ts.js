@@ -494,6 +494,14 @@ program
 	}));
 
 program
+	.command('update-google-tokens <tokens-filename> <client-id> <client-secret>')
+	.description(d(`
+		Refresh the access token in tokens-filename.`))
+	.action(a(function(tokensFilename, clientId, clientSecret) {
+		catchAndLog(terastash.updateGoogleTokens(tokensFilename, clientId, clientSecret));
+	}));
+
+program
 	.command('9p')
 	.description(d(`
 		Start a 9P server.
