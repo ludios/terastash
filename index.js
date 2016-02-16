@@ -41,7 +41,7 @@ cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
 let localfs = new LazyModule('./chunker/localfs');
 let gdrive = new LazyModule('./chunker/gdrive');
 let heapdump = new LazyModule('heapdump', compile_require);
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+let sse4_crc32 = new LazyModule(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32', compile_require);
 let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
 let line_reader = new LazyModule('./line_reader');

@@ -2,6 +2,7 @@
 "use strict";
 
 const A = require('ayy');
+const os = require('os');
 const utils = require('./utils');
 const commaify = utils.commaify;
 const compile_require = require('./compile_require');
@@ -10,7 +11,7 @@ const LazyModule = utils.LazyModule;
 const JoinedBuffers = utils.JoinedBuffers;
 const Transform = require('stream').Transform;
 
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+let sse4_crc32 = new LazyModule(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32', compile_require);
 
 function crcToBuf(n) {
 	const buf = new Buffer(4);

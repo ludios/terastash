@@ -42,6 +42,7 @@ require('cache-require-paths');
 require('better-buffer-inspect');
 
 const terastash = require('..');
+const os = require('os');
 const utils = require('../utils');
 const weak = require('../weak');
 const filename = require('../filename');
@@ -535,7 +536,7 @@ program
 		Requires a C++ compiler.`))
 	.action(a(function() {
 		const compile_require = require('../compile_require');
-		compile_require('sse4_crc32');
+		compile_require(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32');
 	}));
 
 program

@@ -5,6 +5,7 @@ const A = require('ayy');
 const T = require('notmytype');
 const Promise = require('bluebird');
 const mkdirpAsync = Promise.promisify(require('mkdirp'));
+const os = require('os');
 const fs = require('./fs-promisified');
 const path = require('path');
 const crypto = require('crypto');
@@ -43,7 +44,7 @@ function loadNow(obj) {
 	return obj;
 }
 
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+let sse4_crc32 = new LazyModule(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32', compile_require);
 let https = new LazyModule('https');
 
 const OutputContextType = T.shape({mode: T.string});
