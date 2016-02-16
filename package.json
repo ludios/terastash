@@ -29,6 +29,7 @@
     "notmytype": "^2.0.0",
     "request": "^2.64.0",
     "sse4_crc32": "^4.1.0",
+    "armv7l_crc32": "../arm7vl_crc32",
     "streamifier": "^0.1.1",
     "transit-js": "^0.8.837",
     "xdg": "^0.1.1"
