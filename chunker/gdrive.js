@@ -475,7 +475,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 				console.error(`\n${utils.pluralize(triesLeft, 'try', 'tries')} left; ` +
 					`trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
-		}, 20, decayer);
+		}, 40, decayer);
 		if(response === null) {
 			break;
 		}
