@@ -8,7 +8,6 @@ const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
 const getProp = utils.getProp;
-const weak = require('../weak');
 const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
@@ -101,7 +100,7 @@ class GDriver {
 		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
 		const oauth2Client = new FixedOAuth2(clientId, clientSecret, redirectUrl);
 		this._oauth2Client = oauth2Client;
-		this._drive = google.drive(weak.object({version: 'v2', auth: oauth2Client}));
+		this._drive = google.drive({version: 'v2', auth: oauth2Client});
 	}
 
 	getAuthUrl() {

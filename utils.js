@@ -582,20 +582,6 @@ function getProp(obj, k, ...args) {
 	}
 }
 
-/**
- * For strong mode: fill certain properties (keys) with undefined so that we
- * don't get an exception when they're accessed.  Warning: mutates `obj`.
- */
-function weakFill(obj, keys) {
-	T(obj, T.object, keys, T.list(T.string));
-	for(const k of keys) {
-		if(!(Object.prototype.hasOwnProperty.call(obj, k))) {
-			obj[k] = undefined;
-		}
-	}
-	return obj;
-}
-
 // Returns [full-size blocks, remainder block]
 function splitBuffer(buf, blockSize) {
 	let start = 0;
@@ -724,7 +710,7 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, weakFill, splitBuffer,
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, splitBuffer,
 	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip,
 	shuffleArray
 };

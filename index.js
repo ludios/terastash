@@ -1857,7 +1857,6 @@ const configChunkStore = Promise.coroutine(function* configChunkStore$coro(store
 	if(!utils.hasKey(config.stores, storeName)) {
 		throw new Error(`${storeName} is not defined in chunk-stores.json`);
 	}
-	utils.weakFill(opts, ['type', 'chunkSize', 'directory', 'clientId', 'clientSecret']);
 	if(opts.type !== undefined) {
 		T(opts.type, T.string);
 		config.stores[storeName].type = opts.type;
