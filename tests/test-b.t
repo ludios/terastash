@@ -6,7 +6,7 @@ Setup
   $ mkdir -p "$HOME/.config/terastash"
   $ cp -a "$REAL_HOME/.config/terastash/chunk-stores.json" "$HOME/.config/terastash/"
   $ cp -a "$REAL_HOME/.config/terastash/google-tokens.json" "$HOME/.config/terastash/"
-  $ cp -a "$REAL_HOME/.config/terastash/google-tokens" "$HOME/.config/terastash/"
+  $ cp -a "$REAL_HOME/.config/terastash/google-tokens" "$HOME/.config/terastash/" 2> /dev/null || true
   $ ts destroy unit_tests_b > /dev/null 2>&1 || true # In case the last test run was ctrl-c'ed
   $ ts init unit_tests_b --chunk-store=terastash-tests-gdrive "--chunk-threshold=10*10"
 
