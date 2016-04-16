@@ -3,33 +3,39 @@
 set -e
 
 rm -rf node_modules
-./dev/npm install
-./dev/npm dedupe
+npm install
+
+# Redundant copies of libraries with a slightly different version
+rm -rf node_modules/googleapis/node_modules/request
+rm -rf node_modules/google-auth-library/node_modules/request
+rm -rf node_modules/google-auth-library/node_modules/har-validator
+rm -rf node_modules/google-auth-library/node_modules/http-signature
+rm -rf node_modules/google-auth-library/node_modules/bluebird
+rm -rf node_modules/google-auth-library/node_modules/aws-sign2
+rm -rf node_modules/google-auth-library/node_modules/bl
 
 # Unneeded files
-rm -f  node_modules/cassandra-driver/node_modules/long/dist/Long.min.*
-rm -rf node_modules/eslint/node_modules/js-yaml/dist
-rm -rf node_modules/eslint/node_modules/js-yaml/node_modules/argparse/node_modules/sprintf-js/dist
-rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.min.js
-rm -f  node_modules/eslint/node_modules/inquirer/node_modules/rx-lite/rx.lite.map
-rm -rf node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/test
-rm -f  node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/node_modules/google-p12-pem/node_modules/node-forge/nodejs/ui/test.min.js
-rm -f  node_modules/cassandra-driver/build.yaml
-rm -rf node_modules/request/node_modules/qs/dist
-# Web bundles
-rm -f  node_modules/mocha/mocha.js
+find node_modules | grep -P '\.min\.js$' | xargs -d '\n' rm
+rm -f  node_modules/long/dist/Long.min.*
 rm -rf node_modules/bluebird/js/browser
+rm -rf node_modules/js-yaml/dist
+rm -rf node_modules/sprintf-js/dist
+rm -rf node_modules/gtoken/test
+rm -rf node_modules/es5-ext/test
+rm -rf node_modules/is-my-json-valid/test
+rm -rf node_modules/node-forge/tests
+rm -rf node_modules/escope/powered-test
+rm -rf node_modules/qs/dist
 # jade is only needed for mocha's htmlcov
-rm -rf node_modules/mocha/node_modules/jade
+rm -rf node_modules/jade
 # Some coverage leftovers?
-rm -rf node_modules/eslint/node_modules/doctrine/coverage
-# Only needed for eslint's HTML formatter
-rm -rf node_modules/eslint/node_modules/handlebars
+rm -rf node_modules/cli-width/coverage
+rm -rf node_modules/string-template/coverage
 
 # Re-patch node_modules/
-for patchfile in ./dev/patches/???-*.patch; do
-	echo -E "Applying $patchfile"
-	patch -p1 < "$patchfile"
-done
-rm -f node_modules/request/request.js.orig
-rm -f node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/lib/index.js.orig
+#for patchfile in ./dev/patches/???-*.patch; do
+#	echo -E "Applying $patchfile"
+#	patch -p1 < "$patchfile"
+#done
+#rm -f node_modules/request/request.js.orig
+#rm -f node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/lib/index.js.orig
