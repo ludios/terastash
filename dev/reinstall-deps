@@ -15,7 +15,7 @@ rm -rf node_modules/google-auth-library/node_modules/aws-sign2
 rm -rf node_modules/google-auth-library/node_modules/bl
 
 # Unneeded files
-find node_modules | grep -P '\.min\.js$' | xargs -d '\n' rm
+find node_modules | grep -P '\.min\.js$' | xargs -d '\n' rm --
 rm -f  node_modules/long/dist/Long.min.*
 rm -rf node_modules/bluebird/js/browser
 rm -rf node_modules/js-yaml/dist
