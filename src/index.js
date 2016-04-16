@@ -1958,7 +1958,7 @@ const destroyStash = Promise.coroutine(function* destroyStash$coro(stashName) {
 		);
 	}));
 	const config = yield getStashes();
-	utils.deleteKey(config.stashes, stashName);
+	delete config.stashes[stashName];
 	yield utils.writeObjectToConfigFile("stashes.json", config);
 	console.log(`Destroyed keyspace and removed config for ${stashName}.`);
 });

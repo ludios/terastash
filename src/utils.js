@@ -179,11 +179,6 @@ function hasKey(obj, key) {
 	return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-/* eslint-disable no-new-func */
-// Hack to allow delete in strong mode
-const deleteKey = new Function("obj", "key", "delete obj[key];");
-/* eslint-enable no-new-func */
-
 const writeObjectToConfigFile = Promise.coroutine(function* writeObjectToConfigFile$coro(fname, object) {
 	T(fname, T.string, object, T.object);
 	const configPath = basedir.configPath(path.join("terastash", fname));
@@ -703,7 +698,7 @@ module.exports = {
 
 	assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
-	getBaseName, ol, comparator, comparedBy, hasKey, deleteKey,
+	getBaseName, ol, comparator, comparedBy, hasKey,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, dateNow,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,
