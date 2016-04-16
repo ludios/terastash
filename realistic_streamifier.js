@@ -3,7 +3,6 @@
  * Buffer in the first _read call.
  */
 
-"use strong";
 "use strict";
 
 const T = require('notmytype');

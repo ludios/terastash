@@ -5,7 +5,6 @@
  * therefore letting you parallelize the processing of some data.
  */
 
-"use strong";
 "use strict";
 
 const T = require('notmytype');

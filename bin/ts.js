@@ -1,4 +1,3 @@
-"use strong";
 "use strict";
 
 /* eslint-disable no-process-exit */
