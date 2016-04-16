@@ -838,10 +838,10 @@ const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, db
 		}
 		if(k.startsWith('chunks_in') && row[k]) {
 			for(const chunkInfo of row[k]) {
-				if(utils.hasKey(chunkInfo, 'crc32c') && chunkInfo.crc32c) {
+				if(chunkInfo.crc32c) {
 					chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
 				}
-				if(utils.hasKey(chunkInfo, 'md5') && chunkInfo.md5) {
+				if(chunkInfo.md5) {
 					chunkInfo.md5 = chunkInfo.md5.toString('hex');
 				}
 				utils.assertSafeNonNegativeLong(chunkInfo.size);
@@ -849,7 +849,7 @@ const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, db
 			}
 		}
 	}
-	if(!showKeys && utils.hasKey(row, 'key') && row.key) {
+	if(!showKeys && row.key) {
 		row.key = 'X'.repeat(row.key.length);
 	}
 	console.log(JSON.stringify(row, null, 2));
@@ -1817,7 +1817,7 @@ const listChunkStores = Promise.coroutine(function* listChunkStores$coro() {
 const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
-	if(utils.hasKey(config.stores, storeName)) {
+	if(config.stores[storeName]) {
 		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
 	if(typeof opts.chunkSize !== "number") {
@@ -1854,7 +1854,7 @@ const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(stor
 const configChunkStore = Promise.coroutine(function* configChunkStore$coro(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = yield getChunkStores();
-	if(!utils.hasKey(config.stores, storeName)) {
+	if(!config.stores[storeName]) {
 		throw new Error(`${storeName} is not defined in chunk-stores.json`);
 	}
 	if(opts.type !== undefined) {

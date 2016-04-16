@@ -174,11 +174,6 @@ function comparedBy(mapping, ...args) {
 	}
 }
 
-function hasKey(obj, key) {
-	T(obj, T.object, key, T.string);
-	return Object.prototype.hasOwnProperty.call(obj, key);
-}
-
 const writeObjectToConfigFile = Promise.coroutine(function* writeObjectToConfigFile$coro(fname, object) {
 	T(fname, T.string, object, T.object);
 	const configPath = basedir.configPath(path.join("terastash", fname));
@@ -698,7 +693,7 @@ module.exports = {
 
 	assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
-	getBaseName, ol, comparator, comparedBy, hasKey,
+	getBaseName, ol, comparator, comparedBy,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, dateNow,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,

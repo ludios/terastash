@@ -25,14 +25,10 @@ process.on("unhandledRejection", function(err) {
 //new Promise(function(){ throw new Error("boom"); });
 //new Promise(function(){ throw 3; });
 
-function hasKey(obj, key) {
-	return Object.prototype.hasOwnProperty.call(obj, key);
-}
-
 const mkdirp = require('mkdirp');
 const basedir = require('xdg').basedir;
 mkdirp.sync(basedir.configPath("terastash"));
-if(!hasKey(process.env, 'CACHE_REQUIRE_PATHS_FILE')) {
+if(!process.env.CACHE_REQUIRE_PATHS_FILE) {
 	process.env.CACHE_REQUIRE_PATHS_FILE =
 		basedir.configPath("terastash/internal-require-cache.json");
 }
@@ -133,7 +129,7 @@ function getOutputContext() {
 	let mode;
 	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
 		mode = process.env.TERASTASH_OUTPUT_MODE;
-	} else if(utils.hasKey(process.stdout, 'clearLine')) {
+	} else if(process.stdout.clearLine) {
 		mode = 'terminal';
 	} else {
 		mode = 'log';
