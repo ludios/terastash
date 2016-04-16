@@ -24,6 +24,9 @@ rm -rf node_modules/gtoken/test
 rm -rf node_modules/es5-ext/test
 rm -rf node_modules/is-my-json-valid/test
 rm -rf node_modules/node-forge/tests
+rm -rf node_modules/node-forge/nodejs/test
+rm -rf node_modules/node-forge/nodejs/ui
+rm -rf node_modules/node-uuid/benchmark
 rm -rf node_modules/escope/powered-test
 rm -rf node_modules/qs/dist
 # jade is only needed for mocha's htmlcov
