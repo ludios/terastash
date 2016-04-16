@@ -40,10 +40,10 @@ require('cache-require-paths');
 
 require('better-buffer-inspect');
 
-const terastash = require('..');
+const terastash = require('.');
 const os = require('os');
-const utils = require('../utils');
-const filename = require('../filename');
+const utils = require('./utils');
+const filename = require('./filename');
 const T = require('notmytype');
 const program = require('commander');
 const chalk = require('chalk');
@@ -518,7 +518,7 @@ program
 			console.error("--socket PATH is required");
 			process.exit(ERROR_EXIT_CODE);
 		}
-		require('../ninep').listen(socket);
+		require('./ninep').listen(socket);
 	}));
 
 program
@@ -527,7 +527,7 @@ program
 		Build native modules required by terastash.
 		Requires a C++ compiler.`))
 	.action(a(function() {
-		const compile_require = require('../compile_require');
+		const compile_require = require('./compile_require');
 		compile_require(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32');
 	}));
 

@@ -6,8 +6,8 @@ integration_tests_log="$(mktemp)"
 integration_ret_file="$(mktemp)"
 # Run integration tests in a subshell so that unit tests and integration tests run in parallel
 (
-	cd tests
-	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../hg-test-runner/run-tests.py -j8 --shell=bash
+	cd src/tests
+	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../../hg-test-runner/run-tests.py -j8 --shell=bash
 	echo -E -n "$?" >> "$integration_ret_file"
 ) > "$integration_tests_log" 2>&1 &
 integration_pid=$!
@@ -15,7 +15,7 @@ integration_pid=$!
 ./node_modules/eslint/bin/eslint.js .
 eslint_ret="$?"
 
-./dev/js ./node_modules/mocha/bin/_mocha tests/*.js
+./dev/js ./node_modules/mocha/bin/_mocha src/tests/*.js
 mocha_ret="$?"
 
 echo 'Waiting for integration tests to finish...'

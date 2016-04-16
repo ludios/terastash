@@ -57,7 +57,7 @@ if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 	USERNAME = 'test-username';
 } else {
 	TERASTASH_VERSION =
-		require('./package.json').version +
+		require('../package.json').version +
 		'D' + fs.readFileSync(__dirname + '/date-version').toString('utf-8').trim();
 	// TODO: will need to be re-initialized after V8 snapshot
 	HOSTNAME = os.hostname();
