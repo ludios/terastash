@@ -5,6 +5,7 @@ const path = require('path');
 const chalk = require('chalk');
 const T = require('notmytype');
 const A = require('ayy');
+const inspect = require('util').inspect;
 let child_process;
 
 /**
@@ -52,7 +53,8 @@ function maybeCompileAndRequire(name, ...args) {
 		if(!fs.existsSync(nodeGyp)) {
 			throw new Error("Could not find node-gyp");
 		}
-		const cwd = path.join(__dirname, 'node_modules', name);
+		const cwd = path.join(__dirname, '../node_modules', name);
+		A(fs.lstatSync(cwd).isDirectory(), `${inspect(cwd)} missing or not a directory`);
 		if(!child_process) {
 			child_process = require('child_process');
 		}
@@ -76,8 +78,15 @@ function maybeCompileAndRequire(name, ...args) {
 			console.error("See https://github.com/TooTallNate/node-gyp#installation");
 			console.error("");
 			console.error(chalk.bold("Build error was:"));
-			process.stderr.write(child.stdout);
-			process.stderr.write(child.stderr);
+			if(child.error) {
+				console.error(child.error);
+			}
+			if(child.stdout) {
+				process.stderr.write(child.stdout);
+			}
+			if(child.stderr) {
+				process.stderr.write(child.stderr);
+			}
 			console.error("");
 			console.error(chalk.bold("Before building, require error was:"));
 			console.error(requireErr.stack);
