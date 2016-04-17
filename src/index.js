@@ -1795,7 +1795,7 @@ function listTerastashKeyspaces() {
 		// TODO: also display durable_writes, strategy_class, strategy_options  info in table
 		return runQuery(
 			client,
-			`SELECT keyspace_name FROM system_schema.keyspaces;`
+			`SELECT keyspace_name FROM System.schema_keyspaces;`
 		).then(function listTerastashKeyspaces$then(result) {
 			for(const row of result.rows) {
 				const name = row.keyspace_name;
