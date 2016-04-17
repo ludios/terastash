@@ -412,10 +412,6 @@ class FileChangedError extends Error {
 	}
 }
 
-function isGoodRow(row) {
-	return row.type !== null && row.version !== null;
-}
-
 const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasename$coro(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = yield runQuery(
@@ -425,15 +421,13 @@ const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasenam
 		WHERE parent = ? AND basename = ?`,
 		[parent, basename]
 	);
-	// I have a bad row in my Cassandra database where all the fields are null
-	const goodRows = result.rows.filter(isGoodRow);
-	A.lte(goodRows.length, 1);
-	if(!goodRows.length) {
+	A.lte(result.rows.length, 1);
+	if(!result.rows.length) {
 		throw new NoSuchPathError(
 			`No entry with parent=${parent.toString('hex')}` +
 			` and basename=${inspect(basename)}`);
 	}
-	return goodRows[0];
+	return result.rows[0];
 });
 
 let getUuidForPath;
