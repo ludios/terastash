@@ -142,7 +142,7 @@ Continue
   world
   $ rm -f sample1
   $ ls -1 sample1
-  ls: cannot access sample1: No such file or directory
+  ls: cannot access 'sample1': No such file or directory
   [2]
   $ touch sample1 && chmod +x sample1 # Create an executable sample1 so that we can ensure permissions are reset
   $ ts get sample1
