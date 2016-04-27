@@ -89,7 +89,15 @@ class StashServer {
 			A.eq(_, "");
 			A(this.stashes.has(stashName), `Stash ${stashName} not in whitelist ${this.stashes}`);
 			const stashInfo = yield terastash.getStashInfoByName(stashName);
-			const parent = yield terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid']);
+			let parent;
+			// TODO: fix getRowByPath
+			if(dbPath === "") {
+				parent = {};
+				parent.uuid = new Buffer(128/8).fill(0);
+				parent.type = "d";
+			} else {
+				parent = yield terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid']);
+			}
 			if(parent.type === "d") {
 				this._writeListing(res, stashInfo, parent);
 			} else {
