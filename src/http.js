@@ -48,9 +48,11 @@ class StashServer {
 						text-decoration: none;
 					}
 				</style>
+				<li><a href="../">../</a>
 			`);
 			for(const row of rows) {
-				res.write(`<li><a href="${escape(row.basename)}/">${escape(row.basename)}</a>\n`);
+				const d = row.type === "d" ? "/" : "";
+				res.write(`<li><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a>\n`);
 			}
 			res.write(`
 				</body>
