@@ -44,17 +44,43 @@ class StashServer {
 				<html>
 				<body>
 				<style>
+					body, td {
+						font-family: sans-serif;
+					}
 					a {
 						text-decoration: none;
 					}
+					table, td {
+						border: 0;
+					}
+					td.size {
+						text-align: right;
+					}
 				</style>
-				<li><a href="../">../</a>
+				<table>
+				<tr>
+					<td>Name</td>
+					<td>Last modified</td>
+					<td class="size">Size</td>
+				</tr>
+				<tr>
+					<td><a href="../">../</a></td>
+					<td>-</td>
+					<td class="size">-</td>
+				</tr>
 			`);
 			for(const row of rows) {
 				const d = row.type === "d" ? "/" : "";
-				res.write(`<li><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a>\n`);
+				res.write(`
+					<tr>
+						<td><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a></td>
+						<td>${row.mtime}</td>
+						<td class="size">${row.size != null ? utils.commaify(Number(row.size)) : "-"}</td>
+					</tr>
+				`);
 			}
 			res.write(`
+				</table>
 				</body>
 				</html>
 			`);
