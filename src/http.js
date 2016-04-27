@@ -115,8 +115,6 @@ class StashServer {
 						];
 					}
 				}
-				console.log(firstRange);
-
 				const mimeType = mime.lookup(dbPath) || "application/octet-stream";
 				// Don't let active content execute on this domain
 				if(mimeType === "text/html") {
