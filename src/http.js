@@ -135,7 +135,9 @@ class StashServer {
 				const fileParent = yield terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
 				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
 				utils.pipeWithErrors(dataStream, res);
-				//res.end();
+				// TODO: when the client aborts their connection, we need to abort the connections
+				// to Google.  The connections are immediately backpressured, but we don't want
+				// to keep them open.
 			}
 		}
 	}
