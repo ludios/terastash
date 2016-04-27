@@ -518,6 +518,29 @@ program
 	}));
 
 program
+	.command('http')
+	.description(d(`
+		Start a HTTP server serving one or more stashes.
+		`))
+	.option('-i, --interface <interface>', 'Listen on this IP address, default 127.0.0.1')
+	.option('-p, --port <interface>', 'Listen on this port')
+	.option('-s, --stashes <stashes>', 'A comma-separated list of stashes to serve')
+	.action(a(function(options) {
+		if(options.interface === undefined) {
+			options.interface = '127.0.0.1';
+		}
+		if(options.port === undefined) {
+			console.error("http server requires -p/--port option");
+			process.exit(ERROR_EXIT_CODE);
+		}
+		if(!options.stashes) {
+			console.error("http server requires non-empty -s/--stashes option");
+			process.exit(ERROR_EXIT_CODE);
+		}
+		require('./http').listen(options.interface, Number(options.port), options.stashes.split(','));
+	}));
+
+program
 	.command('build-natives')
 	.description(d(`
 		Build native modules required by terastash.
