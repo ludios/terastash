@@ -7,12 +7,67 @@ const escape = require('escape-html');
 const Promise = require('bluebird');
 const terastash = require('.');
 const utils = require('./utils');
+const mime = require('mime-types');
 
 class StashServer {
 	constructor(stashes) {
 		T(stashes, T.list(T.string));
 		this.stashes = new Set(stashes);
 		this.client = terastash.getNewClient();
+	}
+
+	*_writeListing(res, stashInfo, parent) {
+		const rows = yield terastash.getChildrenForParent(
+			this.client, stashInfo.name, parent.uuid,
+			["basename", "type", "size", "mtime", "executable"]
+		);
+		res.setHeader("Content-Type", "text/html; charset=utf-8");
+		res.write(`
+			<!doctype html>
+			<html>
+			<body>
+			<style>
+				body, td {
+					font-family: sans-serif;
+				}
+				a {
+					text-decoration: none;
+				}
+				table, td {
+					border: 0;
+				}
+				td.size {
+					text-align: right;
+				}
+			</style>
+			<table>
+			<tr>
+				<td>Name</td>
+				<td>Last modified</td>
+				<td class="size">Size</td>
+			</tr>
+			<tr>
+				<td><a href="../">../</a></td>
+				<td>-</td>
+				<td class="size">-</td>
+			</tr>
+		`);
+		for(const row of rows) {
+			const d = row.type === "d" ? "/" : "";
+			res.write(`
+				<tr>
+					<td><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a></td>
+					<td>${row.mtime}</td>
+					<td class="size">${row.size != null ? utils.commaify(Number(row.size)) : "-"}</td>
+				</tr>
+			`);
+		}
+		res.write(`
+			</table>
+			</body>
+			</html>
+		`);
+		res.end();
 	}
 
 	*_handleRequest(req, res) {
@@ -25,6 +80,7 @@ class StashServer {
 			for(const stash of this.stashes) {
 				res.write(`<li><a href="${escape(stash)}/">${escape(stash)}</a>\n`);
 			}
+			res.end();
 		} else if(req.url === '/favicon.ico') {
 			res.end();
 		} else {
@@ -33,59 +89,24 @@ class StashServer {
 			A.eq(_, "");
 			A(this.stashes.has(stashName), `Stash ${stashName} not in whitelist ${this.stashes}`);
 			const stashInfo = yield terastash.getStashInfoByName(stashName);
-			const parent = yield terastash.getUuidForPath(this.client, stashInfo.name, dbPath);
-			const rows = yield terastash.getChildrenForParent(
-				this.client, stashInfo.name, parent,
-				["basename", "type", "size", "mtime", "executable"]
-			);
-			res.setHeader("Content-Type", "text/html; charset=utf-8");
-			res.write(`
-				<!doctype html>
-				<html>
-				<body>
-				<style>
-					body, td {
-						font-family: sans-serif;
-					}
-					a {
-						text-decoration: none;
-					}
-					table, td {
-						border: 0;
-					}
-					td.size {
-						text-align: right;
-					}
-				</style>
-				<table>
-				<tr>
-					<td>Name</td>
-					<td>Last modified</td>
-					<td class="size">Size</td>
-				</tr>
-				<tr>
-					<td><a href="../">../</a></td>
-					<td>-</td>
-					<td class="size">-</td>
-				</tr>
-			`);
-			for(const row of rows) {
-				const d = row.type === "d" ? "/" : "";
-				res.write(`
-					<tr>
-						<td><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a></td>
-						<td>${row.mtime}</td>
-						<td class="size">${row.size != null ? utils.commaify(Number(row.size)) : "-"}</td>
-					</tr>
-				`);
+			const parent = yield terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid']);
+			if(parent.type === "d") {
+				this._writeListing(res, stashInfo, parent);
+			} else {
+				const mimeType = mime.lookup(dbPath) || "application/octet-stream";
+				// Don't let active content execute on this domain
+				if(mimeType === "text/html") {
+					mimeType = "text/plain";
+				}
+				res.setHeader("Content-Type", mimeType);
+				// Too bad streamFile doesn't just take an uuid
+				const [parentPath, basename] = utils.rsplitString(dbPath, '/', 1);
+				const fileParent = yield terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
+				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename);
+				utils.pipeWithErrors(dataStream, res);
+				//res.end();
 			}
-			res.write(`
-				</table>
-				</body>
-				</html>
-			`);
 		}
-		res.end();
 	}
 
 	handleRequest(req, res) {
@@ -98,6 +119,7 @@ class StashServer {
 	}
 }
 
+StashServer.prototype._writeListing = Promise.coroutine(StashServer.prototype._writeListing);
 StashServer.prototype._handleRequest = Promise.coroutine(StashServer.prototype._handleRequest);
 
 function listen(host, port, stashes) {

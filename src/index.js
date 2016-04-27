@@ -2339,5 +2339,5 @@ module.exports = {
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
 	checkChunkSize, chunksToBlockRanges, getChildrenForParent, getUuidForPath,
-	getRowByParentBasename, getStashInfoByName
+	getRowByPath, getRowByParentBasename, getStashInfoByName
 };
