@@ -27,6 +27,7 @@
     "heapdump": "^0.3.7",
     "intreader": "^1.0.1",
     "lodash.noop": "^3.0.1",
+    "mime-types": "^2.1.10",
     "mkdirp": "^0.5.1",
     "notmytype": "^2.0.0",
     "request": "^2.71.0",
