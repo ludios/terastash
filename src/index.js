@@ -2341,6 +2341,6 @@ module.exports = {
 	DirectoryNotEmptyError, NotInWorkingDirectoryError, NoSuchPathError,
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
-	checkChunkSize, chunksToBlockRanges, getChildrenForParent,
+	checkChunkSize, chunksToBlockRanges, getChildrenForParent, getUuidForPath,
 	getRowByParentBasename, getStashInfoByName
 };
