@@ -430,8 +430,7 @@ const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasenam
 	return result.rows[0];
 });
 
-let getUuidForPath;
-getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
+const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
@@ -522,8 +521,7 @@ const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, option
 	}
 });
 
-let listRecursively;
-listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, ...args) {
+const listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, ...args) {
 	const [type] = args;
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
@@ -628,8 +626,7 @@ function checkDbPath(dbPath) {
 	dbPath.split('/').map(filename.check);
 }
 
-let makeDirsInDb;
-makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
+const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	checkDbPath(dbPath);
 	// If directory does not exist on host fs, we'll use the current time.
