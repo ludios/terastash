@@ -57,7 +57,7 @@ class StashServer {
 			res.write(`
 				<tr>
 					<td><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a></td>
-					<td>${row.mtime}</td>
+					<td>${utils.shortISO(row.mtime)}</td>
 					<td class="size">${row.size != null ? utils.commaify(Number(row.size)) : "-"}</td>
 				</tr>
 			`);
