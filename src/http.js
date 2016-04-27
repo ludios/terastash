@@ -102,7 +102,6 @@ class StashServer {
 			if(parent.type === "d") {
 				this._writeListing(res, stashInfo, parent);
 			} else {
-				let wants206Response = false;
 				// streamFile only supports 1 range anyway
 				let firstRange = null;
 				if(req.headers.range) {
@@ -110,33 +109,33 @@ class StashServer {
 					const start = matches[1];
 					const end = matches[2];
 					if(start !== undefined) {
-						wants206Response = true;
 						firstRange = [
 							parseInt(start, 10),
 							end !== undefined ? parseInt(end, 10) : Number(parent.size)
 						];
 					}
 				}
-				console.log(firstRange, wants206Response);
+				console.log(firstRange);
 
 				const mimeType = mime.lookup(dbPath) || "application/octet-stream";
 				// Don't let active content execute on this domain
 				if(mimeType === "text/html") {
 					mimeType = "text/plain";
 				}
-				if(wants206Response) {
+				res.setHeader("Content-Length", String(Number(parent.size)));
+				res.setHeader("Accept-Ranges", "bytes");
+				res.setHeader("Content-Type", mimeType);
+				if(firstRange) {
 					// Even if we're sending the whole file after a bytes=0-, the client should
 					// get a 206 response so that they know they can do Range requests.
 					// (e.g. mpv will refuse to seek unless it gets a 206?).
 					res.statusCode = 206;
-					res.setHeader("Content-Range", `bytes ${firstRange[0]}-${firstRange[1] - 1}/${firstRange[1] - firstRange[0]}`);
+					res.setHeader("Content-Range", `bytes ${firstRange[0]}-${firstRange[1] - 1}/${Number(parent.size)}`);
 				}
-				res.setHeader("Accept-Ranges", "bytes");
-				res.setHeader("Content-Type", mimeType);
 				// Too bad streamFile doesn't just take an uuid
 				const [parentPath, basename] = utils.rsplitString(dbPath, '/', 1);
 				const fileParent = yield terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
-				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename, [firstRange]);
+				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
 				utils.pipeWithErrors(dataStream, res);
 				//res.end();
 			}
