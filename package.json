@@ -11,7 +11,6 @@
   },
   "author": "Ivan Kozik",
   "dependencies": {
-    "armv7l_crc32": "../armv7l_crc32",
     "ayy": "^0.2.4",
     "better-buffer-inspect": "^0.1.4",
     "bluebird": "^3.3.5",
@@ -31,7 +30,7 @@
     "mkdirp": "^0.5.1",
     "notmytype": "^2.0.0",
     "request": "^2.71.0",
-    "sse4_crc32": "^4.1.1",
+    "sse4_crc32": "^5.0.0",
     "streamifier": "^0.1.1",
     "transit-js": "^0.8.846",
     "xdg": "^0.1.1"

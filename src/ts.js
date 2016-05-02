@@ -547,7 +547,7 @@ program
 		Requires a C++ compiler.`))
 	.action(a(function() {
 		const compile_require = require('./compile_require');
-		compile_require(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32');
+		compile_require('sse4_crc32');
 	}));
 
 program

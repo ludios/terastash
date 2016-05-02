@@ -10,7 +10,7 @@ const LazyModule = utils.LazyModule;
 const JoinedBuffers = utils.JoinedBuffers;
 const Transform = require('stream').Transform;
 
-let sse4_crc32 = new LazyModule(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32', compile_require);
+let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 
 function crcToBuf(n) {
 	const buf = Buffer.allocUnsafe(4);
