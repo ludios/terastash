@@ -11,9 +11,8 @@ let child_process;
 /**
  * Require a module, building it first if necessary
  */
-function maybeCompileAndRequire(name, ...args) {
-	const [verbose] = args;
-	T(name, T.string, verbose, T.optional(T.boolean));
+function maybeCompileAndRequire(name, verbose=false) {
+	T(name, T.string, verbose, T.boolean);
 	A(!name.startsWith('.'), name);
 	try {
 		return require(name);
@@ -24,7 +23,7 @@ function maybeCompileAndRequire(name, ...args) {
 		let candidates;
 		if(process.platform === "win32") {
 			candidates = [
-				// Official io.js release
+				// Official node.js release
 				path.join(
 					path.dirname(process.execPath),
 					'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'

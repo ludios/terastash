@@ -189,8 +189,7 @@ class GDriver {
 	 * mimeType after sniffing the bytes in your file.  This is not documented
 	 * in their API docs, and there doesn't appear to be a way to turn it off.
 	 */
-	*createFile(name, opts, stream, ...args) {
-		const [requestCb] = args;
+	*createFile(name, opts, stream, requestCb) {
 		T(
 			name, T.string,
 			opts, T.shape({
@@ -360,14 +359,10 @@ class GDriver {
 	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
-	*getData(fileId, ...args) {
-		let [range, checkCRC32CifReceived] = args;
-		T(fileId, T.string, range, T.optional(utils.RangeType), checkCRC32CifReceived, T.optional(T.boolean));
+	*getData(fileId, range, checkCRC32CifReceived=true) {
+		T(fileId, T.string, range, T.optional(utils.RangeType), checkCRC32CifReceived, T.boolean);
 		if(range) {
 			utils.checkRange(range);
-		}
-		if(checkCRC32CifReceived === undefined) {
-			checkCRC32CifReceived = true;
 		}
 		yield this._maybeRefreshAndSaveToken();
 		const reqHeaders = this._getHeaders();
