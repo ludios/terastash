@@ -199,7 +199,7 @@ const makeConfigFileInitializer = function(fname, defaultConfig) {
 		try {
 			return (yield readObjectFromConfigFile(fname));
 		} catch(err) {
-			if(getProp(err, 'code') !== 'ENOENT') {
+			if(err.code !== 'ENOENT') {
 				throw err;
 			}
 			// If there is no config file, write defaultConfig.
@@ -380,7 +380,7 @@ function evalMultiplications(s) {
 }
 
 function dateNow() {
-	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		return new Date(0);
 	} else {
 		return new Date();
@@ -389,7 +389,7 @@ function dateNow() {
 
 let filenameCounter = 0;
 function makeChunkFilename() {
-	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const s = `deterministic-filename-${filenameCounter}`;
 		filenameCounter += 1;
 		return s;
@@ -443,7 +443,7 @@ class PersistentCounter {
 		try {
 			n = Number(fs.readFileSync(this.fname));
 		} catch(err) {
-			if(getProp(err, 'code') !== 'ENOENT') {
+			if(err.code !== 'ENOENT') {
 				throw err;
 			}
 			n = this.start;
@@ -502,7 +502,7 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 	try {
 		yield fs.unlinkAsync(fname);
 	} catch(err) {
-		if(getProp(err, 'code') !== "ENOENT") {
+		if(err.code !== "ENOENT") {
 			throw err;
 		}
 		// else, ignore error
@@ -556,20 +556,6 @@ function clearOrLF(stdStream) {
 function pluralize(count, singular, plural) {
 	T(count, T.number, singular, T.string, plural, T.string);
 	return `${commaify(count)} ${count === 1 ? singular : plural}`;
-}
-
-/**
- * For strong mode: an obj['prop'] that doesn't throw when 'prop' is missing.
- * Does not follow the prototype chain.
- */
-function getProp(obj, k, ...args) {
-	const [alt] = args;
-	T(obj, T.object, k, T.string, alt, T.any);
-	if(Object.prototype.hasOwnProperty.call(obj, k)) {
-		return obj[k];
-	} else {
-		return alt;
-	}
 }
 
 // Returns [full-size blocks, remainder block]
@@ -700,7 +686,7 @@ module.exports = {
 	makeHttpsRequest, readableToBuffer, writableToBuffer, streamHasher, evalMultiplications,
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
-	tryUnlink, JoinedBuffers, clearOrLF, pluralize, getProp, splitBuffer,
+	tryUnlink, JoinedBuffers, clearOrLF, pluralize, splitBuffer,
 	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip,
 	shuffleArray
 };

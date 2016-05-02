@@ -6,13 +6,12 @@ const Promise = require('bluebird');
 const net = require('net');
 const inspect = require('util').inspect;
 const utils = require('./utils');
-const getProp = utils.getProp;
 const terastash = require('./');
 const intreader = require('intreader');
 const chalk = require('chalk');
 const cassandra = require('cassandra-driver');
 
-const DEBUG_9P = Boolean(Number(utils.getProp(process.env, 'TERASTASH_DEBUG_9P', '0')));
+const DEBUG_9P = Boolean(Number(process.env.TERASTASH_DEBUG_9P));
 
 function _buf(size) {
 	return function(buf) {
@@ -444,7 +443,7 @@ class Terastash9P {
 
 	*handleMessage(msg) {
 		if(DEBUG_9P) {
-			console.error(chalk.cyan(`-> ${getProp(packets, String(msg.type), {name: "?"}).name}\n${inspect(msg)}`));
+			console.error(chalk.cyan(`-> ${(packets[String(msg.type)] || {name: "?"}).name}\n${inspect(msg)}`));
 		}
 		if(msg.type === Type.Tversion) {
 			// TODO: ensure version is 9P2000.L

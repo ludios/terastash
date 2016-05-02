@@ -7,7 +7,6 @@ const T = require('notmytype');
 const Combine = require('combine-streams');
 const OAuth2 = google.auth.OAuth2;
 const utils = require('../utils');
-const getProp = utils.getProp;
 const OutputContextType = utils.OutputContextType;
 const retry = require('../retry');
 const inspect = require('util').inspect;
@@ -204,8 +203,8 @@ class GDriver {
 
 		yield this._maybeRefreshAndSaveToken();
 
-		const parents = (getProp(opts, 'parents') || []).concat().sort();
-		const mimeType = getProp(opts, 'mimeType') || "application/octet-stream";
+		const parents = (opts.parents || []).concat().sort();
+		const mimeType = opts.mimeType || "application/octet-stream";
 
 		const insertOpts = {
 			resource: {
@@ -231,8 +230,8 @@ class GDriver {
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if(err) {
-					if(getProp(err, 'code') === 404 &&
-					getProp(err, 'errors') instanceof Array &&
+					if(err.code === 404 &&
+					err.errors instanceof Array &&
 					err.errors.length >= 1 &&
 					err.errors[0].reason === 'notFound') {
 						reject(new UploadError(`googleapis.com returned:\n${err.message}\n\n` +
@@ -391,7 +390,7 @@ class GDriver {
 					);
 				}
 			}
-			const googHash = getProp(res.headers, 'x-goog-hash');
+			const googHash = res.headers['x-goog-hash'];
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
 			if(res.statusCode === 200 && !googHash) {
@@ -515,7 +514,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			// making sure Google is sending us the correct CRC32C for a file.
 			// Though we don't have the opportunity to do this when we're getting a
 			// range that is not the whole file.
-			const googHash = getProp(res.headers, 'x-goog-hash');
+			const googHash = res.headers['x-goog-hash'];
 			if(googHash === undefined) {
 				if(range[1] - range[0] === chunk.size) {
 					throw new Error(`Downloading a whole file, but did not receive ` +

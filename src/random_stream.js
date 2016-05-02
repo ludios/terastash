@@ -3,11 +3,10 @@
 const crypto = require('crypto');
 const path = require('path');
 const utils = require('./utils');
-const getProp = utils.getProp;
 const Readable = require('stream').Readable;
 
 function makeKey() {
-	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'random-stream-key-counter'));
 		const buf = Buffer.alloc(128/8);

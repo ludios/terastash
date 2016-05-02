@@ -19,7 +19,6 @@ const commaify = utils.commaify;
 const LazyModule = utils.LazyModule;
 const loadNow = utils.loadNow;
 const OutputContextType = utils.OutputContextType;
-const getProp = utils.getProp;
 const filename = require('./filename');
 const compile_require = require('./compile_require');
 const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
@@ -51,7 +50,7 @@ let transit = new LazyModule('transit-js');
 let TERASTASH_VERSION;
 let HOSTNAME;
 let USERNAME;
-if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 	TERASTASH_VERSION = 'test-version';
 	HOSTNAME = 'test-hostname';
 	USERNAME = 'test-username';
@@ -61,10 +60,8 @@ if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		'D' + fs.readFileSync(__dirname + '/date-version').toString('utf-8').trim();
 	// TODO: will need to be re-initialized after V8 snapshot
 	HOSTNAME = os.hostname();
-	USERNAME =
-		getProp(process.env, 'USER') ? // Linux, OS X
-			process.env.USER :
-			getProp(process.env, 'USERNAME'); // Windows
+	// Linux and OS X use USER, Windows uses USERNAME
+	USERNAME = process.env.USER || process.env.USERNAME;
 }
 T(HOSTNAME, T.string);
 T(USERNAME, T.string);
@@ -102,7 +99,7 @@ class RepeatHostPolicy extends LoadBalancingPolicy {
 }
 
 function getContactPoint() {
-	return getProp(process.env, 'TERASTASH_CASSANDRA_HOST', '127.0.0.1');
+	return process.env.TERASTASH_CASSANDRA_HOST || '127.0.0.1';
 }
 
 function getNewClient() {
@@ -189,7 +186,7 @@ const StashInfoType = T.shape({path: T.string});
 const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(pathname) {
 	T(pathname, T.string);
 	const config = yield getStashes();
-	if(!getProp(config, 'stashes') || typeof config.stashes !== "object") {
+	if(!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
@@ -212,11 +209,11 @@ const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(p
 const getStashInfoByName = Promise.coroutine(function* getStashInfoByName$coro(stashName) {
 	T(stashName, T.string);
 	const config = yield getStashes();
-	if(!getProp(config, 'stashes') || typeof config.stashes !== "object") {
+	if(!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
-	const stash = getProp(config.stashes, stashName);
+	const stash = config.stashes[stashName];
 	if(!stash) {
 		throw new Error(`No stash with name ${stashName}`);
 	}
@@ -600,7 +597,7 @@ const getTypeInWorkingDirectory = Promise.coroutine(function* getTypeInWorkingDi
 			return FILE;
 		}
 	} catch(err) {
-		if(getProp(err, 'code') !== 'ENOENT') {
+		if(err.code !== 'ENOENT') {
 			throw err;
 		}
 		return MISSING;
@@ -634,7 +631,7 @@ const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stash
 	try {
 		mtime = (yield fs.statAsync(p)).mtime;
 	} catch(err) {
-		if(getProp(err, 'code') !== 'ENOENT') {
+		if(err.code !== 'ENOENT') {
 			throw err;
 		}
 	}
@@ -678,7 +675,7 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnO
 });
 
 function makeKey() {
-	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-key-counter'));
 		const buf = Buffer.alloc(128/8);
@@ -691,7 +688,7 @@ function makeKey() {
 
 function makeUuid() {
 	let uuid;
-	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const uuidCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-uuid-counter'), 1);
 		const buf = Buffer.alloc(128/8);
@@ -1219,7 +1216,7 @@ function addFiles(outCtx, paths, ...args) {
 		// Shuffling instead of sorting helps both 1) reduce "Error: User rate limit exceeded"
 		// that happens when uploading a lot of small files and 2) reduce the
 		// sawtooth pattern in our upstream bandwidth use.
-		if(!Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
+		if(!Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 			utils.shuffleArray(paths);
 		}
 
@@ -1351,7 +1348,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 	}
 
 	const chunkStore = (yield getChunkStores()).stores[storeName];
-	const chunks = getProp(row, `chunks_in_${storeName}`, null);
+	const chunks = row[`chunks_in_${storeName}`] || null;
 	let bytesRead = 0;
 	let dataStream;
 	if(chunks !== null) {
@@ -1658,7 +1655,7 @@ function makeDirectories(stashName, paths) {
 			try {
 				yield mkdirpAsync(p);
 			} catch(err) {
-				if(getProp(err, 'code') !== 'EEXIST') {
+				if(err.code !== 'EEXIST') {
 					throw err;
 				}
 				throw new PathAlreadyExistsError(
@@ -1765,7 +1762,7 @@ function moveFiles(stashName, sources, dest) {
 				try {
 					yield fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
 				} catch(err) {
-					if(getProp(err, 'code') !== "ENOENT") {
+					if(err.code !== "ENOENT") {
 						throw err;
 					}
 					// It's okay if the file was missing in work dir
@@ -1896,18 +1893,18 @@ const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	T(name, T.string);
 	gdrive = loadNow(gdrive);
 	const config = yield getChunkStores();
-	const stores = getProp(config, 'stores');
+	const stores = config.stores;
 	if(!(typeof stores === "object" && stores !== null)) {
 		throw new Error(`'stores' in chunk-stores.json is not an object`);
 	}
-	const chunkStore = getProp(stores, name);
+	const chunkStore = stores[name];
 	if(!(typeof chunkStore === "object" && chunkStore !== null)) {
 		throw new Error(`Chunk store ${name} was ${chunkStore}, should be an object`);
 	}
-	if(!getProp(chunkStore, 'clientId')) {
+	if(!chunkStore.clientId) {
 		throw new Error(`Chunk store ${name} is missing a clientId`);
 	}
-	if(!getProp(chunkStore, 'clientSecret')) {
+	if(!chunkStore.clientSecret) {
 		throw new Error(`Chunk store ${name} is missing a clientSecret`);
 	}
 	const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);

@@ -15,8 +15,8 @@ class MultiStream extends Readable {
 		T(buf, Buffer, options, T.optional(T.object));
 		options = options || {};
 		super({
-			highWaterMark: utils.getProp(options, 'highWaterMark'),
-			encoding: utils.getProp(options, 'encoding')
+			highWaterMark: options.highWaterMark,
+			encoding: options.encoding
 		});
 		this._buf = buf;
 		this._idx = 0;
