@@ -50,7 +50,7 @@ function check(s) {
 	if(s.length > 255) {
 		throw new BadFilename(`Windows does not support filenames with > 255 characters; ${inspect(s)} has ${s.length}`);
 	}
-	const buf = new Buffer(s, "utf-8");
+	const buf = Buffer.from(s, "utf-8");
 	if(buf.length > 255) {
 		throw new BadFilename(`Linux does not support filenames with > 255 bytes; ${inspect(s)} has ${buf.length}`);
 	}

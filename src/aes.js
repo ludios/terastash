@@ -17,7 +17,7 @@ function strictZeroPad(s, num) {
 
 function blockNumberToIv(blockNum) {
 	utils.assertSafeNonNegativeInteger(blockNum);
-	const buf = new Buffer(strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
+	const buf = Buffer.from(strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
 	A(buf.length, IV_SIZE);
 	return buf;
 }
@@ -29,14 +29,14 @@ function blockNumberToIv(blockNum) {
 function selfTest() {
 	let cipher;
 	let decrypted;
-	const key = new Buffer('12300000000000045600000000000789', 'hex');
+	const key = Buffer.from('12300000000000045600000000000789', 'hex');
 	const iv0 = blockNumberToIv(0);
 	const iv1 = blockNumberToIv(1);
 
 	// Test for exact ciphertext
 	cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	const text = 'Hello, world. This is a test string spanning multiple AES blocks.';
-	const encrypted = cipher.update(new Buffer(text));
+	const encrypted = cipher.update(Buffer.from(text));
 	A.eq(
 		encrypted.toString('hex'),
 		'5a4be59fb050aa6059075162597141e2ff2c99e3b7b968f3396d50712587640626719d' +

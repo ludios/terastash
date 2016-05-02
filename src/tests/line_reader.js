@@ -16,8 +16,8 @@ const pow = Math.pow;
 function makeLines(lineLength, numLines) {
 	T(lineLength, T.number, numLines, T.number);
 	const bufs = [];
-	const buf = new Buffer("X".repeat(lineLength));
-	const LF = new Buffer("\n");
+	const buf = Buffer.from("X".repeat(lineLength));
+	const LF = Buffer.from("\n");
 	while(numLines--) {
 		bufs.push(buf);
 		bufs.push(LF);
@@ -41,7 +41,7 @@ describe('DelimitedBufferDecoder', function() {
 			const inputStream = realistic_streamifier.createReadStream(inputBuf);
 			const passThroughStream = new PassThrough();
 			utils.pipeWithErrors(inputStream, passThroughStream);
-			const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
+			const lineStream = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
 			utils.pipeWithErrors(passThroughStream, lineStream);
 			const lines = [];
 			lineStream.on('data', function(line) {

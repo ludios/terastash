@@ -18,7 +18,7 @@ class Padder extends Transform {
 
 	_flush(callback) {
 		if(this._padToLength > this.bytesRead) {
-			this.push(new Buffer(this._padToLength - this.bytesRead).fill(0));
+			this.push(Buffer.alloc(this._padToLength - this.bytesRead));
 		}
 		callback();
 	}

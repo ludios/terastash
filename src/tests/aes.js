@@ -14,19 +14,19 @@ describe('aes.blockNumberToIv()', function() {
 	it('returns correct results', function() {
 		assert.deepStrictEqual(
 			aes.blockNumberToIv(0),
-			new Buffer('00000000000000000000000000000000', 'hex')
+			Buffer.from('00000000000000000000000000000000', 'hex')
 		);
 		assert.deepStrictEqual(
 			aes.blockNumberToIv(1),
-			new Buffer('00000000000000000000000000000001', 'hex')
+			Buffer.from('00000000000000000000000000000001', 'hex')
 		);
 		assert.deepStrictEqual(
 			aes.blockNumberToIv(100),
-			new Buffer('00000000000000000000000000000064', 'hex')
+			Buffer.from('00000000000000000000000000000064', 'hex')
 		);
 		assert.deepStrictEqual(
 			aes.blockNumberToIv(Math.pow(2, 53) - 1),
-			new Buffer('0000000000000000001fffffffffffff', 'hex')
+			Buffer.from('0000000000000000001fffffffffffff', 'hex')
 		);
 	});
 });

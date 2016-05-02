@@ -16,19 +16,19 @@ describe('gcmer.blockNumberToIv()', function() {
 	it('returns correct results', function() {
 		assert.deepStrictEqual(
 			gcmer.blockNumberToIv(0),
-			new Buffer('000000000000000000000000', 'hex')
+			Buffer.from('000000000000000000000000', 'hex')
 		);
 		assert.deepStrictEqual(
 			gcmer.blockNumberToIv(1),
-			new Buffer('000000000000000000000001', 'hex')
+			Buffer.from('000000000000000000000001', 'hex')
 		);
 		assert.deepStrictEqual(
 			gcmer.blockNumberToIv(100),
-			new Buffer('000000000000000000000064', 'hex')
+			Buffer.from('000000000000000000000064', 'hex')
 		);
 		assert.deepStrictEqual(
 			gcmer.blockNumberToIv(Math.pow(2, 53) - 1),
-			new Buffer('00000000001fffffffffffff', 'hex')
+			Buffer.from('00000000001fffffffffffff', 'hex')
 		);
 	});
 });
@@ -43,7 +43,7 @@ const KEY = crypto.pseudoRandomBytes(16);
 
 describe('GCMWriter', function() {
 	it("yields 0-byte stream for 0-byte input", Promise.coroutine(function*() {
-		const inputBuf = new Buffer(0);
+		const inputBuf = Buffer.alloc(0);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new gcmer.GCMWriter(4096, KEY, 0);
 		utils.pipeWithErrors(inputStream, writer);
@@ -52,7 +52,7 @@ describe('GCMWriter', function() {
 	}));
 
 	it("yields 17-byte stream for 1-byte input", Promise.coroutine(function*() {
-		const inputBuf = new Buffer(1).fill(0);
+		const inputBuf = Buffer.alloc(1);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new gcmer.GCMWriter(4096, KEY, 0);
 		utils.pipeWithErrors(inputStream, writer);

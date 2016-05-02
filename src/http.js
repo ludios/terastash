@@ -94,7 +94,7 @@ class StashServer {
 			// TODO: fix getRowByPath
 			if(dbPath === "") {
 				parent = {};
-				parent.uuid = new Buffer(128/8).fill(0);
+				parent.uuid = Buffer.alloc(128/8);
 				parent.type = "d";
 			} else {
 				parent = yield terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid', 'size']);

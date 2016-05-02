@@ -14,7 +14,7 @@ const IV_SIZE = 12;
 // terastash block, not AES block
 function blockNumberToIv(blockNum) {
 	utils.assertSafeNonNegativeInteger(blockNum);
-	const buf = new Buffer(aes.strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
+	const buf = Buffer.from(aes.strictZeroPad(blockNum.toString(16), IV_SIZE * 2), 'hex');
 	A(buf.length, IV_SIZE);
 	return buf;
 }
@@ -24,13 +24,13 @@ function blockNumberToIv(blockNum) {
  * our use of the IV as the counter.
  */
 function selfTest() {
-	const key = new Buffer('12300000000000045600000000000789', 'hex');
+	const key = Buffer.from('12300000000000045600000000000789', 'hex');
 	const iv1 = blockNumberToIv(1);
 
 	// Test for exact ciphertext
 	const cipher = crypto.createCipheriv('aes-128-gcm', key, iv1);
 	const text = 'Hello, world. This is a test string spanning multiple AES blocks.';
-	const encrypted = cipher.update(new Buffer(text));
+	const encrypted = cipher.update(Buffer.from(text));
 	cipher.final();
 	const tag = cipher.getAuthTag();
 	A.eq(
@@ -111,7 +111,7 @@ class BadData extends Error {
 
 const MODE_DATA = Symbol("MODE_DATA");
 const MODE_TAG = Symbol("MODE_TAG");
-const EMPTY_BUF = new Buffer(0);
+const EMPTY_BUF = Buffer.alloc(0);
 
 class GCMReader extends Transform {
 	constructor(blockSize, key, initialBlockNum) {

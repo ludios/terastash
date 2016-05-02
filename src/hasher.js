@@ -13,7 +13,7 @@ const Transform = require('stream').Transform;
 let sse4_crc32 = new LazyModule(os.arch() === 'arm' ? 'armv7l_crc32' : 'sse4_crc32', compile_require);
 
 function crcToBuf(n) {
-	const buf = new Buffer(4);
+	const buf = Buffer.allocUnsafe(4);
 	buf.writeUIntBE(n, 0, 4);
 	return buf;
 }
@@ -73,7 +73,7 @@ class BadData extends Error {
 const MODE_DATA = Symbol("MODE_DATA");
 const MODE_CRC = Symbol("MODE_CRC");
 
-const EMPTY_BUF = new Buffer(0);
+const EMPTY_BUF = Buffer.alloc(0);
 
 class CRCReader extends Transform {
 	constructor(blockSize) {

@@ -434,7 +434,7 @@ const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, s
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
-		return new Buffer(128/8).fill(0);
+		return Buffer.alloc(128/8);
 	}
 
 	const parentPath = utils.getParentPath(p);
@@ -681,7 +681,7 @@ function makeKey() {
 	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-key-counter'));
-		const buf = new Buffer(128/8).fill(0);
+		const buf = Buffer.alloc(128/8);
 		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
 		return buf;
 	} else {
@@ -694,14 +694,14 @@ function makeUuid() {
 	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const uuidCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-uuid-counter'), 1);
-		const buf = new Buffer(128/8).fill(0);
+		const buf = Buffer.alloc(128/8);
 		buf.writeIntBE(uuidCounter.getNext(), 0, 128/8);
 		uuid = buf;
 	} else {
 		uuid = crypto.randomBytes(128/8);
 	}
 	A(
-		!uuid.equals(new Buffer(128/8).fill(0)),
+		!uuid.equals(Buffer.alloc(128/8)),
 		"uuid must not be 0 because root directory is 0"
 	);
 	return uuid;
@@ -2288,7 +2288,7 @@ function importDb(outCtx, stashName, dumpFile) {
 		}
 		line_reader = loadNow(line_reader);
 		work_stealer = loadNow(work_stealer);
-		const lineStream = new line_reader.DelimitedBufferDecoder(new Buffer("\n"));
+		const lineStream = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
 		// 4 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
 		const workStealers = work_stealer.makeWorkStealers(lineStream, 4);
