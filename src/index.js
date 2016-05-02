@@ -292,13 +292,11 @@ function isKeyspaceMissingError(err) {
  * Run a Cassandra query and return a Promise that is fulfilled
  * with the query results.
  */
-function runQuery(client, statement, ...args) {
-	const [queryArgs] = args;
+function runQuery(client, statement, queryArgs) {
 	T(client, CassandraClientType, statement, T.string, queryArgs, T.optional(Array));
 	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(queryArgs)})`);
 	return new Promise(function runQuery$Promise(resolve, reject) {
-		client.execute(statement, queryArgs, {prepare: true}, function(...args) {
-			const [err, result] = args;
+		client.execute(statement, queryArgs, {prepare: true}, function(err, result) {
 			if(err) {
 				reject(err);
 			} else {
@@ -320,8 +318,7 @@ function runQuery(client, statement, ...args) {
 function doWithClient(client, f) {
 	T(client, CassandraClientType, f, T.function);
 	const p = f(client);
-	function shutdown(...args) {
-		const ret = [args];
+	function shutdown(ret) {
 		try {
 			client.shutdown();
 		} catch(e) {
@@ -454,10 +451,8 @@ const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stash
 	return getRowByParentBasename(client, stashName, parent, basename, cols);
 });
 
-const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, ...args) {
-	const [limit] = args;
+const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
-
 	const rows = [];
 	const rowStream = client.stream(
 		`SELECT ${utils.colsAsString(cols)}
@@ -518,8 +513,7 @@ const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, option
 	}
 });
 
-const listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, ...args) {
-	const [type] = args;
+const listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, type) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = yield getChildrenForParent(
@@ -895,8 +889,7 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p,
 	}
 });
 
-function shooFiles(paths, ...args) {
-	const [justRemove, continueOnError, ignoreMtime] = args;
+function shooFiles(paths, justRemove, continueOnError, ignoreMtime) {
 	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -935,15 +928,14 @@ function checkChunkSize(size) {
  * If `dropOldIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, ...args) {
-	const [dropOldIfDifferent, ignoreMtime] = args;
+const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=false, ignoreMtime=false) {
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
 		p, T.string,
 		dbPath, T.string,
-		dropOldIfDifferent, T.optional(T.boolean),
-		ignoreMtime, T.optional(T.boolean)
+		dropOldIfDifferent, T.boolean,
+		ignoreMtime, T.boolean
 	);
 	checkDbPath(dbPath);
 
@@ -1194,16 +1186,15 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 /**
  * Put files or directories into the Cassandra database.
  */
-function addFiles(outCtx, paths, ...args) {
-	const [continueOnExists, dropOldIfDifferent, thenShoo, justRemove, ignoreMtime] = args;
+function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=false, thenShoo=false, justRemove=false, ignoreMtime=false) {
 	T(
 		outCtx, OutputContextType,
 		paths, T.list(T.string),
-		continueOnExists, T.optional(T.boolean),
-		dropOldIfDifferent, T.optional(T.boolean),
-		thenShoo, T.optional(T.boolean),
-		justRemove, T.optional(T.boolean),
-		ignoreMtime, T.optional(T.boolean)
+		continueOnExists, T.boolean,
+		dropOldIfDifferent, T.boolean,
+		thenShoo, T.boolean,
+		justRemove, T.boolean,
+		ignoreMtime, T.boolean
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1299,8 +1290,7 @@ function chunksToBlockRanges(chunks, blockSize) {
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
-const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, parent, basename, ...args) {
-	const [ranges] = args;
+const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, parent, basename, ranges) {
 	T(client, CassandraClientType, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	if(ranges) {
 		A.eq(ranges.length, 1, "Only support 1 range right now");
@@ -1592,8 +1582,7 @@ function getFiles(stashName, paths, fake) {
 	}));
 }
 
-const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath, ...args) {
-	const [ranges] = args;
+const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath, ranges) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	const parent = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);

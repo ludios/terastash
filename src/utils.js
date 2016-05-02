@@ -14,11 +14,10 @@ const inspect = require('util').inspect;
 const compile_require = require('./compile_require');
 
 class LazyModule {
-	constructor(...args) {
-		const [requirePath, requireFunc, postRequireHook] = args;
-		T(requirePath, T.string, requireFunc, T.optional(T.function), postRequireHook, T.optional(T.function));
+	constructor(requirePath, requireFunc=require, postRequireHook) {
+		T(requirePath, T.string, requireFunc, T.function, postRequireHook, T.optional(T.function));
 		this.requirePath = requirePath;
-		this.requireFunc = requireFunc || require;
+		this.requireFunc = requireFunc;
 		this.postRequireHook = postRequireHook;
 	}
 
@@ -160,9 +159,8 @@ function comparator(pred) {
  * Takes a function that maps obj -> (key to sort by) and
  * returns a comparator function that can be passed to arr.sort(...)
  */
-function comparedBy(mapping, ...args) {
-	const [reverse] = args;
-	T(mapping, T.function, reverse, T.optional(T.boolean));
+function comparedBy(mapping, reverse=false) {
+	T(mapping, T.function, reverse, T.boolean);
 	if(!reverse) {
 		return comparator(function(x, y) {
 			return mapping(x) < mapping(y);
@@ -257,8 +255,7 @@ const StreamType = T.shape({
 	resume: T.function
 });
 
-function makeHttpsRequest(options, ...args) {
-	const [stream] = args;
+function makeHttpsRequest(options, stream) {
 	T(options, T.object, stream, T.optional(StreamType));
 	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
@@ -310,8 +307,7 @@ function writableToBuffer(stream) {
 	});
 }
 
-function crc32$digest(...args) {
-	const [encoding] = args;
+function crc32$digest(encoding) {
 	T(encoding, T.optional(T.string));
 	const buf = Buffer.allocUnsafe(4);
 	buf.writeUIntBE(this.crc(), 0, 4);
@@ -329,16 +325,12 @@ function crc32$digest(...args) {
  *		length: number of bytes read from input stream
  * }
  */
-function streamHasher(inputStream, algoOrExistingHash, ...args) {
-	let [existingLength] = args;
+function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 	T(
 		inputStream, StreamType,
 		algoOrExistingHash, T.union([T.string, T.object]),
-		existingLength, T.optional(T.number)
+		existingLength, T.number
 	);
-	if(existingLength === undefined) {
-		existingLength = 0;
-	}
 	assertSafeNonNegativeInteger(existingLength);
 	let hash;
 	if(typeof algoOrExistingHash === "string") {
@@ -427,13 +419,9 @@ function filledArray(n, obj) {
 }
 
 class PersistentCounter {
-	constructor(fname, ...args) {
-		let [start] = args;
-		T(fname, T.string, start, T.optional(T.number));
+	constructor(fname, start=0) {
+		T(fname, T.string, start, T.number);
 		this.fname = fname;
-		if(start === undefined) {
-			start = 0;
-		}
 		assertSafeNonNegativeInteger(start);
 		this.start = start;
 	}
@@ -583,8 +571,7 @@ function splitBuffer(buf, blockSize) {
  *
  * @return {!Array.<string>} The splitted string, as an array.
  */
-function splitString(s, sep, ...args) {
-	const [maxsplit] = args;
+function splitString(s, sep, maxsplit) {
 	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
 	if(maxsplit === undefined || maxsplit < 0) {
 		return s.split(sep);
@@ -609,8 +596,7 @@ function splitString(s, sep, ...args) {
  *
  * @return {!Array.<string>} The rsplitted string, as an array.
  */
-function rsplitString(s, sep, ...args) {
-	const [maxsplit] = args;
+function rsplitString(s, sep, maxsplit) {
 	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
 	if(maxsplit === undefined || maxsplit < 0) {
 		return s.split(sep);
