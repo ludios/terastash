@@ -10,7 +10,7 @@ function makeKey() {
 	if(Number(getProp(process.env, 'TERASTASH_INSECURE_AND_DETERMINISTIC'))) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'random-stream-key-counter'));
-		const buf = new Buffer(128/8).fill(0);
+		const buf = Buffer.alloc(128/8);
 		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
 		return buf;
 	} else {
@@ -18,7 +18,7 @@ function makeKey() {
 	}
 }
 
-const ZERO_64KB = new Buffer(64 * 1024).fill(0);
+const ZERO_64KB = Buffer.alloc(64 * 1024);
 
 class SecureRandomStream extends Readable {
 	constructor(wantLength) {

@@ -313,7 +313,7 @@ function writableToBuffer(stream) {
 function crc32$digest(...args) {
 	const [encoding] = args;
 	T(encoding, T.optional(T.string));
-	const buf = new Buffer(4);
+	const buf = Buffer.allocUnsafe(4);
 	buf.writeUIntBE(this.crc(), 0, 4);
 	if(encoding === undefined) {
 		return buf;
@@ -510,7 +510,7 @@ const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
 });
 
 
-const EMPTY_BUF = new Buffer(0);
+const EMPTY_BUF = Buffer.alloc(0);
 
 /**
  * An object that holds multiple Buffers and knows the total

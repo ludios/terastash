@@ -13,7 +13,7 @@ const crypto = require('crypto');
 
 describe('CRCWriter', function() {
 	it("yields 0-byte stream for 0-byte input", Promise.coroutine(function*() {
-		const inputBuf = new Buffer(0);
+		const inputBuf = Buffer.alloc(0);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new hasher.CRCWriter(4096);
 		utils.pipeWithErrors(inputStream, writer);
@@ -22,7 +22,7 @@ describe('CRCWriter', function() {
 	}));
 
 	it("yields 5-byte stream for 1-byte input", Promise.coroutine(function*() {
-		const inputBuf = new Buffer(1).fill(0);
+		const inputBuf = Buffer.alloc(1);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new hasher.CRCWriter(4096);
 		utils.pipeWithErrors(inputStream, writer);

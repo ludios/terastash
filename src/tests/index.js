@@ -10,7 +10,7 @@ function makeChunks(sizes) {
 	const chunks = [];
 	let idx = 0;
 	for(const s of sizes) {
-		chunks.push({size: s, idx: idx, file_id: "", crc32c: new Buffer(4).fill(0)});
+		chunks.push({size: s, idx: idx, file_id: "", crc32c: Buffer.alloc(4)});
 		idx++;
 	}
 	return chunks;

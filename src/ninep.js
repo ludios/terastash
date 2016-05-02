@@ -167,7 +167,7 @@ const LongLikeType = T.shape({
 
 function uint64(n) {
 	T(n, T.union([T.number, LongLikeType]));
-	const buf = new Buffer(8).fill(0);
+	const buf = Buffer.alloc(8);
 	if(typeof n === 'number') {
 		A.gte(n, 0);
 		if(n <= Math.pow(2, 32)) {
@@ -195,7 +195,7 @@ function uint32(n) {
 	T(n, T.number);
 	A.gte(n, 0);
 	A.lte(n, Math.pow(2, 32));
-	const buf = new Buffer(4);
+	const buf = Buffer.allocUnsafe(4);
 	buf.writeUInt32LE(n, 0);
 	return buf;
 }
@@ -204,7 +204,7 @@ function uint16(n) {
 	T(n, T.number);
 	A.gte(n, 0);
 	A.lte(n, Math.pow(2, 16));
-	const buf = new Buffer(2);
+	const buf = Buffer.allocUnsafe(2);
 	buf.writeUInt16LE(n, 0);
 	return buf;
 }
@@ -213,7 +213,7 @@ function uint8(n) {
 	T(n, T.number);
 	A.gte(n, 0);
 	A.lte(n, Math.pow(2, 8));
-	const buf = new Buffer(1);
+	const buf = Buffer.allocUnsafe(1);
 	buf.writeUInt8(n, 0);
 	return buf;
 }
@@ -398,7 +398,7 @@ class Terastash9P {
 		for(const buf of bufs) {
 			length += buf.length;
 		}
-		const preBuf = new Buffer(4 + 1 + 2);
+		const preBuf = Buffer.allocUnsafe(4 + 1 + 2);
 		const totalLength = 4 + 1 + 2 + length;
 		A.lte(totalLength, this._msize);
 		preBuf.writeUInt32LE(totalLength, 0);
@@ -439,7 +439,7 @@ class Terastash9P {
 		if(DEBUG_9P) {
 			console.error(chalk.bold(chalk.red(`<- ${packets[type].name} ${inspect(reason)}`)));
 		}
-		this.replyAny(msg.tag, type, [string(new Buffer(reason))]);
+		this.replyAny(msg.tag, type, [string(Buffer.from(reason))]);
 	}
 
 	*handleMessage(msg) {
@@ -456,13 +456,13 @@ class Terastash9P {
 		} else if(msg.type === Type.Tattach) {
 			const stashName = msg.aname.toString('utf-8');
 			this._stashInfo = yield terastash.getStashInfoByName(stashName);
-			const qid = {type: "DIR", version: 0, path: new Buffer(8).fill(0)};
+			const qid = {type: "DIR", version: 0, path: Buffer.alloc(8)};
 			// UUID 0000... is the root of the stash
-			this._qidMap.set(_qid(qid).toString('hex'), {uuid: new Buffer(128/8).fill(0), type: "DIR", executable: false, size: 0});
+			this._qidMap.set(_qid(qid).toString('hex'), {uuid: Buffer.alloc(128/8), type: "DIR", executable: false, size: 0});
 			this._fidMap.set(msg.fid, qid);
 			this.replyOK(msg, {qid});
 		} else if(msg.type === Type.Tgetattr) {
-			const valid = new Buffer(8).fill(0);
+			const valid = Buffer.alloc(8);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
 			let {type, uuid, executable, size} = this._qidMap.get(_qid(qid).toString('hex'));
@@ -479,27 +479,27 @@ class Terastash9P {
 			const uid = this._myUID;
 			const gid = 0;
 			const nlink = 1;
-			const rdev = new Buffer(8).fill(0);
+			const rdev = Buffer.alloc(8);
 			if(type === "DIR") {
 				size = 0;
 			} else {
 				A.neq(size, null, `Size for qid ${inspect(qid)} was null; type=${inspect(type)}`);
 			}
-			const blksize = new Buffer(8).fill(0);
+			const blksize = Buffer.alloc(8);
 			// TODO
 			blksize.writeUInt32LE(8 * 1024 * 1024);
-			const blocks = new Buffer(8).fill(0);
-			const atime_sec = new Buffer(8).fill(0);
-			const atime_nsec = new Buffer(8).fill(0);
+			const blocks = Buffer.alloc(8);
+			const atime_sec = Buffer.alloc(8);
+			const atime_nsec = Buffer.alloc(8);
 			// TODO
-			const mtime_sec = new Buffer(8).fill(0);
-			const mtime_nsec = new Buffer(8).fill(0);
-			const ctime_sec = new Buffer(8).fill(0);
-			const ctime_nsec = new Buffer(8).fill(0);
-			const btime_sec = new Buffer(8).fill(0);
-			const btime_nsec = new Buffer(8).fill(0);
-			const gen = new Buffer(8).fill(0);
-			const data_version = new Buffer(8).fill(0);
+			const mtime_sec = Buffer.alloc(8);
+			const mtime_nsec = Buffer.alloc(8);
+			const ctime_sec = Buffer.alloc(8);
+			const ctime_nsec = Buffer.alloc(8);
+			const btime_sec = Buffer.alloc(8);
+			const btime_nsec = Buffer.alloc(8);
+			const gen = Buffer.alloc(8);
+			const data_version = Buffer.alloc(8);
 
 			this.replyOK(msg, {
 				valid, qid, mode, uid, gid, nlink, rdev, size, blksize, blocks,
@@ -518,7 +518,7 @@ class Terastash9P {
 			this.replyOK(msg, {});
 		} else if(msg.type === Type.Txattrwalk) {
 			// We have no xattrs
-			this.replyOK(msg, {size: new Buffer(8).fill(0)});
+			this.replyOK(msg, {size: Buffer.alloc(8)});
 		} else if(msg.type === Type.Twalk) {
 			const qid = this._fidMap.get(msg.fid);
 			let parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
@@ -574,7 +574,7 @@ class Terastash9P {
 				const qid = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), {
 					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
-				entries.push({qid, offset, type, name: new Buffer(row.basename, 'utf-8')});
+				entries.push({qid, offset, type, name: Buffer.from(row.basename, 'utf-8')});
 				offset += 1;
 			}
 			this.replyOK(msg, {entries});

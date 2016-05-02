@@ -401,7 +401,7 @@ class GDriver {
 			if(googHash && checkCRC32CifReceived) {
 				hasher = utils.streamHasher(res, 'crc32c');
 				A(googHash.startsWith("crc32c="), googHash);
-				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				const googCRC = Buffer.from(googHash.replace("crc32c=", ""), "base64");
 				hasher.stream.once('end', function getData$hasher$end() {
 					const computedCRC = hasher.hash.digest();
 					if(!computedCRC.equals(googCRC)) {
@@ -478,7 +478,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 			break;
 		}
 		// We can trust the md5Checksum in response; createFile checked it for us
-		const md5Digest = new Buffer(response['md5Checksum'], 'hex');
+		const md5Digest = Buffer.from(response['md5Checksum'], 'hex');
 		chunkInfo.push({
 			idx,
 			file_id: response.id,
@@ -524,7 +524,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			} else {
 				T(googHash, T.string);
 				A(googHash.startsWith("crc32c="), googHash);
-				const googCRC = new Buffer(googHash.replace("crc32c=", ""), "base64");
+				const googCRC = Buffer.from(googHash.replace("crc32c=", ""), "base64");
 				if(!chunk.crc32c.equals(googCRC)) {
 					throw new BadChunk(
 						`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
