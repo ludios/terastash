@@ -37,7 +37,6 @@ require('cache-require-paths');
 require('better-buffer-inspect');
 
 const terastash = require('.');
-const os = require('os');
 const utils = require('./utils');
 const filename = require('./filename');
 const T = require('notmytype');

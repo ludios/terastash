@@ -4,7 +4,6 @@ const A = require('ayy');
 const T = require('notmytype');
 const Promise = require('bluebird');
 const mkdirpAsync = Promise.promisify(require('mkdirp'));
-const os = require('os');
 const fs = require('./fs-promisified');
 const path = require('path');
 const crypto = require('crypto');

@@ -1,7 +1,6 @@
 "use strict";
 
 const A = require('ayy');
-const os = require('os');
 const utils = require('./utils');
 const commaify = utils.commaify;
 const compile_require = require('./compile_require');

@@ -7,7 +7,6 @@
 
 const T = require('notmytype');
 const Readable = require('stream').Readable;
-const utils = require('./utils');
 
 class MultiStream extends Readable {
 	constructor(buf, options={}) {
