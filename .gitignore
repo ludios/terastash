@@ -1,6 +1,4 @@
 /node_modules/sse4_crc32/build
-/node_modules/armv7l_crc32/build
-/node_modules/heapdump/build
 /.terastash.json
 /src/tests/*.err
 /trash

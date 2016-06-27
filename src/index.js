@@ -38,7 +38,6 @@ cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
 });
 let localfs = new LazyModule('./chunker/localfs');
 let gdrive = new LazyModule('./chunker/gdrive');
-let heapdump = new LazyModule('heapdump', compile_require);
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 let readline = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
@@ -2085,8 +2084,6 @@ class RowToTransit extends Transform {
 
 function exportDb(stashName) {
 	T(stashName, T.maybe(T.string));
-	// Temporary hack for testing
-	loadNow(heapdump);
 	return doWithClient(getNewClient(), function exportDb$doWithClient(client) {
 		return doWithPath(stashName, ".", Promise.coroutine(function* exportDb$coro(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
