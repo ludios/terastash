@@ -71,7 +71,7 @@ class StashServer {
 	}
 
 	*_handleRequest(req, res) {
-		console.log(`${req.method} ${req.url} ${req.headers.range}`);
+		console.log(`OPENED: ${req.method} ${req.url} ${req.headers.range}`);
 		res.setHeader("X-Frame-Options", "DENY");
 		res.setHeader("X-Content-Type-Options", "nosniff");
 		res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -134,6 +134,12 @@ class StashServer {
 				const [parentPath, basename] = utils.rsplitString(dbPath, '/', 1);
 				const fileParent = yield terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
 				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
+				res.once('finish', function() {
+					console.log(`CLOSED: ${req.method} ${req.url} ${req.headers.range}`);
+				});
+				res.once('close', function() {
+					console.log(`CLOSED: ${req.method} ${req.url} ${req.headers.range}`);
+				});
 				utils.pipeWithErrors(dataStream, res);
 				// TODO: when the client aborts their connection, we need to abort the connections
 				// to Google.  The connections are immediately backpressured, but we don't want
