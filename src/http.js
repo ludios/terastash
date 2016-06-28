@@ -8,6 +8,7 @@ const Promise = require('bluebird');
 const terastash = require('.');
 const utils = require('./utils');
 const mime = require('mime-types');
+const domain = require('domain');
 
 class StashServer {
 	constructor(stashes) {
@@ -163,12 +164,20 @@ class StashServer {
 StashServer.prototype._writeListing = Promise.coroutine(StashServer.prototype._writeListing);
 StashServer.prototype._handleRequest = Promise.coroutine(StashServer.prototype._handleRequest);
 
+// We need a domain to avoid blowing up the whole process when something goes badly for one request
+const d = domain.create();
+d.on('error', function(err) {
+	console.error(err.stack);
+});
+
 function listen(host, port, stashes) {
 	T(host, T.string, port, T.number, stashes, T.list(T.string));
-	const stashServer = new StashServer(stashes);
-	const httpServer = http.createServer(stashServer.handleRequest.bind(stashServer));
-	httpServer.listen(port, host);
-	console.log(`HTTP server listening on ${host}:${port}`);
+	d.run(function() {
+		const stashServer = new StashServer(stashes);
+		const httpServer = http.createServer(stashServer.handleRequest.bind(stashServer));
+		httpServer.listen(port, host);
+		console.log(`HTTP server listening on ${host}:${port}`);
+	});
 }
 
 module.exports = {listen};
