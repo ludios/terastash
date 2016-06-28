@@ -500,11 +500,17 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	A.eq(chunks.length, ranges.length);
 
 	const cipherStream = new Combine();
+	let currentChunkStream = null;
+	let destroyed = false;
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
 		for(const [chunk, range] of utils.zip(chunks, ranges)) {
+			if(destroyed) {
+				return;
+			}
 			const [chunkStream, res] = yield gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
+			currentChunkStream = chunkStream;
 			// Note: even when we're not checking whole-chunk CRC32C, we're still
 			// making sure Google is sending us the correct CRC32C for a file.
 			// Though we don't have the opportunity to do this when we're getting a
@@ -536,6 +542,10 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	})().catch(function(err) {
 		cipherStream.emit('error', err);
 	});
+	cipherStream.destroy = function cipherStream$destroy() {
+		destroyed = true;
+		currentChunkStream.destroy();
+	};
 	return cipherStream;
 }
 

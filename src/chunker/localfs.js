@@ -63,16 +63,22 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 	A.eq(chunks.length, ranges.length);
 
 	const cipherStream = new Combine();
+	let currentChunkStream = null;
+	let destroyed = false;
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	Promise.coroutine(function* readChunks$coro() {
 		for(const [chunk, range] of utils.zip(chunks, ranges)) {
+			if(destroyed) {
+				return;
+			}
 			const digest = chunk.crc32c;
 			A.eq(digest.length, 32/8);
 
 			const chunkStream = fs.createReadStream(
 				path.join(directory, chunk.file_id),
 				{start: range[0], end: range[1] - 1}); // end is inclusive
+			currentChunkStream = chunkStream;
 			let hasher;
 			if(checkWholeChunkCRC32C) {
 				hasher = utils.streamHasher(chunkStream, 'crc32c');
@@ -80,7 +86,6 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 			} else {
 				cipherStream.append(chunkStream);
 			}
-
 			yield new Promise(function readChunks$Promise(resolve, reject) {
 				(hasher ? hasher.stream : chunkStream).once('end', function() {
 					if(!checkWholeChunkCRC32C) {
@@ -104,6 +109,11 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 	})().catch(function(err) {
 		cipherStream.emit('error', err);
 	});
+	cipherStream.destroy = function cipherStream$destroy() {
+		// Warning: untested code
+		destroyed = true;
+		currentChunkStream.destroy();
+	};
 	return cipherStream;
 }
 

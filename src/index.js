@@ -1466,6 +1466,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				'aes-128-ctr', row.key, aes.blockNumberToIv(scaledRequestedRange[0]));
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		}
+		// Warning: dataStream may be rebound right below
 
 		if(truncateLeft !== null) {
 			const _dataStream = dataStream;
@@ -1485,6 +1486,10 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		// flowing mode yet, because the user hasn't attached their own
 		// 'data' handler yet.
 		dataStream.pause();
+
+		dataStream.destroy = function dataStream$destroy() {
+			cipherStream.destroy();
+		};
 	} else {
 		hasher = loadNow(hasher);
 		sse4_crc32 = loadNow(sse4_crc32);
@@ -1493,6 +1498,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 				row.content.slice(ranges[0][0], ranges[0][1]) :
 				row.content;
 		dataStream = streamifier.createReadStream(content);
+		dataStream.destroy = noop;
 		bytesRead = content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content

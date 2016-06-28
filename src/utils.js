@@ -346,6 +346,9 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 	}
 
 	const stream = new PassThrough();
+	stream.destroy = function streamHasher$stream$destroy() {
+		inputStream.destroy();
+	};
 	pipeWithErrors(inputStream, stream);
 	const out = {stream, hash, length: existingLength};
 	stream.on('data', function(data) {
