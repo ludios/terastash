@@ -452,25 +452,25 @@ const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stash
 
 const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
-	const rows = [];
-	const rowStream = client.stream(
-		`SELECT ${utils.colsAsString(cols)}
-		from "${KEYSPACE_PREFIX + stashName}".fs
-		WHERE parent = ?
-		${limit === undefined ? "" : `LIMIT ${limit}`}`,
-		[parent], {autoPage: true, prepare: true}
-	);
-	rowStream.on('readable', function getChildForParent$rowStream$readable() {
-		let row;
-		while(row = this.read()) {
-			rows.push(row);
-		}
-	});
 	return new Promise(function getChildForParent$Promise(resolve, reject) {
+		const rows = [];
+		const rowStream = client.stream(
+			`SELECT ${utils.colsAsString(cols)}
+			from "${KEYSPACE_PREFIX + stashName}".fs
+			WHERE parent = ?
+			${limit === undefined ? "" : `LIMIT ${limit}`}`,
+			[parent], {autoPage: true, prepare: true}
+		);
+		rowStream.once('error', reject);
+		rowStream.on('readable', function getChildForParent$rowStream$readable() {
+			let row;
+			while(row = this.read()) {
+				rows.push(row);
+			}
+		});
 		rowStream.on('end', function getChildForParent$rowStream$end() {
 			resolve(rows);
 		});
-		rowStream.once('error', reject);
 	});
 });
 
