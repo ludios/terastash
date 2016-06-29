@@ -57,7 +57,7 @@ class StashServer {
 			const d = row.type === "d" ? "/" : "";
 			res.write(`
 				<tr>
-					<td><a href="${escape(row.basename) + d}">${escape(row.basename) + d}</a></td>
+					<td><a href="${encodeURIComponent(row.basename) + d}">${escape(row.basename) + d}</a></td>
 					<td>${utils.shortISO(row.mtime)}</td>
 					<td class="size">${row.size != null ? utils.commaify(Number(row.size)) : "-"}</td>
 				</tr>
@@ -80,7 +80,7 @@ class StashServer {
 		if(req.url === '/') {
 			res.setHeader("Content-Type", "text/html; charset=utf-8");
 			for(const stash of this.stashes) {
-				res.write(`<li><a href="${escape(stash)}/">${escape(stash)}</a>\n`);
+				res.write(`<li><a href="${encodeURIComponent(stash)}/">${escape(stash)}</a>\n`);
 			}
 			res.end();
 		} else if(req.url === '/favicon.ico') {
