@@ -151,11 +151,12 @@ class StashServer {
 		}
 	}
 
-	handleRequest(req, res) {
+	*handleRequest(req, res) {
 		try {
-			return this._handleRequest(req, res);
+			return yield this._handleRequest(req, res);
 		} catch(err) {
 			console.error(err.stack);
+			res.statusCode = 500;
 			res.end();
 		}
 	}
@@ -163,6 +164,7 @@ class StashServer {
 
 StashServer.prototype._writeListing = Promise.coroutine(StashServer.prototype._writeListing);
 StashServer.prototype._handleRequest = Promise.coroutine(StashServer.prototype._handleRequest);
+StashServer.prototype.handleRequest = Promise.coroutine(StashServer.prototype.handleRequest);
 
 // We need a domain to avoid blowing up the whole process when something goes badly for one request
 const d = domain.create();
