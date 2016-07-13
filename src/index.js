@@ -479,9 +479,12 @@ const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, option
 	const stashInfo = yield getStashInfoForNameOrPaths(stashName, [p]);
 	const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
+	// If user wants just names and we're not sorting, we can put a little less load
+	// on cassandra by getting just the `basename`s
+	const justBasenames = options.justNames && !(options.sortByMtime || options.sortBySize);
 	const rows = yield getChildrenForParent(
 		client, stashInfo.name, parent,
-		["basename", "type", "size", "mtime", "executable"]
+		justBasenames ? ["basename"] : ["basename", "type", "size", "mtime", "executable"]
 	);
 	if(options.sortByMtime) {
 		rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
