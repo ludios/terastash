@@ -607,7 +607,7 @@ class PathAlreadyExistsError extends Error {
 
 const MIN_SUPPORTED_VERSION = 2;
 const MAX_SUPPORTED_VERSION = 3;
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION       = 3;
 
 function checkDbPath(dbPath) {
 	T(dbPath, T.string);
