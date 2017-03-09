@@ -1,50 +1,49 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
-const Promise = require('bluebird');
-const fs = require('./fs-promisified');
-const mkdirpAsync = Promise.promisify(require('mkdirp'));
-const path = require('path');
-const crypto = require('crypto');
-const chalk = require('chalk');
-const inspect = require('util').inspect;
-const streamifier = require('streamifier');
-const noop = require('lodash.noop');
-const Transform = require('stream').Transform;
-const os = require('os');
-
-const utils = require('./utils');
-const commaify = utils.commaify;
-const LazyModule = utils.LazyModule;
-const loadNow = utils.loadNow;
-const OutputContextType = utils.OutputContextType;
-const filename = require('./filename');
-const compile_require = require('./compile_require');
-const RetryPolicy = require('cassandra-driver/lib/policies/retry').RetryPolicy;
+const A                   = require('ayy');
+const T                   = require('notmytype');
+const Promise             = require('bluebird');
+const fs                  = require('./fs-promisified');
+const mkdirpAsync         = Promise.promisify(require('mkdirp'));
+const path                = require('path');
+const crypto              = require('crypto');
+const chalk               = require('chalk');
+const inspect             = require('util').inspect;
+const streamifier         = require('streamifier');
+const noop                = require('lodash.noop');
+const Transform           = require('stream').Transform;
+const os                  = require('os');
+const utils               = require('./utils');
+const commaify            = utils.commaify;
+const LazyModule          = utils.LazyModule;
+const loadNow             = utils.loadNow;
+const OutputContextType   = utils.OutputContextType;
+const filename            = require('./filename');
+const compile_require     = require('./compile_require');
+const RetryPolicy         = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const LoadBalancingPolicy = require('cassandra-driver/lib/policies/load-balancing').LoadBalancingPolicy;
-const deepEqual = require('deep-equal');
-const Table = require('cli-table');
-const Combine = require('combine-streams');
+const deepEqual           = require('deep-equal');
+const Table               = require('cli-table');
+const Combine             = require('combine-streams');
 
 let CassandraClientType = T.object;
 
-let aes = new LazyModule('./aes');
-let gcmer = new LazyModule('./gcmer');
+let aes    = new LazyModule('./aes');
+let gcmer  = new LazyModule('./gcmer');
 let hasher = new LazyModule('./hasher');
 let cassandra;
-cassandra = new LazyModule('cassandra-driver', require, function(realModule) {
+cassandra  = new LazyModule('cassandra-driver', require, function(realModule) {
 	CassandraClientType = realModule.Client;
 });
-let localfs = new LazyModule('./chunker/localfs');
-let gdrive = new LazyModule('./chunker/gdrive');
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
-let readline = new LazyModule('readline');
+let localfs       = new LazyModule('./chunker/localfs');
+let gdrive        = new LazyModule('./chunker/gdrive');
+let sse4_crc32    = new LazyModule('sse4_crc32', compile_require);
+let readline      = new LazyModule('readline');
 let padded_stream = new LazyModule('./padded_stream');
-let line_reader = new LazyModule('./line_reader');
-let work_stealer = new LazyModule('./work_stealer');
+let line_reader   = new LazyModule('./line_reader');
+let work_stealer  = new LazyModule('./work_stealer');
 let random_stream = new LazyModule('./random_stream');
-let transit = new LazyModule('transit-js');
+let transit       = new LazyModule('transit-js');
 
 let TERASTASH_VERSION;
 let HOSTNAME;
