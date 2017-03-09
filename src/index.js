@@ -545,9 +545,9 @@ function findPath(stashName, p, options) {
 	});
 }
 
-const MISSING = Symbol('MISSING');
+const MISSING   = Symbol('MISSING');
 const DIRECTORY = Symbol('DIRECTORY');
-const FILE = Symbol('FILE');
+const FILE      = Symbol('FILE');
 
 const getTypeInDbByParentBasename = Promise.coroutine(function* getTypeInDbByParentBasename$coro(client, stashName, parent, basename) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
