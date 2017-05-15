@@ -1,4 +1,3 @@
-"use strong";
 "use strict";
 
 const filename = require('../filename');
