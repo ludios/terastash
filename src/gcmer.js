@@ -1,13 +1,13 @@
 "use strict";
 
-const crypto = require('crypto');
-const A = require('ayy');
-const T = require('notmytype');
-const utils = require('./utils');
-const aes = require('./aes');
-const commaify = utils.commaify;
+const crypto        = require('crypto');
+const A             = require('ayy');
+const T             = require('notmytype');
+const utils         = require('./utils');
+const aes           = require('./aes');
+const commaify      = utils.commaify;
 const JoinedBuffers = utils.JoinedBuffers;
-const Transform = require('stream').Transform;
+const Transform     = require('stream').Transform;
 
 const IV_SIZE = 12;
 
