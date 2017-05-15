@@ -28,11 +28,10 @@ const Combine             = require('combine-streams');
 
 let CassandraClientType = T.object;
 
-let aes    = new LazyModule('./aes');
-let gcmer  = new LazyModule('./gcmer');
-let hasher = new LazyModule('./hasher');
-let cassandra;
-cassandra  = new LazyModule('cassandra-driver', require, function(realModule) {
+let aes           = new LazyModule('./aes');
+let gcmer         = new LazyModule('./gcmer');
+let hasher        = new LazyModule('./hasher');
+let cassandra     = new LazyModule('cassandra-driver', require, function(realModule) {
 	CassandraClientType = realModule.Client;
 });
 let localfs       = new LazyModule('./chunker/localfs');
