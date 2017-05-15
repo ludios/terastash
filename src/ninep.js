@@ -369,14 +369,14 @@ function decodeMessage(frameBuf) {
 
 class Terastash9P {
 	constructor(peer) {
-		this._peer = peer;
+		this._peer      = peer;
 		this._stashInfo = null;
-		this._qidMap = new Map();
-		this._fidMap = new Map();
-		this._ourMax = (64 * 1024 * 1024) - 4;
-		this._msize = null;
-		this._client = terastash.getNewClient();
-		this._myUID = process.getuid();
+		this._qidMap    = new Map();
+		this._fidMap    = new Map();
+		this._ourMax    = (64 * 1024 * 1024) - 4;
+		this._msize     = null;
+		this._client    = terastash.getNewClient();
+		this._myUID     = process.getuid();
 	}
 
 	init() {
