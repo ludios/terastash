@@ -424,7 +424,7 @@ class Terastash9P {
 			for(let i=0; i < packets[type].enc.length; i+=2) {
 				const field = packets[type].enc[i];
 				const encFn = packets[type].enc[i + 1];
-				const buf = encFn(obj[field]);
+				const buf   = encFn(obj[field]);
 				bufs.push(buf);
 			}
 		} else {
@@ -484,20 +484,20 @@ class Terastash9P {
 			} else {
 				A.neq(size, null, `Size for qid ${inspect(qid)} was null; type=${inspect(type)}`);
 			}
-			const blksize = Buffer.alloc(8);
+			const blksize      = Buffer.alloc(8);
 			// TODO
 			blksize.writeUInt32LE(8 * 1024 * 1024);
-			const blocks = Buffer.alloc(8);
-			const atime_sec = Buffer.alloc(8);
-			const atime_nsec = Buffer.alloc(8);
+			const blocks       = Buffer.alloc(8);
+			const atime_sec    = Buffer.alloc(8);
+			const atime_nsec   = Buffer.alloc(8);
 			// TODO
-			const mtime_sec = Buffer.alloc(8);
-			const mtime_nsec = Buffer.alloc(8);
-			const ctime_sec = Buffer.alloc(8);
-			const ctime_nsec = Buffer.alloc(8);
-			const btime_sec = Buffer.alloc(8);
-			const btime_nsec = Buffer.alloc(8);
-			const gen = Buffer.alloc(8);
+			const mtime_sec    = Buffer.alloc(8);
+			const mtime_nsec   = Buffer.alloc(8);
+			const ctime_sec    = Buffer.alloc(8);
+			const ctime_nsec   = Buffer.alloc(8);
+			const btime_sec    = Buffer.alloc(8);
+			const btime_nsec   = Buffer.alloc(8);
+			const gen          = Buffer.alloc(8);
 			const data_version = Buffer.alloc(8);
 
 			this.replyOK(msg, {
@@ -505,12 +505,12 @@ class Terastash9P {
 				atime_sec, atime_nsec, mtime_sec, mtime_nsec, ctime_sec,
 				ctime_nsec, btime_sec, btime_nsec, gen, data_version});
 		} else if(msg.type === Type.Tread) {
-			const qid = this._fidMap.get(msg.fid);
+			const qid                = this._fidMap.get(msg.fid);
 			const {parent, basename} = this._qidMap.get(_qid(qid).toString('hex'));
-			const offset = uint64BufferToNumber(msg.offset);
-			const count = msg.count;
-			const [row, readStream] = yield terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
-			const data = yield utils.readableToBuffer(readStream);
+			const offset             = uint64BufferToNumber(msg.offset);
+			const count              = msg.count;
+			const [row, readStream]  = yield terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
+			const data               = yield utils.readableToBuffer(readStream);
 			this.replyOK(msg, {data});
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
@@ -519,8 +519,8 @@ class Terastash9P {
 			// We have no xattrs
 			this.replyOK(msg, {size: Buffer.alloc(8)});
 		} else if(msg.type === Type.Twalk) {
-			const qid = this._fidMap.get(msg.fid);
-			let parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
+			const qid   = this._fidMap.get(msg.fid);
+			let parent  = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 			const wqids = [];
 			for(const wname of msg.wnames) {
 				let row;
@@ -534,9 +534,9 @@ class Terastash9P {
 					break;
 				}
 				parent = row.uuid;
-				const type = row.type === "f" ? "FILE" : "DIR";
+				const type    = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
-				const qid = {type, version: 0, path: qidPath};
+				const qid     = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), {
 					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
@@ -549,7 +549,7 @@ class Terastash9P {
 			}
 			this.replyOK(msg, {wqids});
 		} else if(msg.type === Type.Tlopen) {
-			const qid = this._fidMap.get(msg.fid);
+			const qid    = this._fidMap.get(msg.fid);
 			const iounit = 8 * 1024 * 1024;
 			this.replyOK(msg, {qid, iounit});
 		} else if(msg.type === Type.Treaddir) {
@@ -557,7 +557,7 @@ class Terastash9P {
 			// TODO: temporarily remember the rows and return more data for non-0 offset
 			let rows = [];
 			if(msg.offset.readUInt32LE() === 0) {
-				const qid = this._fidMap.get(msg.fid);
+				const qid    = this._fidMap.get(msg.fid);
 				const parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 				T(parent, Buffer);
 				rows = yield terastash.getChildrenForParent(
@@ -566,11 +566,11 @@ class Terastash9P {
 				);
 			}
 			const entries = [];
-			let offset = 1;
+			let offset    = 1;
 			for(const row of rows) {
-				const type = row.type === "f" ? "FILE" : "DIR";
+				const type    = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
-				const qid = {type, version: 0, path: qidPath};
+				const qid     = {type, version: 0, path: qidPath};
 				this._qidMap.set(_qid(qid).toString('hex'), {
 					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
 				entries.push({qid, offset, type, name: Buffer.from(row.basename, 'utf-8')});
@@ -595,7 +595,7 @@ class Terastash9P {
 	}
 }
 
-Terastash9P.prototype.handleFrame = Promise.coroutine(Terastash9P.prototype.handleFrame);
+Terastash9P.prototype.handleFrame   = Promise.coroutine(Terastash9P.prototype.handleFrame);
 Terastash9P.prototype.handleMessage = Promise.coroutine(Terastash9P.prototype.handleMessage);
 
 function listen(socketPath) {
