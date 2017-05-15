@@ -1,9 +1,9 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
+const A       = require('ayy');
+const T       = require('notmytype');
 const Promise = require('bluebird');
-const utils = require('./utils');
+const utils   = require('./utils');
 
 class Decayer {
 	/**
@@ -12,11 +12,11 @@ class Decayer {
 	 * max - cap number at this value
 	 */
 	constructor(initial, multiplier, max) {
-		this.initial = initial;
+		this.initial    = initial;
 		this.multiplier = multiplier;
-		this.max = max;
+		this.max        = max;
 		// Inlined reset() for strong mode
-		this.current = initial / multiplier;
+		this.current    = initial / multiplier;
 	}
 
 	reset() {
