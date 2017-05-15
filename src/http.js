@@ -1,14 +1,14 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
-const http = require('http');
-const escape = require('escape-html');
-const Promise = require('bluebird');
+const A         = require('ayy');
+const T         = require('notmytype');
+const http      = require('http');
+const escape    = require('escape-html');
+const Promise   = require('bluebird');
 const terastash = require('.');
-const utils = require('./utils');
-const mime = require('mime-types');
-const domain = require('domain');
+const utils     = require('./utils');
+const mime      = require('mime-types');
+const domain    = require('domain');
 
 class StashServer {
 	constructor(stashes) {
