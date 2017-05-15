@@ -27,8 +27,8 @@ class CRCWriter extends Transform {
 		A.gt(blockSize, 0);
 		super();
 		this._blockSize = blockSize;
-		this._joined = new JoinedBuffers();
-		sse4_crc32 = loadNow(sse4_crc32);
+		this._joined    = new JoinedBuffers();
+		sse4_crc32      = loadNow(sse4_crc32);
 	}
 
 	_pushCRCAndBuf(buf) {
@@ -70,7 +70,7 @@ class BadData extends Error {
 
 
 const MODE_DATA = Symbol("MODE_DATA");
-const MODE_CRC = Symbol("MODE_CRC");
+const MODE_CRC  = Symbol("MODE_CRC");
 
 const EMPTY_BUF = Buffer.alloc(0);
 
