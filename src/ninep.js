@@ -22,37 +22,37 @@ function _buf(size) {
 
 /* 9P2000.L types */
 const QT = {
-	DIR: 0x80, // directory
+	DIR:    0x80, // directory
 	APPEND: 0x40, // append-only file
-	EXCL: 0x20, // exclusive use file
-	MOUNT: 0x10, // mounted channel
-	AUTH: 0x08, // authentication file
-	TMP: 0x04, // non-backed-up file
-	LINK: 0x02, // symbolic link
-	FILE: 0x00 // regular file
+	EXCL:   0x20, // exclusive use file
+	MOUNT:  0x10, // mounted channel
+	AUTH:   0x08, // authentication file
+	TMP:    0x04, // non-backed-up file
+	LINK:   0x02, // symbolic link
+	FILE:   0x00 // regular file
 };
 
 /* VFS types from dirent.h */
 const DT = {
 	 UNKNOWN: 0
-	,FIFO: 1
-	,CHR: 2
-	,DIR: 4
-	,BLK: 6
-	,REG: 8
-	,LNK: 10
-	,SOCK: 12
-	,WHT: 14
+	,FIFO:    1
+	,CHR:     2
+	,DIR:     4
+	,BLK:     6
+	,REG:     8
+	,LNK:     10
+	,SOCK:    12
+	,WHT:     14
 };
 
 /* stat mode bits from http://osxr.org/glibc/source/sysdeps/unix/sysv/linux/x86/bits/stat.h#0182 */
 const STAT = {
-	 IFDIR: 0o0040000 /* Directory */
-	,IFCHR: 0o0020000 /* Character device */
-	,IFBLK: 0o0060000 /* Block device */
-	,IFREG: 0o0100000 /* Regular file */
-	,IFIFO: 0o0010000 /* FIFO */
-	,IFLNK: 0o0120000 /* Symbolic link */
+	 IFDIR:  0o0040000 /* Directory */
+	,IFCHR:  0o0020000 /* Character device */
+	,IFBLK:  0o0060000 /* Block device */
+	,IFREG:  0o0100000 /* Regular file */
+	,IFIFO:  0o0010000 /* FIFO */
+	,IFLNK:  0o0120000 /* Symbolic link */
 	,IFSOCK: 0o0140000 /* Socket */
 };
 
@@ -95,25 +95,25 @@ const packets = {
 	15: {name: "Rlcreate"},
 	24: {name: "Tgetattr"},
 	25: {name: "Rgetattr", enc: [
-		"valid", _buf(8),
-		"qid", _qid,
-		"mode", uint32,
-		"uid", uint32,
-		"gid", uint32,
-		"nlink", uint64,
-		"rdev", _buf(8),
-		"size", uint64,
-		"blksize", _buf(8),
-		"blocks", _buf(8),
-		"atime_sec", _buf(8),
-		"atime_nsec", _buf(8),
-		"mtime_sec", _buf(8),
-		"mtime_nsec", _buf(8),
-		"ctime_sec", _buf(8),
-		"ctime_nsec", _buf(8),
-		"btime_sec", _buf(8),
-		"btime_nsec", _buf(8),
-		"gen", _buf(8),
+		"valid",        _buf(8),
+		"qid",          _qid,
+		"mode",         uint32,
+		"uid",          uint32,
+		"gid",          uint32,
+		"nlink",        uint64,
+		"rdev",         _buf(8),
+		"size",         uint64,
+		"blksize",      _buf(8),
+		"blocks",       _buf(8),
+		"atime_sec",    _buf(8),
+		"atime_nsec",   _buf(8),
+		"mtime_sec",    _buf(8),
+		"mtime_nsec",   _buf(8),
+		"ctime_sec",    _buf(8),
+		"ctime_nsec",   _buf(8),
+		"btime_sec",    _buf(8),
+		"btime_nsec",   _buf(8),
+		"gen",          _buf(8),
 		"data_version", _buf(8)
 	]},
 	26: {name: "Tsetattr"},
