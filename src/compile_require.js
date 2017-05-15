@@ -1,10 +1,10 @@
 "use strict";
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const T = require('notmytype');
-const A = require('ayy');
+const fs      = require('fs');
+const path    = require('path');
+const chalk   = require('chalk');
+const T       = require('notmytype');
+const A       = require('ayy');
 const inspect = require('util').inspect;
 let child_process;
 
