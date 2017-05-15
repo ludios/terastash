@@ -15,8 +15,7 @@ class Decayer {
 		this.initial    = initial;
 		this.multiplier = multiplier;
 		this.max        = max;
-		// Inlined reset() for strong mode
-		this.current    = initial / multiplier;
+		this.current    = this.reset()
 	}
 
 	reset() {
