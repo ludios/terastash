@@ -1,14 +1,14 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
-const Promise = require('bluebird');
-const net = require('net');
-const inspect = require('util').inspect;
-const utils = require('./utils');
+const A         = require('ayy');
+const T         = require('notmytype');
+const Promise   = require('bluebird');
+const net       = require('net');
+const inspect   = require('util').inspect;
+const utils     = require('./utils');
 const terastash = require('./');
 const intreader = require('intreader');
-const chalk = require('chalk');
+const chalk     = require('chalk');
 const cassandra = require('cassandra-driver');
 
 const DEBUG_9P = Boolean(Number(process.env.TERASTASH_DEBUG_9P));
