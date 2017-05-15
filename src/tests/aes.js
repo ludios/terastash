@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require('assert');
-const aes = require('../aes');
+const aes    = require('../aes');
 
 describe('aes.selfTest()', function() {
 	it('does not throw Error', function() {
