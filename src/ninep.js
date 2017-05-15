@@ -276,48 +276,48 @@ function decodeMessage(frameBuf) {
 	const type = frame.uint8();
 	const tag = frame.uint16();
 	if(type === Type.Tread) {
-		const fid = frame.uint32();
-		const offset = frame.buffer(8);
-		const count = frame.uint32();
+		const fid          = frame.uint32();
+		const offset       = frame.buffer(8);
+		const count        = frame.uint32();
 		return {type, tag, fid, offset, count};
 	} else if(type === Type.Twrite) {
-		const fid = frame.uint32();
-		const offset = frame.buffer(8);
-		const count = frame.uint32();
-		const data = frame.buffer(count);
+		const fid          = frame.uint32();
+		const offset       = frame.buffer(8);
+		const count        = frame.uint32();
+		const data         = frame.buffer(count);
 		return {type, tag, fid, offset, data};
 	} else if(type === Type.Treaddir) {
-		const fid = frame.uint32();
-		const offset = frame.buffer(8);
-		const count = frame.uint32();
+		const fid          = frame.uint32();
+		const offset       = frame.buffer(8);
+		const count        = frame.uint32();
 		return {type, tag, fid, offset, count};
 	} else if(type === Type.Tversion) {
-		const msize = frame.uint32();
-		const version = frame.string();
+		const msize        = frame.uint32();
+		const version      = frame.string();
 		return {type, tag, msize, version};
 	} else if(type === Type.Tattach) {
-		const fid = frame.uint32();
-		const afid = frame.uint32();
-		const uname = frame.string();
-		const aname = frame.string();
+		const fid          = frame.uint32();
+		const afid         = frame.uint32();
+		const uname        = frame.string();
+		const aname        = frame.string();
 		return {type, tag, fid, afid, uname, aname};
 	} else if(type === Type.Tgetattr) {
-		const fid = frame.uint32();
+		const fid          = frame.uint32();
 		const request_mask = frame.buffer(8);
 		return {type, tag, fid, request_mask};
 	} else if(type === Type.Tclunk) {
-		const fid = frame.uint32();
+		const fid          = frame.uint32();
 		return {type, tag, fid};
 	} else if(type === Type.Txattrwalk) {
-		const fid = frame.uint32();
-		const newfid = frame.uint32();
-		const name = frame.string();
+		const fid          = frame.uint32();
+		const newfid       = frame.uint32();
+		const name         = frame.string();
 		return {type, tag, fid, newfid, name};
 	} else if(type === Type.Twalk) {
-		const fid = frame.uint32();
-		const newfid = frame.uint32();
-		const nwname = frame.uint16();
-		const wnames = [];
+		const fid          = frame.uint32();
+		const newfid       = frame.uint32();
+		const nwname       = frame.uint16();
+		const wnames       = [];
 		let n = nwname;
 		while(n--) {
 			wnames.push(frame.string());
