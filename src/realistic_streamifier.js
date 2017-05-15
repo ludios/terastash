@@ -16,8 +16,8 @@ class MultiStream extends Readable {
 			highWaterMark: options.highWaterMark,
 			encoding: options.encoding
 		});
-		this._buf = buf;
-		this._idx = 0;
+		this._buf      = buf;
+		this._idx      = 0;
 		this._readSize = 64 * 1024;
 	}
 
