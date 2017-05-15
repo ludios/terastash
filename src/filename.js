@@ -1,6 +1,6 @@
 "use strict";
 
-const T = require('notmytype');
+const T       = require('notmytype');
 const inspect = require('util').inspect;
 
 class BadFilename extends Error {
