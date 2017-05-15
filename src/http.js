@@ -73,10 +73,10 @@ class StashServer {
 
 	*_handleRequest(req, res) {
 		console.log(`OPENED: ${req.method} ${req.url} ${req.headers.range}`);
-		res.setHeader("X-Frame-Options", "DENY");
+		res.setHeader("X-Frame-Options",        "DENY");
 		res.setHeader("X-Content-Type-Options", "nosniff");
-		res.setHeader("X-XSS-Protection", "1; mode=block");
-		res.setHeader("X-UA-Compatible", "IE=edge");
+		res.setHeader("X-XSS-Protection",       "1; mode=block");
+		res.setHeader("X-UA-Compatible",        "IE=edge");
 		if(req.url === '/') {
 			res.setHeader("Content-Type", "text/html; charset=utf-8");
 			for(const stash of this.stashes) {
