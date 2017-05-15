@@ -94,7 +94,7 @@ class StashServer {
 			let parent;
 			// TODO: fix getRowByPath
 			if(dbPath === "") {
-				parent = {};
+				parent      = {};
 				parent.uuid = Buffer.alloc(128/8);
 				parent.type = "d";
 			} else {
@@ -107,8 +107,8 @@ class StashServer {
 				let firstRange = null;
 				if(req.headers.range) {
 					const matches = req.headers.range.match(/^bytes=(\d+)-(\d+)?/);
-					const start = matches[1];
-					const end = matches[2];
+					const start   = matches[1];
+					const end     = matches[2];
 					if(start !== undefined) {
 						firstRange = [
 							parseInt(start, 10),
@@ -122,8 +122,8 @@ class StashServer {
 					mimeType = "text/plain";
 				}
 				res.setHeader("Content-Length", String(Number(parent.size)));
-				res.setHeader("Accept-Ranges", "bytes");
-				res.setHeader("Content-Type", mimeType);
+				res.setHeader("Accept-Ranges",  "bytes");
+				res.setHeader("Content-Type",   mimeType);
 				if(firstRange) {
 					// Even if we're sending the whole file after a bytes=0-, the client should
 					// get a 206 response so that they know they can do Range requests.
@@ -162,9 +162,9 @@ class StashServer {
 	}
 }
 
-StashServer.prototype._writeListing = Promise.coroutine(StashServer.prototype._writeListing);
+StashServer.prototype._writeListing  = Promise.coroutine(StashServer.prototype._writeListing);
 StashServer.prototype._handleRequest = Promise.coroutine(StashServer.prototype._handleRequest);
-StashServer.prototype.handleRequest = Promise.coroutine(StashServer.prototype.handleRequest);
+StashServer.prototype.handleRequest  = Promise.coroutine(StashServer.prototype.handleRequest);
 
 // We need a domain to avoid blowing up the whole process when something goes badly for one request
 const d = domain.create();
