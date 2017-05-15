@@ -318,48 +318,48 @@ function decodeMessage(frameBuf) {
 		const newfid       = frame.uint32();
 		const nwname       = frame.uint16();
 		const wnames       = [];
-		let n = nwname;
+		let n              = nwname;
 		while(n--) {
 			wnames.push(frame.string());
 		}
 		return {type, tag, fid, newfid, wnames};
 	} else if(type === Type.Tlopen) {
-		const fid = frame.uint32();
-		const flags = frame.uint32();
+		const fid          = frame.uint32();
+		const flags        = frame.uint32();
 		return {type, tag, fid, flags};
 	} else if(type === Type.Tlcreate) {
-		const fid = frame.uint32();
-		const name = frame.string();
-		const flags = frame.uint32();
-		const mode = frame.uint32();
-		const gid = frame.uint32();
+		const fid          = frame.uint32();
+		const name         = frame.string();
+		const flags        = frame.uint32();
+		const mode         = frame.uint32();
+		const gid          = frame.uint32();
 		return {type, tag, fid, name, flags, mode, gid};
 	} else if(type === Type.Tmkdir) {
-		const dfid = frame.uint32();
-		const name = frame.string();
-		const mode = frame.uint32();
-		const gid = frame.uint32();
+		const dfid         = frame.uint32();
+		const name         = frame.string();
+		const mode         = frame.uint32();
+		const gid          = frame.uint32();
 		return {type, tag, dfid, name, mode, gid};
 	} else if(type === Type.Tsetattr) {
-		const fid = frame.uint32();
-		const valid = frame.uint32();
-		const mode = frame.uint32();
-		const uid = frame.uint32();
-		const gid = frame.uint32();
-		const size = frame.buffer(8);
-		const atime_sec = frame.buffer(8);
-		const atime_nsec = frame.buffer(8);
-		const mtime_sec = frame.buffer(8);
-		const mtime_nsec = frame.buffer(8);
+		const fid          = frame.uint32();
+		const valid        = frame.uint32();
+		const mode         = frame.uint32();
+		const uid          = frame.uint32();
+		const gid          = frame.uint32();
+		const size         = frame.buffer(8);
+		const atime_sec    = frame.buffer(8);
+		const atime_nsec   = frame.buffer(8);
+		const mtime_sec    = frame.buffer(8);
+		const mtime_nsec   = frame.buffer(8);
 		return {type, tag, fid, valid, mode, uid, gid, size, atime_sec, atime_nsec, mtime_sec, mtime_nsec};
 	} else if(type === Type.Tfsync) {
-		const fid = frame.uint32();
+		const fid          = frame.uint32();
 		return {type, tag, fid};
 	} else if(type === Type.Tstatfs) {
-		const fid = frame.uint32();
+		const fid          = frame.uint32();
 		return {type, tag, fid};
 	} else if(type === Type.Tflush) {
-		const oldtag = frame.uint16();
+		const oldtag       = frame.uint16();
 		return {type, tag, oldtag};
 	} else {
 		return {type, tag, decode_error: "Unsupported message"};
