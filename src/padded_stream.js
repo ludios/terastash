@@ -1,13 +1,13 @@
 "use strict";
 
-const utils = require('./utils');
+const utils     = require('./utils');
 const Transform = require('stream').Transform;
 
 class Padder extends Transform {
 	constructor(padToLength) {
 		utils.assertSafeNonNegativeInteger(padToLength);
 		super();
-		this.bytesRead = 0;
+		this.bytesRead    = 0;
 		this._padToLength = padToLength;
 	}
 
@@ -28,7 +28,7 @@ class RightTruncate extends Transform {
 	constructor(desiredLength) {
 		utils.assertSafeNonNegativeInteger(desiredLength);
 		super();
-		this.bytesRead = 0;
+		this.bytesRead      = 0;
 		this._desiredLength = desiredLength;
 	}
 
@@ -51,7 +51,7 @@ class LeftTruncate extends Transform {
 	constructor(skipBytes) {
 		utils.assertSafeNonNegativeInteger(skipBytes);
 		super();
-		this.bytesRead = 0;
+		this.bytesRead  = 0;
 		this._skipBytes = skipBytes;
 	}
 
