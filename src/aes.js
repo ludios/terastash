@@ -1,12 +1,12 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
+const A      = require('ayy');
+const T      = require('notmytype');
 const crypto = require('crypto');
-const utils = require('./utils');
+const utils  = require('./utils');
 
 const BLOCK_SIZE = 16;
-const IV_SIZE = 16;
+const IV_SIZE    = 16;
 
 function strictZeroPad(s, num) {
 	T(s, T.string, num, T.number);
