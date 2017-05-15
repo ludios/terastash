@@ -1,13 +1,13 @@
 "use strict";
 
-const A = require('ayy');
-const utils = require('./utils');
-const commaify = utils.commaify;
+const A               = require('ayy');
+const utils           = require('./utils');
+const commaify        = utils.commaify;
 const compile_require = require('./compile_require');
-const loadNow = utils.loadNow;
-const LazyModule = utils.LazyModule;
-const JoinedBuffers = utils.JoinedBuffers;
-const Transform = require('stream').Transform;
+const loadNow         = utils.loadNow;
+const LazyModule      = utils.LazyModule;
+const JoinedBuffers   = utils.JoinedBuffers;
+const Transform       = require('stream').Transform;
 
 let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
 
