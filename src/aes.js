@@ -27,15 +27,14 @@ function blockNumberToIv(blockNum) {
  * our use of the IV as the counter.
  */
 function selfTest() {
-	let cipher;
-	let decrypted;
 	const key = Buffer.from('12300000000000045600000000000789', 'hex');
 	const iv0 = blockNumberToIv(0);
 	const iv1 = blockNumberToIv(1);
+	let decrypted;
 
 	// Test for exact ciphertext
-	cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
-	const text = 'Hello, world. This is a test string spanning multiple AES blocks.';
+	let cipher      = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	const text      = 'Hello, world. This is a test string spanning multiple AES blocks.';
 	const encrypted = cipher.update(Buffer.from(text));
 	A.eq(
 		encrypted.toString('hex'),
@@ -44,12 +43,12 @@ function selfTest() {
 	);
 
 	// Test that encryption->decryption round-trips
-	cipher = crypto.createCipheriv('aes-128-ctr', key, iv0);
+	cipher    = crypto.createCipheriv('aes-128-ctr', key, iv0);
 	decrypted = cipher.update(encrypted);
 	A.eq(decrypted.toString('utf-8'), text);
 
 	// Test that we can decrypt the middle of the ciphertext with an incremented IV
-	cipher = crypto.createCipheriv('aes-128-ctr', key, iv1);
+	cipher    = crypto.createCipheriv('aes-128-ctr', key, iv1);
 	decrypted = cipher.update(encrypted.slice(BLOCK_SIZE));
 	A.eq(decrypted.toString('utf-8'), text.substr(BLOCK_SIZE));
 }
