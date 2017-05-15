@@ -28,8 +28,8 @@ function selfTest() {
 	const iv1 = blockNumberToIv(1);
 
 	// Test for exact ciphertext
-	const cipher = crypto.createCipheriv('aes-128-gcm', key, iv1);
-	const text = 'Hello, world. This is a test string spanning multiple AES blocks.';
+	const cipher    = crypto.createCipheriv('aes-128-gcm', key, iv1);
+	const text      = 'Hello, world. This is a test string spanning multiple AES blocks.';
 	const encrypted = cipher.update(Buffer.from(text));
 	cipher.final();
 	const tag = cipher.getAuthTag();
