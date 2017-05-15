@@ -1,8 +1,8 @@
 "use strict";
 
-const crypto = require('crypto');
-const path = require('path');
-const utils = require('./utils');
+const crypto   = require('crypto');
+const path     = require('path');
+const utils    = require('./utils');
 const Readable = require('stream').Readable;
 
 function makeKey() {
@@ -24,8 +24,8 @@ class SecureRandomStream extends Readable {
 		utils.assertSafeNonNegativeInteger(wantLength);
 		super();
 		this._bytesWritten = 0;
-		this._wantLength = wantLength;
-		this._cipher = crypto.createCipheriv('aes-128-ctr', makeKey(), makeKey());
+		this._wantLength   = wantLength;
+		this._cipher       = crypto.createCipheriv('aes-128-ctr', makeKey(), makeKey());
 	}
 
 	_read() {
