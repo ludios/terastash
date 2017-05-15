@@ -1,8 +1,8 @@
 "use strict";
 
-const T = require('notmytype');
-const A = require('ayy');
-const Transform = require('stream').Transform;
+const T             = require('notmytype');
+const A             = require('ayy');
+const Transform     = require('stream').Transform;
 const JoinedBuffers = require('./utils').JoinedBuffers;
 
 
