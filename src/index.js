@@ -2125,9 +2125,9 @@ class TransitToInsert extends Transform {
 		undefinedToNull(obj, 'block_size');
 
 		T(obj.get('basename'), T.string);
-		T(obj.get('type'), T.string);
-		T(obj.get('mtime'), Date);
-		T(obj.get('parent'), Buffer);
+		T(obj.get('type'),     T.string);
+		T(obj.get('mtime'),    Date);
+		T(obj.get('parent'),   Buffer);
 		A.eq(obj.get('parent').length, 128/8);
 
 		if(obj.get('version') === null) {
@@ -2149,18 +2149,18 @@ class TransitToInsert extends Transform {
 
 			// Pre-version 3 rows don't have added_ information, so add it now,
 			// as if it were added by the current user on the current host.
-			obj.set('added_time', utils.dateNow());
-			obj.set('added_user', USERNAME);
-			obj.set('added_host', HOSTNAME);
+			obj.set('added_time',    utils.dateNow());
+			obj.set('added_user',    USERNAME);
+			obj.set('added_host',    HOSTNAME);
 			obj.set('added_version', TERASTASH_VERSION);
-			obj.set('version', 3);
+			obj.set('version',       3);
 		}
 
-		T(obj.get('added_time'), Date);
-		T(obj.get('added_user'), T.string);
-		T(obj.get('added_host'), T.string);
+		T(obj.get('added_time'),    Date);
+		T(obj.get('added_user'),    T.string);
+		T(obj.get('added_host'),    T.string);
 		T(obj.get('added_version'), T.string);
-		T(obj.get('uuid'), Buffer);
+		T(obj.get('uuid'),          Buffer);
 		A.eq(obj.get('uuid').length, 128/8);
 
 		const extraCols = [];
@@ -2207,7 +2207,7 @@ class TransitToInsert extends Transform {
 					obj.get('block_size') > 0 ?
 						GCM_TAG_SIZE * Math.ceil(size / obj.get('block_size')) :
 						0;
-				const sizeWithTags = size + sizeOfTags;
+				const sizeWithTags  = size + sizeOfTags;
 				const concealedSize = utils.concealSize(sizeWithTags);
 				A.eq(concealedSize, totalChunksSize);
 			} else {
@@ -2215,10 +2215,10 @@ class TransitToInsert extends Transform {
 			}
 			T(obj.get('executable'), T.boolean);
 		} else if(obj.get('type') === 'd') {
-			A.eq(obj.get('content'), null);
+			A.eq(obj.get('content'),    null);
 			A.eq(obj.get('executable'), null);
-			A.eq(obj.get('crc32c'), null);
-			A.eq(obj.get('size'), null);
+			A.eq(obj.get('crc32c'),     null);
+			A.eq(obj.get('size'),       null);
 		}
 
 		const cols = [
