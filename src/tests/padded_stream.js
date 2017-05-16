@@ -2,11 +2,11 @@
 
 require('better-buffer-inspect');
 
-const assert = require('assert');
-const utils = require('../utils');
+const assert        = require('assert');
+const utils         = require('../utils');
 const padded_stream = require('../padded_stream');
-const streamifier = require('streamifier');
-const Promise = require('bluebird');
+const streamifier   = require('streamifier');
+const Promise       = require('bluebird');
 
 describe('Padder', function() {
 	it("pads streams when given length > stream length", Promise.coroutine(function*() {

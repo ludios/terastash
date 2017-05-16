@@ -2,7 +2,7 @@
 
 require('better-buffer-inspect');
 
-const assert = require('assert');
+const assert    = require('assert');
 const terastash = require('../');
 
 function makeChunks(sizes) {

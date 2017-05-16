@@ -2,16 +2,16 @@
 
 require('better-buffer-inspect');
 
-const assert = require('assert');
-const A = require('ayy');
+const assert    = require('assert');
+const A         = require('ayy');
 const terastash = require('..');
-const fs = require('../fs-promisified');
-const os = require('os');
-const crypto = require('crypto');
-const path = require('path');
-const utils = require('../utils');
-const Promise = require('bluebird');
-const gdrive = require('../chunker/gdrive');
+const fs        = require('../fs-promisified');
+const os        = require('os');
+const crypto    = require('crypto');
+const path      = require('path');
+const utils     = require('../utils');
+const Promise   = require('bluebird');
+const gdrive    = require('../chunker/gdrive');
 
 describe('GDriver', function() {
 	it('can upload a file, create folder, get file, delete both', Promise.coroutine(function*() {

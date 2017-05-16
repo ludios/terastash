@@ -2,9 +2,9 @@
 
 require('better-buffer-inspect');
 
-const A = require('ayy');
+const A      = require('ayy');
 const assert = require('assert');
-const utils = require('../utils');
+const utils  = require('../utils');
 
 describe('getParentPath', function() {
 	it('returns the parent path', function() {

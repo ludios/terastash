@@ -2,13 +2,13 @@
 
 require('better-buffer-inspect');
 
-const A = require('ayy');
-const T = require('notmytype');
-const utils = require('../utils');
-const line_reader = require('../line_reader');
+const A                     = require('ayy');
+const T                     = require('notmytype');
+const utils                 = require('../utils');
+const line_reader           = require('../line_reader');
 const realistic_streamifier = require('../realistic_streamifier');
-const Promise = require('bluebird');
-const PassThrough = require('stream').PassThrough;
+const Promise               = require('bluebird');
+const PassThrough           = require('stream').PassThrough;
 
 const pow = Math.pow;
 
@@ -36,11 +36,11 @@ describe('DelimitedBufferDecoder', function() {
 				lineLength < 100000 ?
 					1000 :
 					3;
-			const inputBuf = makeLines(lineLength, numLines);
-			const inputStream = realistic_streamifier.createReadStream(inputBuf);
+			const inputBuf          = makeLines(lineLength, numLines);
+			const inputStream       = realistic_streamifier.createReadStream(inputBuf);
 			const passThroughStream = new PassThrough();
 			utils.pipeWithErrors(inputStream, passThroughStream);
-			const lineStream = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
+			const lineStream        = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
 			utils.pipeWithErrors(passThroughStream, lineStream);
 			const lines = [];
 			lineStream.on('data', function(line) {

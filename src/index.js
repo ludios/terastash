@@ -965,10 +965,10 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	if(!stat.isFile()) {
 		throw new Error(`Cannot add ${inspect(p)} because it is not a file`);
 	}
-	const type = 'f';
-	const mtime = stat.mtime;
+	const type       = 'f';
+	const mtime      = stat.mtime;
 	const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
-	const sticky = Boolean(stat.mode & 0o1000);
+	const sticky     = Boolean(stat.mode & 0o1000);
 	if(sticky) {
 		throw new UnexpectedFileError(
 			`Refusing to add file ${inspect(p)} because it has sticky bit set,` +
@@ -1188,13 +1188,13 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
  */
 function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=false, thenShoo=false, justRemove=false, ignoreMtime=false) {
 	T(
-		outCtx, OutputContextType,
-		paths, T.list(T.string),
-		continueOnExists, T.boolean,
+		outCtx,             OutputContextType,
+		paths,              T.list(T.string),
+		continueOnExists,   T.boolean,
 		dropOldIfDifferent, T.boolean,
-		thenShoo, T.boolean,
-		justRemove, T.boolean,
-		ignoreMtime, T.boolean
+		thenShoo,           T.boolean,
+		justRemove,         T.boolean,
+		ignoreMtime,        T.boolean
 	);
 	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
 		const stashInfo = yield getStashInfoForPaths(paths);
@@ -1417,12 +1417,12 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			//	scaledRequestedRange, returnedDataRange, truncateLeft, truncateRight,
 			//	wantedChunks, wantedRanges});
 		} else {
-			wantedChunks = chunks;
-			wantedRanges = chunks.map(chunk => [0, chunk.size]);
-			truncateLeft = null;
-			truncateRight = null;
+			wantedChunks         = chunks;
+			wantedRanges         = chunks.map(chunk => [0, chunk.size]);
+			truncateLeft         = null;
+			truncateRight        = null;
 			scaledRequestedRange = [0, null];
-			returnedDataRange = [0, Number(row.size)];
+			returnedDataRange    = [0, Number(row.size)];
 		}
 		A.eq(wantedChunks.length, wantedRanges.length);
 
@@ -1447,7 +1447,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		const sizeWithoutLeading = Number(row.size) - returnedDataRange[0];
 		utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
 		if(row.block_size > 0) {
-			const sizeOfTags = GCM_TAG_SIZE * Math.ceil(sizeWithoutLeading / row.block_size);
+			const sizeOfTags   = GCM_TAG_SIZE * Math.ceil(sizeWithoutLeading / row.block_size);
 			const sizeWithTags = sizeWithoutLeading + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
 
@@ -1541,10 +1541,10 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 	yield utils.tryUnlink(outputFilename);
 
 	if(fake) {
-		const row = yield getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
+		const row               = yield getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
 		yield makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
-		const parent = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const parent            = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 		const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
@@ -1874,7 +1874,7 @@ const questionAsync = function(question) {
 	readline = loadNow(readline);
 	return new Promise(function questionAsync$Promise(resolve) {
 		const rl = readline.createInterface({
-			input: process.stdin,
+			input:  process.stdin,
 			output: process.stdout
 		});
 		rl.question(question, function(answer) {

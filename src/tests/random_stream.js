@@ -2,9 +2,9 @@
 
 require('better-buffer-inspect');
 
-const A = require('ayy');
-const utils = require('../utils');
-const Promise = require('bluebird');
+const A             = require('ayy');
+const utils         = require('../utils');
+const Promise       = require('bluebird');
 const random_stream = require('../random_stream');
 
 describe('SecureRandomStream', function() {

@@ -7,8 +7,8 @@
 
 "use strict";
 
-const T = require('notmytype');
-const utils = require('./utils');
+const T        = require('notmytype');
+const utils    = require('./utils');
 const Readable = require('stream').Readable;
 
 class WorkStealer extends Readable {
@@ -16,14 +16,14 @@ class WorkStealer extends Readable {
 		T(inputStream, utils.StreamType);
 		super({readableObjectMode: true});
 		this._inputStream = inputStream;
-		this._stopped = false;
-		this._waiting = false;
+		this._stopped     = false;
+		this._waiting     = false;
 	}
 
 	// Initialization needs to be finished outside constructor because of strong mode
 	init() {
-		this._inputStream.once('end', this._stop.bind(this));
-		this._inputStream.once('error', this._inputError.bind(this));
+		this._inputStream.once('end',    this._stop.bind(this));
+		this._inputStream.once('error',  this._inputError.bind(this));
 		this._inputStream.on('readable', this._inputReadable.bind(this));
 		return this;
 	}
