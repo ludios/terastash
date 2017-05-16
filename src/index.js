@@ -2225,10 +2225,7 @@ class TransitToInsert extends Transform {
 			'basename', 'parent', 'type', 'uuid', 'content', 'key', 'size',
 			'crc32c', 'mtime', 'executable', 'version', 'block_size',
 			'added_time', 'added_user', 'added_host', 'added_version'];
-		const vals = [
-			obj.get('basename'), obj.get('parent'), obj.get('type'), obj.get('uuid'), obj.get('content'), obj.get('key'),
-			obj.get('size'), obj.get('crc32c'), obj.get('mtime'), obj.get('executable'), obj.get('version'), obj.get('block_size'),
-			obj.get('added_time'), obj.get('added_user'), obj.get('added_host'), obj.get('added_version')];
+		const vals = cols.map(key => obj.get(key));
 		const qMarks = utils.filledArray(cols.length + extraCols.length, "?");
 		const query = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols.concat(extraCols))})
