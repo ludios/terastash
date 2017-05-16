@@ -2011,8 +2011,8 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 
 		const config = yield getStashes();
 		config.stashes[stashName] = {
-			path: path.resolve(stashPath),
-			chunkStore: options.chunkStore,
+			path:           path.resolve(stashPath),
+			chunkStore:     options.chunkStore,
 			chunkThreshold: options.chunkThreshold
 		};
 		yield utils.writeObjectToConfigFile("stashes.json", config);
