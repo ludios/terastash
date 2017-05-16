@@ -2031,12 +2031,12 @@ function getTransitWriter() {
 				cassandra.types.Row,
 				transit.makeWriteHandler({
 					tag: () => "Row",
-					rep: v => Object.assign({}, v)
+					rep: v  => Object.assign({}, v)
 				}),
 				cassandra.types.Long,
 				transit.makeWriteHandler({
 					tag: () => "Long",
-					rep: v => String(v)
+					rep: v  => String(v)
 				})
 			])
 		});
@@ -2102,12 +2102,12 @@ class TransitToInsert extends Transform {
 	constructor(client, stashName) {
 		T(client, CassandraClientType, stashName, T.string);
 		super({readableObjectMode: true});
-		this._client = client;
-		this._stashName = stashName;
-		this._transitReader = getTransitReader();
+		this._client         = client;
+		this._stashName      = stashName;
+		this._transitReader  = getTransitReader();
 		this._columnsCreated = new Set();
-		sse4_crc32 = loadNow(sse4_crc32);
-		hasher = loadNow(hasher);
+		sse4_crc32           = loadNow(sse4_crc32);
+		hasher               = loadNow(hasher);
 	}
 
 	*_insertFromLine(lineBuf) {
