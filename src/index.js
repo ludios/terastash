@@ -1976,29 +1976,29 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 
 		// An individual chunk
 		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + stashName}".chunk (
-			idx int,
+			idx     int,
 			file_id text,
-			md5 blob,
-			crc32c blob,
-			size bigint
+			md5     blob,
+			crc32c  blob,
+			size    bigint
 		)`);
 
 		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
-			basename text,
-			type ascii,
-			parent blob,
-			uuid blob,
-			size bigint,
-			content blob,
-			crc32c blob,
-			key blob,
-			mtime timestamp,
-			executable boolean,
-			version int,
-			block_size int,
-			added_time timestamp,
-			added_user text,
-			added_host text,
+			basename      text,
+			type          ascii,
+			parent        blob,
+			uuid          blob,
+			size          bigint,
+			content       blob,
+			crc32c        blob,
+			key           blob,
+			mtime         timestamp,
+			executable    boolean,
+			version       int,
+			block_size    int,
+			added_time    timestamp,
+			added_user    text,
+			added_host    text,
 			added_version text,
 			PRIMARY KEY (parent, basename)
 		);`);
