@@ -355,29 +355,12 @@ const doWithPath = Promise.coroutine(function* doWithPath$coro(stashName, p, fn)
 	return fn(stashInfo, dbPath, parentPath);
 });
 
-const pathsorterAsc = utils.comparedBy(function(row) {
-	return row.basename;
-});
-
-const pathsorterDesc = utils.comparedBy(function(row) {
-	return row.basename;
-}, true);
-
-const mtimeSorterAsc = utils.comparedBy(function(row) {
-	return row.mtime.getTime();
-});
-
-const mtimeSorterDesc = utils.comparedBy(function(row) {
-	return row.mtime.getTime();
-}, true);
-
-const sizeSorterAsc = utils.comparedBy(function(row) {
-	return Number(row.size);
-});
-
-const sizeSorterDesc = utils.comparedBy(function(row) {
-	return Number(row.size);
-}, true);
+const pathsorterAsc   = utils.comparedBy(row => row.basename);
+const pathsorterDesc  = utils.comparedBy(row => row.basename, true);
+const mtimeSorterAsc  = utils.comparedBy(row => row.mtime.getTime());
+const mtimeSorterDesc = utils.comparedBy(row => row.mtime.getTime(), true);
+const sizeSorterAsc   = utils.comparedBy(row => Number(row.size));
+const sizeSorterDesc  = utils.comparedBy(row => Number(row.size), true);
 
 class NoSuchPathError extends Error {
 	get name() {
