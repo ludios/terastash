@@ -2264,8 +2264,8 @@ function importDb(outCtx, stashName, dumpFile) {
 		} else {
 			inputStream = fs.createReadStream(dumpFile);
 		}
-		line_reader = loadNow(line_reader);
-		work_stealer = loadNow(work_stealer);
+		line_reader      = loadNow(line_reader);
+		work_stealer     = loadNow(work_stealer);
 		const lineStream = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
 		// 4 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
