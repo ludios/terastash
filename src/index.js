@@ -1950,8 +1950,8 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 	T(
 		stashPath, T.string,
 		stashName, T.string,
-		options, T.shape({
-			chunkStore: T.string,
+		options,   T.shape({
+			chunkStore:     T.string,
 			chunkThreshold: T.number
 		})
 	);
