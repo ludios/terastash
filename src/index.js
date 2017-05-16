@@ -1918,7 +1918,7 @@ const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 
 const updateGoogleTokens = Promise.coroutine(function* updateGoogleTokens$coro(tokensFilename, clientId, clientSecret) {
 	gdrive = loadNow(gdrive);
-	const gdriver = new gdrive.GDriver(clientId, clientSecret);
+	const gdriver     = new gdrive.GDriver(clientId, clientSecret);
 	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
 	gdriver._oauth2Client.setCredentials(credentials);
 	yield gdriver.refreshAccessToken();
