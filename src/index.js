@@ -1004,7 +1004,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	let key = null;
 	let block_size = null;
 
-	if(stat.size >= stashInfo.chunkThreshold) {
+	if(stat.size >= stashInfo.chunkThreshold || p.endsWith(".jpg")) {
 		key = makeKey();
 		block_size = DEFAULT_GCM_BLOCK_SIZE;
 
