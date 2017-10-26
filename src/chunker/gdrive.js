@@ -441,7 +441,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 	const chunkInfo = [];
 
 	while(true) {
-		const decayer = new retry.Decayer(3*1000, 1.5, 120*1000);
+		const decayer = new retry.Decayer(5*1000, 1.5, 3600*1000);
 		let lastChunkAgain = false;
 		let crc32Hasher;
 		const response = yield retry.retryFunction(Promise.coroutine(function* writeChunks$retry() {
@@ -467,7 +467,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 				console.error(`\n${utils.pluralize(triesLeft, 'try', 'tries')} left; ` +
 					`trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
-		}, 40, decayer);
+		}, 50, decayer);
 		if(response === null) {
 			break;
 		}
