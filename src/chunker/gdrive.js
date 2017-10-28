@@ -457,7 +457,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
 			// Load credentials on every try because one account might be overloaded while others are not.
-			gdriver.loadCredentials();
+			yield gdriver.loadCredentials();
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}), function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
