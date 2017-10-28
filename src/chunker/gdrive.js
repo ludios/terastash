@@ -424,12 +424,12 @@ class GDriver {
 	}
 }
 
-GDriver.prototype.createFile = Promise.coroutine(GDriver.prototype.createFile);
-GDriver.prototype.loadCredentials = Promise.coroutine(GDriver.prototype.loadCredentials);
-GDriver.prototype.saveCredentials = Promise.coroutine(GDriver.prototype.saveCredentials);
-GDriver.prototype.deleteFile = Promise.coroutine(GDriver.prototype.deleteFile);
-GDriver.prototype.getMetadata = Promise.coroutine(GDriver.prototype.getMetadata);
-GDriver.prototype.getData = Promise.coroutine(GDriver.prototype.getData);
+GDriver.prototype.createFile                = Promise.coroutine(GDriver.prototype.createFile);
+GDriver.prototype.loadCredentials           = Promise.coroutine(GDriver.prototype.loadCredentials);
+GDriver.prototype.saveCredentials           = Promise.coroutine(GDriver.prototype.saveCredentials);
+GDriver.prototype.deleteFile                = Promise.coroutine(GDriver.prototype.deleteFile);
+GDriver.prototype.getMetadata               = Promise.coroutine(GDriver.prototype.getMetadata);
+GDriver.prototype.getData                   = Promise.coroutine(GDriver.prototype.getData);
 GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
 
