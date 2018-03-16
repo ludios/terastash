@@ -15,7 +15,7 @@ class Decayer {
 		this.initial    = initial;
 		this.multiplier = multiplier;
 		this.max        = max;
-		this.current    = this.reset()
+		this.current    = this.reset();
 	}
 
 	reset() {
