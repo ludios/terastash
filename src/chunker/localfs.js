@@ -109,11 +109,10 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 	})().catch(function(err) {
 		cipherStream.emit('error', err);
 	});
-	cipherStream.destroy = function cipherStream$destroy() {
-		// Warning: untested code
+	cipherStream.once('close', function cipherStream$destroy() {
 		destroyed = true;
 		currentChunkStream.destroy();
-	};
+	});
 	return cipherStream;
 }
 
