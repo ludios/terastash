@@ -1,22 +1,22 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
-const Promise = require('bluebird');
-const mkdirpAsync = Promise.promisify(require('mkdirp'));
-const fs = require('./fs-promisified');
-const path = require('path');
-const crypto = require('crypto');
-const PassThrough = require('stream').PassThrough;
-const basedir = require('xdg').basedir;
-const inspect = require('util').inspect;
+const A               = require('ayy');
+const T               = require('notmytype');
+const Promise         = require('bluebird');
+const mkdirpAsync     = Promise.promisify(require('mkdirp'));
+const fs              = require('./fs-promisified');
+const path            = require('path');
+const crypto          = require('crypto');
+const PassThrough     = require('stream').PassThrough;
+const basedir         = require('xdg').basedir;
+const inspect         = require('util').inspect;
 const compile_require = require('./compile_require');
 
 class LazyModule {
 	constructor(requirePath, requireFunc=require, postRequireHook) {
 		T(requirePath, T.string, requireFunc, T.function, postRequireHook, T.optional(T.function));
-		this.requirePath = requirePath;
-		this.requireFunc = requireFunc;
+		this.requirePath     = requirePath;
+		this.requireFunc     = requireFunc;
 		this.postRequireHook = postRequireHook;
 	}
 
