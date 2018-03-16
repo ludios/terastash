@@ -1,16 +1,16 @@
 "use strict";
 
-const A = require('ayy');
-const T = require('notmytype');
-const fs = require('../fs-promisified');
-const path = require('path');
-const crypto = require('crypto');
-const Promise = require('bluebird');
-const Combine = require('combine-streams');
-const utils = require('../utils');
+const A                 = require('ayy');
+const T                 = require('notmytype');
+const fs                = require('../fs-promisified');
+const path              = require('path');
+const crypto            = require('crypto');
+const Promise           = require('bluebird');
+const Combine           = require('combine-streams');
+const utils             = require('../utils');
 const OutputContextType = utils.OutputContextType;
-const inspect = require('util').inspect;
-const chalk = require('chalk');
+const inspect           = require('util').inspect;
+const chalk             = require('chalk');
 
 const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, directory, getChunkStream) {
 	T(outCtx, OutputContextType, directory, T.string, getChunkStream, T.function);
