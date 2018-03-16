@@ -24,7 +24,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, directo
 		if(chunkStream === null) {
 			break;
 		}
-		const tempFname = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
+		const tempFname   = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
 		const writeStream = fs.createWriteStream(tempFname);
 
 		const hasher = utils.streamHasher(chunkStream, 'crc32c');
