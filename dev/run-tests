@@ -2,12 +2,14 @@
 
 . ./dev/setup-test-env
 
+terastash_src=$(dirname -- $(dirname -- $(realpath -- $0)))
+
 integration_tests_log="$(mktemp)"
 integration_ret_file="$(mktemp)"
 # Run integration tests in a subshell so that unit tests and integration tests run in parallel
 (
 	cd src/tests
-	PATH="$(dirname "$PWD")/bin:$PATH" python2 -S -B ../../../hg-test-runner/run-tests.py -j8 --shell=bash
+	PATH="$terastash_src/bin:$PATH" python2 -S -B ../../../hg-test-runner/run-tests.py -j8 --shell=bash
 	echo -E -n "$?" >> "$integration_ret_file"
 ) > "$integration_tests_log" 2>&1 &
 integration_pid=$!
