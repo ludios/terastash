@@ -30,7 +30,7 @@ describe('GDriver', function() {
 		const fileLength = utils.randInt(1*1024, 5*1024);
 		const buf = crypto.pseudoRandomBytes(fileLength);
 		A.eq(buf.length, fileLength);
-		yield fs.writeFileAsync(tempFname, buf, 0, buf.length);
+		yield fs.writeFileAsync(tempFname, buf);
 
 		let _ = yield Promise.all([
 			gdriver.createFile(
