@@ -9,39 +9,9 @@ const PassThrough     = require('stream').PassThrough;
 const basedir         = require('xdg').basedir;
 const inspect         = require('util').inspect;
 const mkdirp          = require('mkdirp');
+const https           = require('https');
 const compile_require = require('./compile_require');
-
-class LazyModule {
-	constructor(requirePath, requireFunc=require, postRequireHook) {
-		T(requirePath, T.string, requireFunc, T.function, postRequireHook, T.optional(T.function));
-		this.requirePath     = requirePath;
-		this.requireFunc     = requireFunc;
-		this.postRequireHook = postRequireHook;
-	}
-
-	load() {
-		const realModule = this.requireFunc(this.requirePath);
-		if(this.postRequireHook) {
-			this.postRequireHook(realModule);
-		}
-		return realModule;
-	}
-}
-
-/**
- * We must make the user do  x = loadNow(x);  instead of just loadNow(x);
- * because setting module['x'] = x; doesn't affect the variable in the function
- * until called again.
- */
-function loadNow(obj) {
-	if(obj instanceof LazyModule) {
-		return obj.load();
-	}
-	return obj;
-}
-
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
-let https = new LazyModule('https');
+const sse4_crc32          = compile_require('sse4_crc32');
 
 const OutputContextType = T.shape({mode: T.string});
 
@@ -261,7 +231,6 @@ const StreamType = T.shape({
 
 function makeHttpsRequest(options, stream) {
 	T(options, T.object, stream, T.optional(StreamType));
-	https = loadNow(https);
 	return new Promise(function makeHttpsRequest$Promise(resolve, reject) {
 		const req = https.request(options, resolve).once('error', function(err) {
 			reject(err);
@@ -340,7 +309,6 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 	if(typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
 		if(algo === "crc32c") {
-			sse4_crc32 = loadNow(sse4_crc32);
 			hash = new sse4_crc32.CRC32();
 			hash.digest = crc32$digest;
 		} else {
@@ -668,9 +636,7 @@ function shuffleArray(arr) {
 }
 
 module.exports = {
-	LazyModule, loadNow, OutputContextType,
-
-	assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
+	OutputContextType, assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
 	getBaseName, ol, comparator, comparedBy, mkdirpAsync,
 

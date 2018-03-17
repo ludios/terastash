@@ -4,12 +4,9 @@ const A               = require('ayy');
 const utils           = require('./utils');
 const commaify        = utils.commaify;
 const compile_require = require('./compile_require');
-const loadNow         = utils.loadNow;
-const LazyModule      = utils.LazyModule;
 const JoinedBuffers   = utils.JoinedBuffers;
 const Transform       = require('stream').Transform;
-
-let sse4_crc32 = new LazyModule('sse4_crc32', compile_require);
+const sse4_crc32      = compile_require('sse4_crc32');
 
 function crcToBuf(n) {
 	const buf = Buffer.allocUnsafe(4);
@@ -28,7 +25,6 @@ class CRCWriter extends Transform {
 		super();
 		this._blockSize = blockSize;
 		this._joined    = new JoinedBuffers();
-		sse4_crc32      = loadNow(sse4_crc32);
 	}
 
 	_pushCRCAndBuf(buf) {
@@ -84,7 +80,6 @@ class CRCReader extends Transform {
 		this._joined = new JoinedBuffers();
 		this._crc = null;
 		this._mode = MODE_CRC;
-		sse4_crc32 = loadNow(sse4_crc32);
 	}
 
 	_checkCRC(callback, actual, expect) {

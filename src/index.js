@@ -13,34 +13,27 @@ const Transform           = require('stream').Transform;
 const os                  = require('os');
 const utils               = require('./utils');
 const commaify            = utils.commaify;
-const LazyModule          = utils.LazyModule;
-const loadNow             = utils.loadNow;
 const OutputContextType   = utils.OutputContextType;
 const filename            = require('./filename');
 const compile_require     = require('./compile_require');
+const cassandra           = require('cassandra-driver');
 const RetryPolicy         = require('cassandra-driver/lib/policies/retry').RetryPolicy;
 const LoadBalancingPolicy = require('cassandra-driver/lib/policies/load-balancing').LoadBalancingPolicy;
 const deepEqual           = require('deep-equal');
 const Table               = require('cli-table');
 const Combine             = require('combine-streams');
-
-let CassandraClientType = T.object;
-
-let aes           = new LazyModule('./aes');
-let gcmer         = new LazyModule('./gcmer');
-let hasher        = new LazyModule('./hasher');
-let cassandra     = new LazyModule('cassandra-driver', require, function(realModule) {
-	CassandraClientType = realModule.Client;
-});
-let localfs       = new LazyModule('./chunker/localfs');
-let gdrive        = new LazyModule('./chunker/gdrive');
-let sse4_crc32    = new LazyModule('sse4_crc32', compile_require);
-let readline      = new LazyModule('readline');
-let padded_stream = new LazyModule('./padded_stream');
-let line_reader   = new LazyModule('./line_reader');
-let work_stealer  = new LazyModule('./work_stealer');
-let random_stream = new LazyModule('./random_stream');
-let transit       = new LazyModule('transit-js');
+const aes                 = require('./aes');
+const gcmer               = require('./gcmer');
+const hasher              = require('./hasher');
+const localfs             = require('./chunker/localfs');
+const gdrive              = require('./chunker/gdrive');
+const sse4_crc32          = compile_require('sse4_crc32');
+const readline            = require('readline');
+const padded_stream       = require('./padded_stream');
+const line_reader         = require('./line_reader');
+const work_stealer        = require('./work_stealer');
+const random_stream       = require('./random_stream');
+const transit             = require('transit-js');
 
 let TERASTASH_VERSION;
 let HOSTNAME;
@@ -98,7 +91,6 @@ function getContactPoint() {
 }
 
 function getNewClient() {
-	cassandra = loadNow(cassandra);
 	return new cassandra.Client({
 		contactPoints: [getContactPoint()],
 		policies: {
@@ -288,7 +280,7 @@ function isKeyspaceMissingError(err) {
  * with the query results.
  */
 function runQuery(client, statement, queryArgs) {
-	T(client, CassandraClientType, statement, T.string, queryArgs, T.optional(Array));
+	T(client, cassandra.Client, statement, T.string, queryArgs, T.optional(Array));
 	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(queryArgs)})`);
 	return new Promise(function runQuery$Promise(resolve, reject) {
 		client.execute(statement, queryArgs, {prepare: true}, function(err, result) {
@@ -311,7 +303,7 @@ function runQuery(client, statement, queryArgs) {
  * after `f` is done.
  */
 function doWithClient(client, f) {
-	T(client, CassandraClientType, f, T.function);
+	T(client, cassandra.Client, f, T.function);
 	const p = f(client);
 	function shutdown(ret) {
 		try {
@@ -385,7 +377,7 @@ class FileChangedError extends Error {
 }
 
 async function getRowByParentBasename(client, stashName, parent, basename, cols) {
-	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
+	T(client, cassandra.Client, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
 	const result = await runQuery(
 		client,
 		`SELECT ${utils.colsAsString(cols)}
@@ -403,7 +395,7 @@ async function getRowByParentBasename(client, stashName, parent, basename, cols)
 }
 
 async function getUuidForPath(client, stashName, p) {
-	T(client, CassandraClientType, stashName, T.string, p, T.string);
+	T(client, cassandra.Client, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
 		return Buffer.alloc(128/8);
@@ -422,7 +414,7 @@ async function getUuidForPath(client, stashName, p) {
 }
 
 async function getRowByPath(client, stashName, p, cols) {
-	T(client, CassandraClientType, stashName, T.string, p, T.string, cols, utils.ColsType);
+	T(client, cassandra.Client, stashName, T.string, p, T.string, cols, utils.ColsType);
 	const parentPath = utils.getParentPath(p);
 	const parent = await getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
@@ -430,7 +422,7 @@ async function getRowByPath(client, stashName, p, cols) {
 }
 
 function getChildrenForParent(client, stashName, parent, cols, limit) {
-	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
+	T(client, cassandra.Client, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 	return new Promise(function getChildForParent$Promise(resolve, reject) {
 		const rows = [];
 		const rowStream = client.stream(
@@ -454,7 +446,7 @@ function getChildrenForParent(client, stashName, parent, cols, limit) {
 }
 
 async function lsPath(client, stashName, options, p) {
-	T(client, CassandraClientType, stashName, T.maybe(T.string), options, T.object, p, T.string);
+	T(client, cassandra.Client, stashName, T.maybe(T.string), options, T.object, p, T.string);
 	const stashInfo = await getStashInfoForNameOrPaths(stashName, [p]);
 	const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 	const parent = await getUuidForPath(client, stashInfo.name, dbPath);
@@ -495,7 +487,7 @@ async function lsPath(client, stashName, options, p) {
 }
 
 async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, type) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
+	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
 	const parent = await getUuidForPath(client, stashInfo.name, dbPath);
 	const rows = await getChildrenForParent(
 		client, stashInfo.name, parent,
@@ -530,7 +522,7 @@ const DIRECTORY = Symbol('DIRECTORY');
 const FILE      = Symbol('FILE');
 
 async function getTypeInDbByParentBasename(client, stashName, parent, basename) {
-	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
+	T(client, cassandra.Client, stashName, T.string, parent, Buffer, basename, T.string);
 	let row;
 	try {
 		row = await getRowByParentBasename(client, stashName, parent, basename, ['type']);
@@ -553,7 +545,7 @@ async function getTypeInDbByParentBasename(client, stashName, parent, basename) 
 };
 
 async function getTypeInDbByPath(client, stashName, dbPath) {
-	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
+	T(client, cassandra.Client, stashName, T.string, dbPath, T.string);
 	if(dbPath === "") {
 		// The root directory
 		return DIRECTORY;
@@ -599,7 +591,7 @@ function checkDbPath(dbPath) {
 }
 
 async function makeDirsInDb(client, stashName, p, dbPath) {
-	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
+	T(client, cassandra.Client, stashName, T.string, p, T.string, dbPath, T.string);
 	checkDbPath(dbPath);
 	// If directory does not exist on host fs, we'll use the current time.
 	let mtime = utils.dateNow();
@@ -636,7 +628,7 @@ async function makeDirsInDb(client, stashName, p, dbPath) {
 };
 
 async function tryCreateColumnOnStashTable(client, stashName, columnName, type) {
-	T(client, CassandraClientType, stashName, T.string, columnName, T.string, type, T.string);
+	T(client, cassandra.Client, stashName, T.string, columnName, T.string, type, T.string);
 	try {
 		await runQuery(client,
 			`ALTER TABLE "${KEYSPACE_PREFIX + stashName}".fs ADD
@@ -696,19 +688,17 @@ async function getChunkStore(stashInfo) {
 let selfTests;
 selfTests = {
 	aes: function selfTests$aes() {
-		aes = loadNow(aes);
 		aes.selfTest();
 		selfTests.aes = noop;
 	},
 	gcm: function selfTests$gcm() {
-		gcmer = loadNow(gcmer);
 		gcmer.selfTest();
 		selfTests.gcm = noop;
 	}
 }
 
 async function dropFile(client, stashInfo, dbPath) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
+	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string);
 	const chunkStore = await getChunkStore(stashInfo);
 	const parentUuid = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	let chunks = null;
@@ -746,10 +736,8 @@ async function dropFile(client, stashInfo, dbPath) {
 	if(chunks !== null) {
 		validateChunksFixBigints(chunks);
 		if(chunkStore.type === "localfs") {
-			localfs = loadNow(localfs);
 			await localfs.deleteChunks(chunkStore.directory, chunks);
 		} else {
-			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			await gdriver.loadCredentials();
 			await gdrive.deleteChunks(gdriver, chunks);
@@ -795,7 +783,7 @@ async function makeFakeFile(p, size, mtime) {
 }
 
 async function infoFile(client, stashInfo, dbPath, showKeys) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, dbPath, T.string, showKeys, T.boolean);
+	T(client, cassandra.Client, stashInfo, StashInfoType, dbPath, T.string, showKeys, T.boolean);
 	const row = await getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
 	if(row.size !== null) {
 		utils.assertSafeNonNegativeLong(row.size);
@@ -836,7 +824,7 @@ function infoFiles(stashName, paths, showKeys) {
 }
 
 async function shooFile(client, stashInfo, p, justRemove, ignoreMtime) {
-	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
+	T(client, cassandra.Client, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = await getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
 	if(row.type === 'd') {
@@ -911,7 +899,7 @@ function checkChunkSize(size) {
  */
 async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=false, ignoreMtime=false) {
 	T(
-		client, CassandraClientType,
+		client, cassandra.Client,
 		stashInfo, StashInfoType,
 		p, T.string,
 		dbPath, T.string,
@@ -1006,9 +994,6 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 		key = makeKey();
 		block_size = DEFAULT_GCM_BLOCK_SIZE;
 
-		aes = loadNow(aes);
-		gcmer = loadNow(gcmer);
-		padded_stream = loadNow(padded_stream);
 
 		checkChunkSize(chunkStore.chunkSize);
 
@@ -1083,7 +1068,6 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			if(needPadding) {
 				outStream = new Combine();
 				outStream.append(cipherStream);
-				random_stream = loadNow(random_stream);
 				outStream.append(new random_stream.SecureRandomStream(concealedSize - sizeWithTags));
 				outStream.append(null);
 			} else {
@@ -1095,10 +1079,8 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 
 		let _;
 		if(chunkStore.type === "localfs") {
-			localfs = loadNow(localfs);
 			_ = await localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
-			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			await gdriver.loadCredentials();
 			_ = await gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
@@ -1120,8 +1102,6 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 		size = stat.size;
 	} else {
 		content = await fs.readFileAsync(p);
-		hasher = loadNow(hasher);
-		sse4_crc32 = loadNow(sse4_crc32);
 		crc32c = hasher.crcToBuf(sse4_crc32.calculate(content));
 		size = content.length;
 		A.eq(size, stat.size,
@@ -1272,7 +1252,7 @@ function chunksToBlockRanges(chunks, blockSize) {
  * or in a chunk store.
  */
 async function streamFile(client, stashInfo, parent, basename, ranges) {
-	T(client, CassandraClientType, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
+	T(client, cassandra.Client, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	if(ranges) {
 		A.eq(ranges.length, 1, "Only support 1 range right now");
 		utils.assertSafeNonNegativeInteger(ranges[0][0]);
@@ -1343,7 +1323,6 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		if(ranges) {
 			wantedChunks = [];
 			wantedRanges = [];
-			aes = loadNow(aes);
 			// block_size > 0 uses AES-128-GCM, block size == 0 uses AES-128-CTR with no
 			// authentication tags or in-stream checksums.
 			//
@@ -1409,11 +1388,9 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 
 		let cipherStream;
 		if(chunkStore.type === "localfs") {
-			localfs = loadNow(localfs);
 			const chunksDir = chunkStore.directory;
 			cipherStream = localfs.readChunks(chunksDir, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else if(chunkStore.type === "gdrive") {
-			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			await gdriver.loadCredentials();
 			cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
@@ -1421,7 +1398,6 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
 
-		padded_stream = loadNow(padded_stream);
 		// We need to make sure we don't try to GCM-decrypt any of the padding.
 		// If we go even one byte over, GCMReader will incorrectly assume that byte
 		// is part of the last block, and authentication will fail.
@@ -1435,7 +1411,6 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			const unpaddedStream = new padded_stream.RightTruncate(sizeWithTags);
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
-			gcmer = loadNow(gcmer);
 			selfTests.gcm();
 			dataStream = new gcmer.GCMReader(row.block_size, row.key, scaledRequestedRange[0]);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
@@ -1473,8 +1448,6 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			cipherStream.destroy();
 		};
 	} else {
-		hasher = loadNow(hasher);
-		sse4_crc32 = loadNow(sse4_crc32);
 		const content =
 			ranges ?
 				row.content.slice(ranges[0][0], ranges[0][1]) :
@@ -1512,7 +1485,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
  * Get a file or directory from the Cassandra database.
  */
 async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
+	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
 	await utils.mkdirpAsync(path.dirname(outputFilename));
 
 	// Delete the existing file because it may
@@ -1570,7 +1543,7 @@ function getFiles(stashName, paths, fake) {
 }
 
 async function catFile(client, stashInfo, dbPath, ranges) {
-	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
+	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	const parent = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	const [row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
 	utils.pipeWithErrors(readStream, process.stdout);
@@ -1852,7 +1825,6 @@ async function configChunkStore(storeName, opts) {
 
 function questionAsync(question) {
 	T(question, T.string);
-	readline = loadNow(readline);
 	return new Promise(function questionAsync$Promise(resolve) {
 		const rl = readline.createInterface({
 			input:  process.stdin,
@@ -1867,7 +1839,6 @@ function questionAsync(question) {
 
 async function authorizeGDrive(name) {
 	T(name, T.string);
-	gdrive = loadNow(gdrive);
 	const config = await getChunkStores();
 	const stores = config.stores;
 	if(!(typeof stores === "object" && stores !== null)) {
@@ -1898,7 +1869,6 @@ async function authorizeGDrive(name) {
 }
 
 async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
-	gdrive = loadNow(gdrive);
 	const gdriver     = new gdrive.GDriver(clientId, clientSecret);
 	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
 	gdriver._oauth2Client.setCredentials(credentials);
@@ -2002,8 +1972,6 @@ async function initStash(stashPath, stashName, options) {
 
 let transitWriter;
 function getTransitWriter() {
-	cassandra = loadNow(cassandra);
-	transit = loadNow(transit);
 	if(!transitWriter) {
 		transitWriter = transit.writer("json-verbose", {
 			/* Don't need a cache because we're using json-verbose */
@@ -2028,8 +1996,6 @@ function getTransitWriter() {
 
 let transitReader;
 function getTransitReader() {
-	cassandra = loadNow(cassandra);
-	transit = loadNow(transit);
 	if(!transitReader) {
 		transitReader = transit.reader("json-verbose", {handlers: {
 			"Long": v => {
@@ -2081,14 +2047,12 @@ function exportDb(stashName) {
 
 class TransitToInsert extends Transform {
 	constructor(client, stashName) {
-		T(client, CassandraClientType, stashName, T.string);
+		T(client, cassandra.Client, stashName, T.string);
 		super({readableObjectMode: true});
 		this._client         = client;
 		this._stashName      = stashName;
 		this._transitReader  = getTransitReader();
 		this._columnsCreated = new Set();
-		sse4_crc32           = loadNow(sse4_crc32);
-		hasher               = loadNow(hasher);
 	}
 
 	async _insertFromLine(lineBuf) {
@@ -2244,8 +2208,6 @@ function importDb(outCtx, stashName, dumpFile) {
 		} else {
 			inputStream = fs.createReadStream(dumpFile);
 		}
-		line_reader      = loadNow(line_reader);
-		work_stealer     = loadNow(work_stealer);
 		const lineStream = new line_reader.DelimitedBufferDecoder(Buffer.from("\n"));
 		utils.pipeWithErrors(inputStream, lineStream);
 		// 4 requests in flight saturates a 4790K core (tested io.js 3.2.0/V8 4.4)
