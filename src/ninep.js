@@ -441,7 +441,7 @@ class Terastash9P {
 		this.replyAny(msg.tag, type, [string(Buffer.from(reason))]);
 	}
 
-	*handleMessage(msg) {
+	async handleMessage(msg) {
 		if(DEBUG_9P) {
 			console.error(chalk.cyan(`-> ${(packets[String(msg.type)] || {name: "?"}).name}\n${inspect(msg)}`));
 		}
@@ -454,7 +454,7 @@ class Terastash9P {
 			this.replyOK(msg, {msize: this._msize, version: msg.version});
 		} else if(msg.type === Type.Tattach) {
 			const stashName = msg.aname.toString('utf-8');
-			this._stashInfo = yield terastash.getStashInfoByName(stashName);
+			this._stashInfo = await terastash.getStashInfoByName(stashName);
 			const qid = {type: "DIR", version: 0, path: Buffer.alloc(8)};
 			// UUID 0000... is the root of the stash
 			this._qidMap.set(_qid(qid).toString('hex'), {uuid: Buffer.alloc(128/8), type: "DIR", executable: false, size: 0});
@@ -509,8 +509,8 @@ class Terastash9P {
 			const {parent, basename} = this._qidMap.get(_qid(qid).toString('hex'));
 			const offset             = uint64BufferToNumber(msg.offset);
 			const count              = msg.count;
-			const [row, readStream]  = yield terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
-			const data               = yield utils.readableToBuffer(readStream);
+			const [row, readStream]  = await terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
+			const data               = await utils.readableToBuffer(readStream);
 			this.replyOK(msg, {data});
 		} else if(msg.type === Type.Tclunk) {
 			this._fidMap.delete(msg.fid);
@@ -525,7 +525,7 @@ class Terastash9P {
 			for(const wname of msg.wnames) {
 				let row;
 				try {
-					row = yield terastash.getRowByParentBasename(
+					row = await terastash.getRowByParentBasename(
 						this._client, this._stashInfo.name, parent, wname.toString('utf-8'), ['uuid', 'type', 'executable', 'parent', 'basename', 'size']);
 				} catch(err) {
 					if(!(err instanceof terastash.NoSuchPathError)) {
@@ -560,7 +560,7 @@ class Terastash9P {
 				const qid    = this._fidMap.get(msg.fid);
 				const parent = this._qidMap.get(_qid(qid).toString('hex')).uuid;
 				T(parent, Buffer);
-				rows = yield terastash.getChildrenForParent(
+				rows = await terastash.getChildrenForParent(
 					this._client, this._stashInfo.name, parent,
 					["basename", "type", "uuid", "parent", "size", "executable"]
 				);
@@ -583,10 +583,10 @@ class Terastash9P {
 		}
 	}
 
-	*handleFrame(frameBuf) {
+	async handleFrame(frameBuf) {
 		const msg = decodeMessage(frameBuf);
 		try {
-			yield this.handleMessage(msg);
+			await this.handleMessage(msg);
 		} catch(err) {
 			console.error(`Errored while processing ${inspect(msg)}:`);
 			console.error(err.stack);
@@ -594,9 +594,6 @@ class Terastash9P {
 		}
 	}
 }
-
-Terastash9P.prototype.handleFrame   = Promise.coroutine(Terastash9P.prototype.handleFrame);
-Terastash9P.prototype.handleMessage = Promise.coroutine(Terastash9P.prototype.handleMessage);
 
 function listen(socketPath) {
 	T(socketPath, T.string);

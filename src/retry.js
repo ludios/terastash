@@ -51,7 +51,7 @@ function wait(ms) {
  * tries - number of times to try before giving up
  * decayer - an instance of Decayer
  */
-const retryFunction = Promise.coroutine(function* retryPromiseFunc$coro(func, errorHandler, tries, decayer) {
+async function retryFunction(func, errorHandler, tries, decayer) {
 	T(func, T.function, errorHandler, T.function, tries, T.number, decayer, Decayer);
 	utils.assertSafeNonNegativeInteger(tries);
 	let caught = null;
@@ -59,17 +59,17 @@ const retryFunction = Promise.coroutine(function* retryPromiseFunc$coro(func, er
 		try {
 			// Need the 'yield' here to make sure errors are caught
 			// in *this* function
-			return yield func();
+			return await func();
 		} catch(e) {
 			A(e, "expected e to be truthy");
 			caught = e;
 			errorHandler(caught, tries);
 		}
 		tries--;
-		yield wait(decayer.decay());
+		await wait(decayer.decay());
 	}
 	A.neq(caught, null);
 	throw caught;
-});
+}
 
 module.exports = {Decayer, wait, retryFunction};
