@@ -3,13 +3,13 @@
 const A               = require('ayy');
 const T               = require('notmytype');
 const Promise         = require('bluebird');
-const mkdirpAsync     = Promise.promisify(require('mkdirp'));
 const fs              = require('./fs-promisified');
 const path            = require('path');
 const crypto          = require('crypto');
 const PassThrough     = require('stream').PassThrough;
 const basedir         = require('xdg').basedir;
 const inspect         = require('util').inspect;
+const mkdirp          = require('mkdirp');
 const compile_require = require('./compile_require');
 
 class LazyModule {
@@ -169,6 +169,12 @@ function comparedBy(mapping, reverse=false) {
 			return mapping(x) > mapping(y);
 		});
 	}
+}
+
+function mkdirpAsync(dir, opts) {
+	return new Promise((resolve, reject) => {
+		mkdirp(dir, opts, (err, made) => err === null ? resolve(made) : reject(err));
+	});
 }
 
 const writeObjectToConfigFile = Promise.coroutine(function* writeObjectToConfigFile$coro(fname, object) {
@@ -667,7 +673,7 @@ module.exports = {
 
 	assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
-	getBaseName, ol, comparator, comparedBy,
+	getBaseName, ol, comparator, comparedBy, mkdirpAsync,
 
 	writeObjectToConfigFile, readObjectFromConfigFile, clone, dateNow,
 	makeConfigFileInitializer, getConcealmentSize, concealSize, pipeWithErrors,

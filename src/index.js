@@ -4,7 +4,6 @@ const A                   = require('ayy');
 const T                   = require('notmytype');
 const Promise             = require('bluebird');
 const fs                  = require('./fs-promisified');
-const mkdirpAsync         = Promise.promisify(require('mkdirp'));
 const path                = require('path');
 const crypto              = require('crypto');
 const chalk               = require('chalk');
@@ -1515,7 +1514,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
  */
 async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
-	await mkdirpAsync(path.dirname(outputFilename));
+	await utils.mkdirpAsync(path.dirname(outputFilename));
 
 	// Delete the existing file because it may
 	// 1) have hard links
@@ -1631,7 +1630,7 @@ function makeDirectories(stashName, paths) {
 			const dbPath = dbPaths[i];
 			checkDbPath(dbPath);
 			try {
-				await mkdirpAsync(p);
+				await utils.mkdirpAsync(p);
 			} catch(err) {
 				if(err.code !== 'EEXIST') {
 					throw err;
@@ -1735,7 +1734,7 @@ function moveFiles(stashName, sources, dest) {
 				);
 
 				// Now move the file in the working directory
-				await mkdirpAsync(path.dirname(actualDestInWorkDir));
+				await utils.mkdirpAsync(path.dirname(actualDestInWorkDir));
 				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
 				try {
 					await fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
