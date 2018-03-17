@@ -1,10 +1,9 @@
 "use strict";
 
-const google            = require('googleapis');
+const {google}          = require('googleapis');
 const A                 = require('ayy');
 const T                 = require('notmytype');
 const Combine           = require('combine-streams');
-const OAuth2            = google.auth.OAuth2;
 const utils             = require('../utils');
 const OutputContextType = utils.OutputContextType;
 const retry             = require('../retry');
@@ -57,48 +56,14 @@ class DownloadError extends Error {
 	}
 }
 
-class FixedOAuth2 extends OAuth2 {
-	// Work around https://github.com/google/google-api-nodejs-client/issues/260
-	// by patching getRequestMetadata with something that never returns an
-	// auth request to googleapis/lib/apirequest.js:createAPIRequest
-	//
-	// If we don't patch this, the buggy googleapis/google-auth-library interaction
-	// will hang terastash forever when we try to upload a file when our access token
-	// is expired.  (createAPIRequest decides to pipe the stream into the auth request
-	// instead of the subsequent request.)
-	//
-	// We could always refresh the access token ourselves, but we prefer to also
-	// patch the buggy code to prevent bugs from compounding.
-	getRequestMetadata(optUri, metadataCb) {
-		const thisCreds = this.credentials;
-
-		if(!thisCreds.access_token && !thisCreds.refresh_token) {
-			return metadataCb(new Error('No access or refresh token is set.'), null);
-		}
-
-		// if no expiry time, assume it's not expired
-		const expiryDate = thisCreds.expiry_date;
-		const isTokenExpired = expiryDate ? expiryDate <= (new Date()).getTime() : false;
-
-		if(thisCreds.access_token && !isTokenExpired) {
-			thisCreds.token_type = thisCreds.token_type || 'Bearer';
-			const headers = {'Authorization': thisCreds.token_type + ' ' + thisCreds.access_token};
-			return metadataCb(null, headers, null);
-		} else {
-			return metadataCb(new Error('Access token is expired.'), null);
-		}
-	}
-}
-
 class GDriver {
 	constructor(clientId, clientSecret) {
 		T(clientId, T.string, clientSecret, T.string);
 		this.clientId = clientId;
 		this.clientSecret = clientSecret;
 		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
-		const oauth2Client = new FixedOAuth2(clientId, clientSecret, redirectUrl);
-		this._oauth2Client = oauth2Client;
-		this._drive = google.drive({version: 'v2', auth: oauth2Client});
+		this._oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUrl);
+		this._drive = google.drive({version: 'v2', auth: this._oauth2Client});
 	}
 
 	getAuthUrl() {
@@ -246,25 +211,26 @@ class GDriver {
 			if(requestCb) {
 				requestCb(requestObj);
 			}
-		}.bind(this)).then(function(obj) {
-			T(obj, T.object);
-			if(obj.kind !== "drive#file") {
+		}.bind(this)).then(function(reply) {
+			T(reply, T.object);
+			const data = reply.data;
+			if(data.kind !== "drive#file") {
 				throw new UploadError(`Expected Google Drive to create an` +
-					` object with kind='drive#file' but was ${inspect(obj.kind)}`
+					` object with kind='drive#file' but was ${inspect(data.kind)}`
 				);
 			}
-			if(typeof obj.id !== "string") {
+			if(typeof data.id !== "string") {
 				throw new UploadError(`Expected Google Drive to create a` +
-					` file with id=(string) but was id=${inspect(obj.id)}`
+					` file with id=(string) but was id=${inspect(data.id)}`
 				);
 			}
-			if(stream && obj.fileSize !== String(hasher.length)) {
+			if(stream && data.fileSize !== String(hasher.length)) {
 				throw new UploadError(`Expected Google Drive to create a` +
-					` file with fileSize=${inspect(String(hasher.length))} but was ${inspect(obj.fileSize)}`
+					` file with fileSize=${inspect(String(hasher.length))} but was ${inspect(data.fileSize)}`
 				);
 			}
 			if(parents.length !== 0) {
-				const parentsInDrive = obj.parents.map(idProp).sort();
+				const parentsInDrive = data.parents.map(idProp).sort();
 				if(!utils.sameArrayValues(parentsInDrive, parents)) {
 					throw new UploadError(`Expected Google Drive to create a file` +
 						` with parents=${inspect(parents)} but was ${inspect(parentsInDrive)}.\n` +
@@ -274,15 +240,15 @@ class GDriver {
 			}
 			if(stream) {
 				const expectedHexDigest = hasher.hash.digest('hex');
-				if(obj.md5Checksum !== expectedHexDigest) {
+				if(data.md5Checksum !== expectedHexDigest) {
 					throw new UploadError(`Expected Google Drive to create a` +
 						` file with md5Checksum=${inspect(expectedHexDigest)}` +
-						` but was ${inspect(obj.md5Checksum)}`
+						` but was ${inspect(data.md5Checksum)}`
 					);
 				}
 			}
-			// obj.mimeType may not match what we wanted, so don't check it
-			return obj;
+			// data.mimeType may not match what we wanted, so don't check it
+			return data;
 		});
 	}
 
@@ -325,11 +291,11 @@ class GDriver {
 					fileId,
 					updateViewedDate: false
 				},
-				function(err, obj) {
+				function(err, reply) {
 					if(err) {
 						reject(err);
 					} else {
-						resolve(obj);
+						resolve(reply.data);
 					}
 				}
 			);
