@@ -1,36 +1,5 @@
 #!/bin/bash
 
-set -e
+set -eu
 
-rm -rf node_modules
-npm install
-
-# Redundant copies of libraries with a slightly different version
-rm -rf node_modules/googleapis/node_modules/request
-rm -rf node_modules/google-auth-library/node_modules/request
-rm -rf node_modules/google-auth-library/node_modules/har-validator
-rm -rf node_modules/google-auth-library/node_modules/http-signature
-rm -rf node_modules/google-auth-library/node_modules/bluebird
-rm -rf node_modules/google-auth-library/node_modules/aws-sign2
-rm -rf node_modules/google-auth-library/node_modules/bl
-
-# Unneeded files
-find node_modules | grep -P '\.min\.js$' | xargs -d '\n' rm --
-rm -f  node_modules/long/dist/Long.min.*
-rm -rf node_modules/bluebird/js/browser
-rm -rf node_modules/js-yaml/dist
-rm -rf node_modules/sprintf-js/dist
-rm -rf node_modules/gtoken/test
-rm -rf node_modules/es5-ext/test
-rm -rf node_modules/is-my-json-valid/test
-rm -rf node_modules/node-forge/tests
-rm -rf node_modules/node-forge/nodejs/test
-rm -rf node_modules/node-forge/nodejs/ui
-rm -rf node_modules/node-uuid/benchmark
-rm -rf node_modules/escope/powered-test
-rm -rf node_modules/qs/dist
-# jade is only needed for mocha's htmlcov
-rm -rf node_modules/jade
-# Some coverage leftovers?
-rm -rf node_modules/cli-width/coverage
-rm -rf node_modules/string-template/coverage
+yarn --verbose --ignore-scripts --ignore-optional --no-bin-links
