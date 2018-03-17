@@ -5,7 +5,7 @@
 
 "use strict";
 
-const T = require('notmytype');
+const T        = require('notmytype');
 const Readable = require('stream').Readable;
 
 class MultiStream extends Readable {
