@@ -685,8 +685,7 @@ async function getChunkStore(stashInfo) {
 	return chunkStore;
 }
 
-let selfTests;
-selfTests = {
+const selfTests = {
 	aes: function selfTests$aes() {
 		aes.selfTest();
 		selfTests.aes = noop;
@@ -695,7 +694,7 @@ selfTests = {
 		gcmer.selfTest();
 		selfTests.gcm = noop;
 	}
-}
+};
 
 async function dropFile(client, stashInfo, dbPath) {
 	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string);
