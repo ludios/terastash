@@ -8,7 +8,6 @@ const crypto              = require('crypto');
 const chalk               = require('chalk');
 const inspect             = require('util').inspect;
 const streamifier         = require('streamifier');
-const noop                = require('lodash.noop');
 const Transform           = require('stream').Transform;
 const os                  = require('os');
 const utils               = require('./utils');
@@ -685,17 +684,6 @@ async function getChunkStore(stashInfo) {
 	return chunkStore;
 }
 
-const selfTests = {
-	aes: function selfTests$aes() {
-		aes.selfTest();
-		selfTests.aes = noop;
-	},
-	gcm: function selfTests$gcm() {
-		gcmer.selfTest();
-		selfTests.gcm = noop;
-	}
-};
-
 async function dropFile(client, stashInfo, dbPath) {
 	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string);
 	const chunkStore = await getChunkStore(stashInfo);
@@ -1057,7 +1045,6 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			//console.error("addFile", {iv: iv});
 			utils.assertSafeNonNegativeInteger(iv);
 
-			selfTests.gcm();
 			const cipherStream = new gcmer.GCMWriter(block_size, key, iv);
 			utils.pipeWithErrors(inputStream, cipherStream);
 
@@ -1412,14 +1399,12 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			const unpaddedStream = new padded_stream.RightTruncate(sizeWithTags);
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
-			selfTests.gcm();
 			dataStream = new gcmer.GCMReader(row.block_size, row.key, scaledRequestedRange[0]);
 			utils.pipeWithErrors(unpaddedStream, dataStream);
 		} else {
 			const unpaddedStream = new padded_stream.RightTruncate(sizeWithoutLeading);
 			utils.pipeWithErrors(cipherStream, unpaddedStream);
 
-			selfTests.aes();
 			dataStream = crypto.createCipheriv(
 				'aes-128-ctr', row.key, aes.blockNumberToIv(scaledRequestedRange[0]));
 			utils.pipeWithErrors(unpaddedStream, dataStream);
@@ -1454,7 +1439,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 				row.content.slice(ranges[0][0], ranges[0][1]) :
 				row.content;
 		dataStream = streamifier.createReadStream(content);
-		dataStream.destroy = noop;
+		dataStream.destroy = () => {};
 		bytesRead = content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
