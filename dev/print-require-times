@@ -1,7 +1,6 @@
 node -e "\
 rt = require('require-times')();\
 rt.start();\
-require('./index');\
 require('cassandra-driver');\
-require('googleapis').drive({'version':'v2'});\
+require('googleapis').google.drive({'version':'v2'});\
 rt.end()"
