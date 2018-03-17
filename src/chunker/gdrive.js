@@ -136,16 +136,16 @@ class GDriver {
 		}.bind(this));
 	}
 
-	*loadCredentials() {
-		const config = yield getAllCredentials();
+	async loadCredentials() {
+		const config = await getAllCredentials();
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
 			this._oauth2Client.setCredentials(credentials);
 		}
 	}
 
-	*saveCredentials() {
-		const config = yield getAllCredentials();
+	async saveCredentials() {
+		const config = await getAllCredentials();
 		config.credentials[this.clientId] = this._oauth2Client.credentials;
 		//console.log("Saving credentials", this._oauth2Client.credentials);
 		return utils.writeObjectToConfigFile("google-tokens.json", config);
@@ -163,7 +163,7 @@ class GDriver {
 		}.bind(this));
 	}
 
-	*_maybeRefreshAndSaveToken() {
+	async _maybeRefreshAndSaveToken() {
 		// If we have a google-tokens/, don't update the tokens because another process
 		// is responsible for updating them.
 		if(getTokenFiles()) {
@@ -174,9 +174,9 @@ class GDriver {
 		const minMinutes = 50;
 		if(!(this._oauth2Client.credentials.expiry_date >= Date.now() + (minMinutes * 60 * 1000))) {
 			//console.log("Refreshing access token...");
-			yield this.refreshAccessToken();
+			await this.refreshAccessToken();
 			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() + (minMinutes * 60 * 1000));
-			yield this.saveCredentials();
+			await this.saveCredentials();
 		}
 	}
 
@@ -189,7 +189,7 @@ class GDriver {
 	 * mimeType after sniffing the bytes in your file.  This is not documented
 	 * in their API docs, and there doesn't appear to be a way to turn it off.
 	 */
-	*createFile(name, opts, stream, requestCb) {
+	async createFile(name, opts, stream, requestCb) {
 		T(
 			name, T.string,
 			opts, T.shape({
@@ -200,7 +200,7 @@ class GDriver {
 			requestCb, T.optional(T.object)
 		);
 
-		yield this._maybeRefreshAndSaveToken();
+		await this._maybeRefreshAndSaveToken();
 
 		const parents = (opts.parents || []).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
@@ -303,9 +303,9 @@ class GDriver {
 	/**
 	 * Delete a file or folder by ID
 	 */
-	*deleteFile(fileId) {
+	async deleteFile(fileId) {
 		T(fileId, T.string);
-		yield this._maybeRefreshAndSaveToken();
+		await this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			this._drive.files.delete({fileId}, function(err, obj) {
 				if(err) {
@@ -317,9 +317,9 @@ class GDriver {
 		}.bind(this));
 	}
 
-	*getMetadata(fileId) {
+	async getMetadata(fileId) {
 		T(fileId, T.string);
-		yield this._maybeRefreshAndSaveToken();
+		await this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			this._drive.files.get(
 				{
@@ -359,17 +359,17 @@ class GDriver {
 	 * You must read from the stream, not the http response.
 	 * For full (non-Range) requests, the crc32c checksum from Google is verified.
 	 */
-	*getData(fileId, range, checkCRC32CifReceived=true) {
+	async getData(fileId, range, checkCRC32CifReceived=true) {
 		T(fileId, T.string, range, T.optional(utils.RangeType), checkCRC32CifReceived, T.boolean);
 		if(range) {
 			utils.checkRange(range);
 		}
-		yield this._maybeRefreshAndSaveToken();
+		await this._maybeRefreshAndSaveToken();
 		const reqHeaders = this._getHeaders();
 		if(range) {
 			reqHeaders["Range"] = `bytes=${range[0]}-${range[1] - 1}`;
 		}
-		const res = yield utils.makeHttpsRequest({
+		const res = await utils.makeHttpsRequest({
 			method: "GET",
 			host: "www.googleapis.com",
 			path: `/drive/v2/files/${fileId}?alt=media`,
@@ -409,7 +409,7 @@ class GDriver {
 			}
 			return [(hasher ? hasher.stream : res), res];
 		} else {
-			let body = yield utils.readableToBuffer(res);
+			let body = await utils.readableToBuffer(res);
 			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 				try {
 					body = JSON.parse(body);
@@ -424,16 +424,8 @@ class GDriver {
 	}
 }
 
-GDriver.prototype.createFile                = Promise.coroutine(GDriver.prototype.createFile);
-GDriver.prototype.loadCredentials           = Promise.coroutine(GDriver.prototype.loadCredentials);
-GDriver.prototype.saveCredentials           = Promise.coroutine(GDriver.prototype.saveCredentials);
-GDriver.prototype.deleteFile                = Promise.coroutine(GDriver.prototype.deleteFile);
-GDriver.prototype.getMetadata               = Promise.coroutine(GDriver.prototype.getMetadata);
-GDriver.prototype.getData                   = Promise.coroutine(GDriver.prototype.getData);
-GDriver.prototype._maybeRefreshAndSaveToken = Promise.coroutine(GDriver.prototype._maybeRefreshAndSaveToken);
 
-
-const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver, parents, getChunkStream) {
+async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 	T(outCtx, OutputContextType, gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
 
 	let totalSize = 0;
@@ -444,11 +436,11 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 		const decayer = new retry.Decayer(5*1000, 1.5, 3600*1000);
 		let lastChunkAgain = false;
 		let crc32Hasher;
-		const response = yield retry.retryFunction(Promise.coroutine(function* writeChunks$retry() {
+		const response = await retry.retryFunction(async function writeChunks$retry() {
 			// Make a new filename each time, in case server reports error
 			// when it actually succeeded.
 			const fname = utils.makeChunkFilename();
-			const chunkStream = yield getChunkStream(lastChunkAgain);
+			const chunkStream = await getChunkStream(lastChunkAgain);
 			if(chunkStream === null) {
 				return null;
 			}
@@ -457,9 +449,9 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
 			// Load credentials on every try because one account might be overloaded while others are not.
-			yield gdriver.loadCredentials();
+			await gdriver.loadCredentials();
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
-		}), function writeChunks$errorHandler(e, triesLeft) {
+		}, function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
 			if(outCtx.mode !== 'quiet') {
 				console.error(`Error while uploading chunk ${idx}:\n`);
@@ -484,7 +476,7 @@ const writeChunks = Promise.coroutine(function* writeChunks$coro(outCtx, gdriver
 		idx += 1;
 	}
 	return [totalSize, chunkInfo];
-});
+}
 
 class BadChunk extends Error {
 	get name() {
@@ -504,12 +496,12 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	let destroyed = false;
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
-	Promise.coroutine(function* readChunks$coro() {
+	(async function readChunks$coro() {
 		for(const [chunk, range] of utils.zip(chunks, ranges)) {
 			if(destroyed) {
 				return;
 			}
-			const [chunkStream, res] = yield gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
+			const [chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
 			currentChunkStream = chunkStream;
 			// Note: even when we're not checking whole-chunk CRC32C, we're still
 			// making sure Google is sending us the correct CRC32C for a file.
@@ -534,7 +526,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 				}
 			}
 			cipherStream.append(chunkStream);
-			yield new Promise(function(resolve) {
+			await new Promise(function(resolve) {
 				chunkStream.once('end', resolve);
 			});
 		}
@@ -552,11 +544,11 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 /**
  * Deletes chunks
  */
-const deleteChunks = Promise.coroutine(function* deleteChunks$coro(gdriver, chunks) {
+async function deleteChunks(gdriver, chunks) {
 	T(gdriver, GDriver, chunks, utils.ChunksType);
 	for(const chunk of chunks) {
 		try {
-			yield gdriver.deleteFile(chunk.file_id);
+			await gdriver.deleteFile(chunk.file_id);
 		} catch(err) {
 			console.error(chalk.red(
 				`Failed to delete chunk with file_id=${inspect(chunk.file_id)}` +
@@ -564,6 +556,6 @@ const deleteChunks = Promise.coroutine(function* deleteChunks$coro(gdriver, chun
 			console.error(chalk.red(err.stack));
 		}
 	}
-});
+}
 
 module.exports = {GDriver, writeChunks, readChunks, deleteChunks};
