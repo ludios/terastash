@@ -14,7 +14,7 @@ integration_ret_file="$(mktemp)"
 ) > "$integration_tests_log" 2>&1 &
 integration_pid=$!
 
-./node_modules/eslint/bin/eslint.js .
+node ./node_modules/eslint/bin/eslint.js .
 eslint_ret="$?"
 
 node ./node_modules/mocha/bin/_mocha src/tests/*.js
