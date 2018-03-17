@@ -1,21 +1,19 @@
 "use strict";
 
-const fs      = require('fs');
-const Promise = require('bluebird');
+const fs        = require('fs');
+const promisify = require('util').promisify;
 
-// Promisify only the functions we need to avoid a 24+ ms require
-// penalty with promisifyAll (tested Intel 4790K)
 module.exports = {
-	chmodAsync:        Promise.promisify(fs.chmod),
-	closeAsync:        Promise.promisify(fs.close),
-	futimesAsync:      Promise.promisify(fs.futimes),
-	openAsync:         Promise.promisify(fs.open),
-	readFileAsync:     Promise.promisify(fs.readFile),
-	renameAsync:       Promise.promisify(fs.rename),
-	statAsync:         Promise.promisify(fs.stat),
-	truncateAsync:     Promise.promisify(fs.truncate),
-	unlinkAsync:       Promise.promisify(fs.unlink),
-	writeFileAsync:    Promise.promisify(fs.writeFile),
+	chmodAsync:        promisify(fs.chmod),
+	closeAsync:        promisify(fs.close),
+	futimesAsync:      promisify(fs.futimes),
+	openAsync:         promisify(fs.open),
+	readFileAsync:     promisify(fs.readFile),
+	renameAsync:       promisify(fs.rename),
+	statAsync:         promisify(fs.stat),
+	truncateAsync:     promisify(fs.truncate),
+	unlinkAsync:       promisify(fs.unlink),
+	writeFileAsync:    promisify(fs.writeFile),
 
 	createReadStream:  fs.createReadStream,
 	createWriteStream: fs.createWriteStream,
