@@ -794,7 +794,7 @@ mime-db@~1.33.0:
   version "1.33.0"
   resolved "https://registry.yarnpkg.com/mime-db/-/mime-db-1.33.0.tgz#a3492050a5cb9b63450541e39d9788d2272783db"
 
-mime-types@^2.1.10, mime-types@^2.1.12:
+mime-types@^2.1.12, mime-types@^2.1.18:
   version "2.1.18"
   resolved "https://registry.yarnpkg.com/mime-types/-/mime-types-2.1.18.tgz#6f323f60a83d11146f831ff11fd66e2fe5503bb8"
   dependencies:
@@ -1050,7 +1050,7 @@ sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
 
-sse4_crc32@^5.1.1:
+sse4_crc32@^5.2.0:
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/sse4_crc32/-/sse4_crc32-5.2.0.tgz#f65b192105b1e367683ca1422a0614e1d1da3c15"
   dependencies:
