@@ -34,11 +34,3 @@ rm -rf node_modules/jade
 # Some coverage leftovers?
 rm -rf node_modules/cli-width/coverage
 rm -rf node_modules/string-template/coverage
-
-# Re-patch node_modules/
-#for patchfile in ./dev/patches/???-*.patch; do
-#	echo -E "Applying $patchfile"
-#	patch -p1 < "$patchfile"
-#done
-#rm -f node_modules/request/request.js.orig
-#rm -f node_modules/googleapis/node_modules/google-auth-library/node_modules/gtoken/lib/index.js.orig
