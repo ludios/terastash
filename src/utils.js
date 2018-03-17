@@ -11,7 +11,7 @@ const inspect         = require('util').inspect;
 const mkdirp          = require('mkdirp');
 const https           = require('https');
 const compile_require = require('./compile_require');
-const sse4_crc32          = compile_require('sse4_crc32');
+const sse4_crc32      = compile_require('sse4_crc32');
 
 const OutputContextType = T.shape({mode: T.string});
 
