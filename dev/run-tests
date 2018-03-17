@@ -17,7 +17,7 @@ integration_pid=$!
 ./node_modules/eslint/bin/eslint.js .
 eslint_ret="$?"
 
-./dev/js ./node_modules/mocha/bin/_mocha src/tests/*.js
+node ./node_modules/mocha/bin/_mocha src/tests/*.js
 mocha_ret="$?"
 
 echo 'Waiting for integration tests to finish...'

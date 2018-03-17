@@ -1,6 +1,6 @@
 export CACHE_REQUIRE_PATHS_FILE="$HOME/.config/terastash/internal-require-cache.json"
 
-./dev/js -e "\
+node -e "\
 require('cache-require-paths');\
 rt = require('require-times')();\
 rt.start();\

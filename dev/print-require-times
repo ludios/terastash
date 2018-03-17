@@ -1,4 +1,4 @@
-./dev/js -e "\
+node -e "\
 rt = require('require-times')();\
 rt.start();\
 require('./index');\

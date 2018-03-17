@@ -1,4 +1,0 @@
-# Enable "long stack traces" on bluebird promises
-export BLUEBIRD_DEBUG=1
-
-node "$@"
