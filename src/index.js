@@ -180,9 +180,9 @@ const StashInfoType = T.shape({path: T.string});
  * For a given pathname, return a stash that contains the file,
  * or `null` if there is no terastash base.
  */
-const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(pathname) {
+async function getStashInfoByPath(pathname) {
 	T(pathname, T.string);
-	const config = yield getStashes();
+	const config = await getStashes();
 	if(!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
@@ -198,14 +198,14 @@ const getStashInfoByPath = Promise.coroutine(function* getStashInfoByPath$coro(p
 	}
 	throw new NotInWorkingDirectoryError(
 		`File ${inspect(pathname)} is not in a terastash working directory`);
-});
+}
 
 /**
  * Return a stash for a given stash name
  */
-const getStashInfoByName = Promise.coroutine(function* getStashInfoByName$coro(stashName) {
+async function getStashInfoByName(stashName) {
 	T(stashName, T.string);
-	const config = yield getStashes();
+	const config = await getStashes();
 	if(!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
@@ -216,7 +216,7 @@ const getStashInfoByName = Promise.coroutine(function* getStashInfoByName$coro(s
 	}
 	stash.name = stashName;
 	return stash;
-});
+}
 
 /**
  * For any given relative user path, which may include ../, return
@@ -241,12 +241,12 @@ class DifferentStashesError extends Error {
 	}
 }
 
-const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$coro(paths) {
+async function getStashInfoForPaths(paths) {
 	// Make sure all paths are in the same stash
 	const stashInfos = [];
 	// Don't use Promise.all to avoid having too many file handles open
 	for(const p of paths) {
-		stashInfos.push(yield getStashInfoByPath(path.resolve(p)));
+		stashInfos.push(await getStashInfoByPath(path.resolve(p)));
 	}
 	const stashNames = stashInfos.map(utils.prop('name'));
 	if(!utils.allIdentical(stashNames)) {
@@ -255,16 +255,16 @@ const getStashInfoForPaths = Promise.coroutine(function* getStashInfoForPaths$co
 			` stashes were ${inspect(stashNames)}`);
 	}
 	return stashInfos[0];
-});
+}
 
-const getStashInfoForNameOrPaths = Promise.coroutine(function* getStashInfoForNameOrPaths$coro(stashName, paths) {
+async function getStashInfoForNameOrPaths(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	if(stashName !== null) {
-		return yield getStashInfoByName(stashName);
+		return await getStashInfoByName(stashName);
 	} else {
-		return yield getStashInfoForPaths(paths);
+		return await getStashInfoForPaths(paths);
 	}
-});
+}
 
 /**
  * If stashName === null, convert p to database path, else just return p.
@@ -335,16 +335,16 @@ function doWithClient(client, f) {
 	);
 }
 
-const doWithPath = Promise.coroutine(function* doWithPath$coro(stashName, p, fn) {
+async function doWithPath(stashName, p, fn) {
 	T(stashName, T.maybe(T.string), p, T.string, fn, T.function);
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
 	if(stashName) { // Explicit stash name provided
-		stashInfo = yield getStashInfoByName(stashName);
+		stashInfo = await getStashInfoByName(stashName);
 		dbPath = p;
 	} else {
-		stashInfo = yield getStashInfoByPath(resolvedPathname);
+		stashInfo = await getStashInfoByPath(resolvedPathname);
 		dbPath = userPathToDatabasePath(stashInfo.path, p);
 	}
 
@@ -353,7 +353,7 @@ const doWithPath = Promise.coroutine(function* doWithPath$coro(stashName, p, fn)
 
 	// TODO: validate stashInfo.name - it may contain injection
 	return fn(stashInfo, dbPath, parentPath);
-});
+}
 
 const pathsorterAsc   = utils.comparedBy(row => row.basename);
 const pathsorterDesc  = utils.comparedBy(row => row.basename, true);
@@ -386,9 +386,9 @@ class FileChangedError extends Error {
 	}
 }
 
-const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasename$coro(client, stashName, parent, basename, cols) {
+async function getRowByParentBasename(client, stashName, parent, basename, cols) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string, cols, utils.ColsType);
-	const result = yield runQuery(
+	const result = await runQuery(
 		client,
 		`SELECT ${utils.colsAsString(cols)}
 		from "${KEYSPACE_PREFIX + stashName}".fs
@@ -402,9 +402,9 @@ const getRowByParentBasename = Promise.coroutine(function* getRowByParentBasenam
 			` and basename=${inspect(basename)}`);
 	}
 	return result.rows[0];
-});
+}
 
-const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, stashName, p) {
+async function getUuidForPath(client, stashName, p) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string);
 	if(p === "") {
 		// root directory is 0
@@ -412,26 +412,26 @@ const getUuidForPath = Promise.coroutine(function* getUuidForPath$coro(client, s
 	}
 
 	const parentPath = utils.getParentPath(p);
-	const parent = yield getUuidForPath(client, stashName, parentPath);
+	const parent = await getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
 
-	const row = yield getRowByParentBasename(client, stashName, parent, basename, ['type', 'uuid']);
+	const row = await getRowByParentBasename(client, stashName, parent, basename, ['type', 'uuid']);
 	if(row.type !== "d") {
 		throw new NoSuchPathError(`${inspect(p)} in ${stashName} is not a directory`);
 	}
 	T(row.uuid, Buffer);
 	return row.uuid;
-});
+}
 
-const getRowByPath = Promise.coroutine(function* getRowByPath$coro(client, stashName, p, cols) {
+async function getRowByPath(client, stashName, p, cols) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, cols, utils.ColsType);
 	const parentPath = utils.getParentPath(p);
-	const parent = yield getUuidForPath(client, stashName, parentPath);
+	const parent = await getUuidForPath(client, stashName, parentPath);
 	const basename = p.split("/").pop();
 	return getRowByParentBasename(client, stashName, parent, basename, cols);
-});
+}
 
-const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$coro(client, stashName, parent, cols, limit) {
+function getChildrenForParent(client, stashName, parent, cols, limit) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, cols, utils.ColsType, limit, T.optional(T.number));
 	return new Promise(function getChildForParent$Promise(resolve, reject) {
 		const rows = [];
@@ -453,17 +453,17 @@ const getChildrenForParent = Promise.coroutine(function* getChildrenForParent$co
 			resolve(rows);
 		});
 	});
-});
+}
 
-const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, options, p) {
+async function lsPath(client, stashName, options, p) {
 	T(client, CassandraClientType, stashName, T.maybe(T.string), options, T.object, p, T.string);
-	const stashInfo = yield getStashInfoForNameOrPaths(stashName, [p]);
+	const stashInfo = await getStashInfoForNameOrPaths(stashName, [p]);
 	const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
-	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
+	const parent = await getUuidForPath(client, stashInfo.name, dbPath);
 	// If user wants just names and we're not sorting, we can put a little less load
 	// on cassandra by getting just the `basename`s
 	const justBasenames = options.justNames && !(options.sortByMtime || options.sortBySize);
-	const rows = yield getChildrenForParent(
+	const rows = await getChildrenForParent(
 		client, stashInfo.name, parent,
 		justBasenames ? ["basename"] : ["basename", "type", "size", "mtime", "executable"]
 	);
@@ -494,12 +494,12 @@ const lsPath = Promise.coroutine(function* lsPath$coro(client, stashName, option
 			);
 		}
 	}
-});
+}
 
-const listRecursively = Promise.coroutine(function* listRecursively$coro(client, stashInfo, baseDbPath, dbPath, print0, type) {
+async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, type) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, print0, T.boolean, type, T.optional(T.string));
-	const parent = yield getUuidForPath(client, stashInfo.name, dbPath);
-	const rows = yield getChildrenForParent(
+	const parent = await getUuidForPath(client, stashInfo.name, dbPath);
+	const rows = await getChildrenForParent(
 		client, stashInfo.name, parent,
 		["basename", "type"]
 	);
@@ -512,18 +512,18 @@ const listRecursively = Promise.coroutine(function* listRecursively$coro(client,
 			process.stdout.write(pathWithoutBase + (print0 ? "\0" : "\n"));
 		}
 		if(row.type === "d") {
-			yield listRecursively(client, stashInfo, baseDbPath, fullPath, print0, type);
+			await listRecursively(client, stashInfo, baseDbPath, fullPath, print0, type);
 		}
 	}
-});
+}
 
 // Like "find" utility
 function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
 	return doWithClient(getNewClient(), function findPath$doWithClient(client) {
-		return doWithPath(stashName, p, Promise.coroutine(function* findPath$coro(stashInfo, dbPath, parentPath) {
-			yield listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
-		}));
+		return doWithPath(stashName, p, async function(stashInfo, dbPath, parentPath) {
+			await listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
+		});
 	});
 }
 
@@ -531,11 +531,11 @@ const MISSING   = Symbol('MISSING');
 const DIRECTORY = Symbol('DIRECTORY');
 const FILE      = Symbol('FILE');
 
-const getTypeInDbByParentBasename = Promise.coroutine(function* getTypeInDbByParentBasename$coro(client, stashName, parent, basename) {
+async function getTypeInDbByParentBasename(client, stashName, parent, basename) {
 	T(client, CassandraClientType, stashName, T.string, parent, Buffer, basename, T.string);
 	let row;
 	try {
-		row = yield getRowByParentBasename(client, stashName, parent, basename, ['type']);
+		row = await getRowByParentBasename(client, stashName, parent, basename, ['type']);
 	} catch(err) {
 		if(!(err instanceof NoSuchPathError)) {
 			throw err;
@@ -552,22 +552,22 @@ const getTypeInDbByParentBasename = Promise.coroutine(function* getTypeInDbByPar
 			` basename=${inspect(basename)}: ${inspect(row.type)}`
 		);
 	}
-});
+};
 
-const getTypeInDbByPath = Promise.coroutine(function* getTypeInDbByPath$coro(client, stashName, dbPath) {
+async function getTypeInDbByPath(client, stashName, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, dbPath, T.string);
 	if(dbPath === "") {
 		// The root directory
 		return DIRECTORY;
 	}
-	const parent = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
+	const parent = await getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 	return getTypeInDbByParentBasename(client, stashName, parent, utils.getBaseName(dbPath));
-});
+};
 
-const getTypeInWorkingDirectory = Promise.coroutine(function* getTypeInWorkingDirectory$coro(p) {
+async function getTypeInWorkingDirectory(p) {
 	T(p, T.string);
 	try {
-		const stat = yield fs.statAsync(p);
+		const stat = await fs.statAsync(p);
 		if(stat.isDirectory()) {
 			return DIRECTORY;
 		} else {
@@ -579,7 +579,7 @@ const getTypeInWorkingDirectory = Promise.coroutine(function* getTypeInWorkingDi
 		}
 		return MISSING;
 	}
-});
+};
 
 class PathAlreadyExistsError extends Error {
 	get name() {
@@ -600,13 +600,13 @@ function checkDbPath(dbPath) {
 	dbPath.split('/').map(filename.check);
 }
 
-const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stashName, p, dbPath) {
+async function makeDirsInDb(client, stashName, p, dbPath) {
 	T(client, CassandraClientType, stashName, T.string, p, T.string, dbPath, T.string);
 	checkDbPath(dbPath);
 	// If directory does not exist on host fs, we'll use the current time.
 	let mtime = utils.dateNow();
 	try {
-		mtime = (yield fs.statAsync(p)).mtime;
+		mtime = (await fs.statAsync(p)).mtime;
 	} catch(err) {
 		if(err.code !== 'ENOENT') {
 			throw err;
@@ -614,14 +614,14 @@ const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stash
 	}
 	const parentPath = utils.getParentPath(dbPath);
 	if(parentPath) {
-		yield makeDirsInDb(client, stashName, p, parentPath);
+		await makeDirsInDb(client, stashName, p, parentPath);
 	}
-	const typeInDb = yield getTypeInDbByPath(client, stashName, dbPath);
+	const typeInDb = await getTypeInDbByPath(client, stashName, dbPath);
 	if(typeInDb === MISSING) {
-		const parentUuid = yield getUuidForPath(client, stashName, utils.getParentPath(dbPath));
+		const parentUuid = await getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 		const uuid = makeUuid();
 		const added_time = utils.dateNow();
-		yield runQuery(
+		await runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashName}".fs
 			(basename, parent, uuid, type, mtime, version, added_time, added_user, added_host, added_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -635,7 +635,7 @@ const makeDirsInDb = Promise.coroutine(function* makeDirsInDb$coro(client, stash
 	} else if(typeInDb === DIRECTORY) {
 		// do nothing
 	}
-});
+};
 
 const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnOnStashTable$coro(client, stashName, columnName, type) {
 	T(client, CassandraClientType, stashName, T.string, columnName, T.string, type, T.string);
