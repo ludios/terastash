@@ -27,12 +27,12 @@ require('cache-require-paths');
 
 require('better-buffer-inspect');
 
-const terastash     = require('.');
-const utils         = require('./utils');
-const filename      = require('./filename');
-const T             = require('notmytype');
-const program       = require('commander');
-const chalk         = require('chalk');
+const terastash = require('.');
+const utils     = require('./utils');
+const filename  = require('./filename');
+const T         = require('notmytype');
+const program   = require('commander');
+const chalk     = require('chalk');
 
 const ERROR_EXIT_CODE = 255;
 
