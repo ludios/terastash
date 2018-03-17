@@ -62,16 +62,16 @@ async function catchAndLog(p) {
 		await p;
 	} catch(err) {
 		if(
-		err instanceof terastash.DirectoryNotEmptyError ||
-		err instanceof terastash.NoSuchPathError ||
-		err instanceof terastash.NotAFileError ||
-		err instanceof terastash.PathAlreadyExistsError ||
-		err instanceof terastash.NotInWorkingDirectoryError ||
-		err instanceof terastash.KeyspaceMissingError ||
-		err instanceof terastash.DifferentStashesError ||
-		err instanceof terastash.UnexpectedFileError ||
-		err instanceof terastash.UsageError ||
-		err instanceof filename.BadFilename) {
+			err instanceof terastash.DirectoryNotEmptyError ||
+			err instanceof terastash.NoSuchPathError ||
+			err instanceof terastash.NotAFileError ||
+			err instanceof terastash.PathAlreadyExistsError ||
+			err instanceof terastash.NotInWorkingDirectoryError ||
+			err instanceof terastash.KeyspaceMissingError ||
+			err instanceof terastash.DifferentStashesError ||
+			err instanceof terastash.UnexpectedFileError ||
+			err instanceof terastash.UsageError ||
+			err instanceof filename.BadFilename) {
 			console.error(chalk.bold(chalk.red(err.message)));
 		} else {
 			console.error(err.stack);

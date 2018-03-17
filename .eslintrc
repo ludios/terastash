@@ -2,6 +2,7 @@
 	"parserOptions": {
 		"ecmaVersion": 2017
 	},
+
 	"rules": {
 		"indent": [2, "tab"],
 
@@ -11,7 +12,12 @@
 
 		"no-shadow": 1,
 
-		"no-unused-vars": 1,
+		"no-unused-vars": [1, {
+			"vars": "all",
+			"args": "after-used",
+			"argsIgnorePattern": "^_",
+			"varsIgnorePattern": "^_"
+		}],
 
 		"camelcase": 0,
 
@@ -59,6 +65,7 @@
 		/* allow while(row = ...) */
 		"no-cond-assign": 0
 	},
+
 	"globals": {
 		"it": true,
 		"describe": true,

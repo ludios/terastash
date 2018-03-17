@@ -133,7 +133,7 @@ class StashServer {
 				// Too bad streamFile doesn't just take an uuid
 				const [parentPath, basename] = utils.rsplitString(dbPath, '/', 1);
 				const fileParent = await terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
-				const [row, dataStream] = await terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
+				const [_row, dataStream] = await terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
 				// If the connection is closed by the client or the response just finishes, send an
 				// .destroy() up the chain of streams, which will eventually abort the HTTPS request
 				// made to Google.

@@ -58,14 +58,14 @@ const KEYSPACE_PREFIX = "ts_";
 
 
 class CustomRetryPolicy extends RetryPolicy {
-	onReadTimeout(requestInfo, consistency, received, blockFor, isDataPresent) {
+	onReadTimeout(requestInfo, _consistency, _received, _blockFor, _isDataPresent) {
 		if(requestInfo.nbRetry > 10) {
 			return this.rethrowResult();
 		}
 		return this.retryResult();
 	}
 
-	onWriteTimeout(requestInfo, consistency, received, blockFor, writeType) {
+	onWriteTimeout(requestInfo, _consistency, _received, _blockFor, _writeType) {
 		if(requestInfo.nbRetry > 10) {
 			return this.rethrowResult();
 		}
@@ -511,7 +511,7 @@ async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, ty
 function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
 	return doWithClient(getNewClient(), function findPath$doWithClient(client) {
-		return doWithPath(stashName, p, async function findPath$coro(stashInfo, dbPath, parentPath) {
+		return doWithPath(stashName, p, async function findPath$coro(stashInfo, dbPath, _parentPath) {
 			await listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
 		});
 	});
@@ -1123,8 +1123,10 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size,
 			crc32c, mtime, executable, version, block_size, uuid, added_time, added_user, added_host, added_version)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size,
-			crc32c, mtime, executable, version, block_size, uuid, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION]
+			[
+				utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size,
+				crc32c, mtime, executable, version, block_size, uuid, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION
+			]
 		);
 	}
 
@@ -1544,7 +1546,7 @@ function getFiles(stashName, paths, fake) {
 async function catFile(client, stashInfo, dbPath, ranges) {
 	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	const parent = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-	const [row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
+	const [_row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
 	utils.pipeWithErrors(readStream, process.stdout);
 	await new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
@@ -2029,7 +2031,7 @@ class RowToTransit extends Transform {
 function exportDb(stashName) {
 	T(stashName, T.maybe(T.string));
 	return doWithClient(getNewClient(), function exportDb$doWithClient(client) {
-		return doWithPath(stashName, ".", function exportDb$Promise(stashInfo, dbPath, parentPath) {
+		return doWithPath(stashName, ".", function exportDb$Promise(stashInfo, _dbPath, _parentPath) {
 			T(stashInfo.name, T.string);
 			return new Promise(function(resolve, reject) {
 				const rowStream = client.stream(
@@ -2224,7 +2226,7 @@ function importDb(outCtx, stashName, dumpFile) {
 			const inserter = new TransitToInsert(client, stashName);
 			stealer.pipe(inserter);
 
-			inserter.on('data', function(obj) {
+			inserter.on('data', function(_obj) {
 				count += 1;
 				// Print every 100th to avoid getting 30% slowdown by just terminal output
 				if(outCtx.mode === 'terminal' && count % 100 === 0) {

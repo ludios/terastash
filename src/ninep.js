@@ -463,7 +463,7 @@ class Terastash9P {
 			const valid = Buffer.alloc(8);
 			valid.writeUInt32LE(0x000007FF);
 			const qid = this._fidMap.get(msg.fid);
-			let {type, uuid, executable, size} = this._qidMap.get(_qid(qid).toString('hex'));
+			let {type, _uuid, executable, size} = this._qidMap.get(_qid(qid).toString('hex'));
 			if(DEBUG_9P) {
 				console.error({fid: msg.fid, qid});
 			}
@@ -508,7 +508,7 @@ class Terastash9P {
 			const {parent, basename} = this._qidMap.get(_qid(qid).toString('hex'));
 			const offset             = uint64BufferToNumber(msg.offset);
 			const count              = msg.count;
-			const [row, readStream]  = await terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
+			const [_row, readStream] = await terastash.streamFile(this._client, this._stashInfo, parent, basename, [[offset, offset + count]]);
 			const data               = await utils.readableToBuffer(readStream);
 			this.replyOK(msg, {data});
 		} else if(msg.type === Type.Tclunk) {
@@ -535,11 +535,11 @@ class Terastash9P {
 				parent = row.uuid;
 				const type    = row.type === "f" ? "FILE" : "DIR";
 				const qidPath = row.uuid.slice(0, 64/8); // UGH
-				const qid     = {type, version: 0, path: qidPath};
-				this._qidMap.set(_qid(qid).toString('hex'), {
+				const wqid    = {type, version: 0, path: qidPath};
+				this._qidMap.set(_qid(wqid).toString('hex'), {
 					uuid: row.uuid, type: type, executable: row.executable, parent: row.parent, basename: row.basename, size: row.size});
-				//console.error(`${inspect(wname)} -> ${inspect(qid)} -> ${inspect(row.uuid)}`);
-				wqids.push(qid);
+				//console.error(`${inspect(wname)} -> ${inspect(wqid)} -> ${inspect(row.uuid)}`);
+				wqids.push(wqid);
 			}
 			if(!msg.wnames.length) {
 				this._fidMap.set(msg.newfid, this._fidMap.get(msg.fid));
@@ -607,8 +607,8 @@ function listen(socketPath) {
 module.exports = {listen};
 
 // TODO: test how many unfulfilled reads that Linux kernel issues
-	// Some testing showed that it keeps ~432 reads going, with an msize of 65536
-	// Tested 4.3-rc3 kernel - saw 997 reads, perhaps no limit
+// 	Some testing showed that it keeps ~432 reads going, with an msize of 65536
+// 	Tested 4.3-rc3 kernel - saw 997 reads, perhaps no limit
 // TODO: handle Tflush
 // TODO: don't get streamFile a range larger than the actual file?  Hitting this assert:
 //Error: For parent=16fc2b528c139e05221253971c218412 basename='Torrent downloaded from Demonoid.me.txt', expected length of content to be
