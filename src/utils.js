@@ -177,40 +177,40 @@ function mkdirpAsync(dir, opts) {
 	});
 }
 
-const writeObjectToConfigFile = Promise.coroutine(function* writeObjectToConfigFile$coro(fname, object) {
+async function writeObjectToConfigFile(fname, object) {
 	T(fname, T.string, object, T.object);
 	const configPath = basedir.configPath(path.join("terastash", fname));
-	yield mkdirpAsync(path.dirname(configPath));
-	yield fs.writeFileAsync(configPath, JSON.stringify(object, null, 2));
-});
+	await mkdirpAsync(path.dirname(configPath));
+	await fs.writeFileAsync(configPath, JSON.stringify(object, null, 2));
+}
 
-const readObjectFromConfigFile = Promise.coroutine(function* readObjectFromConfigFile$coro(fname) {
+async function readObjectFromConfigFile(fname) {
 	T(fname, T.string);
 	const configPath = basedir.configPath(path.join("terastash", fname));
-	const buf = yield fs.readFileAsync(configPath);
+	const buf = await fs.readFileAsync(configPath);
 	return JSON.parse(buf);
-});
+}
 
 // Beware: clone converts undefined to null
 function clone(obj) {
 	return JSON.parse(JSON.stringify(obj));
 }
 
-const makeConfigFileInitializer = function(fname, defaultConfig) {
+function makeConfigFileInitializer(fname, defaultConfig) {
 	T(fname, T.string, defaultConfig, T.object);
-	return Promise.coroutine(function* makeConfigFileInitializer$coro() {
+	return async function makeConfigFileInitializer$coro() {
 		try {
-			return (yield readObjectFromConfigFile(fname));
+			return (await readObjectFromConfigFile(fname));
 		} catch(err) {
 			if(err.code !== 'ENOENT') {
 				throw err;
 			}
 			// If there is no config file, write defaultConfig.
-			yield writeObjectToConfigFile(fname, defaultConfig);
+			await writeObjectToConfigFile(fname, defaultConfig);
 			return clone(defaultConfig);
 		}
-	});
-};
+	};
+}
 
 function roundUpToNearest(n, nearest) {
 	T(n, T.number, nearest, T.number);
@@ -482,28 +482,28 @@ const NumberOrDateType = T.union([T.number, Date]);
  * https://github.com/joyent/libuv/issues/1371
  * https://github.com/joyent/node/issues/7000#issuecomment-33758278
  */
-const utimesMilliseconds = Promise.coroutine(function* utimesMilliseconds$coro(fname, atime, mtime) {
+async function utimesMilliseconds(fname, atime, mtime) {
 	T(fname, T.string, atime, NumberOrDateType, mtime, NumberOrDateType);
-	const outputHandle = yield fs.openAsync(fname, "r");
+	const outputHandle = await fs.openAsync(fname, "r");
 	try {
 		// Use fs.futimes instead of fs.utimes because fs.utimes has
 		// 1-second granularity, losing the milliseconds.
-		yield fs.futimesAsync(outputHandle, atime, mtime);
+		await fs.futimesAsync(outputHandle, atime, mtime);
 	} finally {
-		yield fs.closeAsync(outputHandle);
+		await fs.closeAsync(outputHandle);
 	}
-});
+}
 
-const tryUnlink = Promise.coroutine(function* tryUnlink$coro(fname) {
+async function tryUnlink(fname) {
 	try {
-		yield fs.unlinkAsync(fname);
+		await fs.unlinkAsync(fname);
 	} catch(err) {
 		if(err.code !== "ENOENT") {
 			throw err;
 		}
 		// else, ignore error
 	}
-});
+}
 
 
 const EMPTY_BUF = Buffer.alloc(0);

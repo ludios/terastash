@@ -17,8 +17,8 @@ class StashServer {
 		this.client = terastash.getNewClient();
 	}
 
-	*_writeListing(res, stashInfo, parent) {
-		const rows = yield terastash.getChildrenForParent(
+	async _writeListing(res, stashInfo, parent) {
+		const rows = await terastash.getChildrenForParent(
 			this.client, stashInfo.name, parent.uuid,
 			["basename", "type", "size", "mtime", "executable"]
 		);
@@ -71,7 +71,7 @@ class StashServer {
 		res.end();
 	}
 
-	*_handleRequest(req, res) {
+	async _handleRequest(req, res) {
 		console.log(`OPENED: ${req.method} ${req.url} ${req.headers.range}`);
 		res.setHeader("X-Frame-Options",        "DENY");
 		res.setHeader("X-Content-Type-Options", "nosniff");
@@ -90,7 +90,7 @@ class StashServer {
 			dbPath = decodeURIComponent(dbPath.replace(/\/+$/g, ""));
 			A.eq(_, "");
 			A(this.stashes.has(stashName), `Stash ${stashName} not in whitelist ${this.stashes}`);
-			const stashInfo = yield terastash.getStashInfoByName(stashName);
+			const stashInfo = await terastash.getStashInfoByName(stashName);
 			let parent;
 			// TODO: fix getRowByPath
 			if(dbPath === "") {
@@ -98,7 +98,7 @@ class StashServer {
 				parent.uuid = Buffer.alloc(128/8);
 				parent.type = "d";
 			} else {
-				parent = yield terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid', 'size']);
+				parent = await terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid', 'size']);
 			}
 			if(parent.type === "d") {
 				this._writeListing(res, stashInfo, parent);
@@ -133,8 +133,8 @@ class StashServer {
 				}
 				// Too bad streamFile doesn't just take an uuid
 				const [parentPath, basename] = utils.rsplitString(dbPath, '/', 1);
-				const fileParent = yield terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
-				const [row, dataStream] = yield terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
+				const fileParent = await terastash.getUuidForPath(this.client, stashInfo.name, parentPath);
+				const [row, dataStream] = await terastash.streamFile(this.client, stashInfo, fileParent, basename, firstRange ? [firstRange] : undefined);
 				// If the connection is closed by the client or the response just finishes, send an
 				// .destroy() up the chain of streams, which will eventually abort the HTTPS request
 				// made to Google.
@@ -151,9 +151,9 @@ class StashServer {
 		}
 	}
 
-	*handleRequest(req, res) {
+	async handleRequest(req, res) {
 		try {
-			return yield this._handleRequest(req, res);
+			return await this._handleRequest(req, res);
 		} catch(err) {
 			console.error(err.stack);
 			res.statusCode = 500;
@@ -161,10 +161,6 @@ class StashServer {
 		}
 	}
 }
-
-StashServer.prototype._writeListing  = Promise.coroutine(StashServer.prototype._writeListing);
-StashServer.prototype._handleRequest = Promise.coroutine(StashServer.prototype._handleRequest);
-StashServer.prototype.handleRequest  = Promise.coroutine(StashServer.prototype.handleRequest);
 
 // We need a domain to avoid blowing up the whole process when something goes badly for one request
 const d = domain.create();
