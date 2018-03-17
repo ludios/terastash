@@ -1,19 +1,19 @@
 "use strict";
 
-const google = require('googleapis');
-const Promise = require('bluebird');
-const A = require('ayy');
-const T = require('notmytype');
-const Combine = require('combine-streams');
-const OAuth2 = google.auth.OAuth2;
-const utils = require('../utils');
+const google            = require('googleapis');
+const Promise           = require('bluebird');
+const A                 = require('ayy');
+const T                 = require('notmytype');
+const Combine           = require('combine-streams');
+const OAuth2            = google.auth.OAuth2;
+const utils             = require('../utils');
 const OutputContextType = utils.OutputContextType;
-const retry = require('../retry');
-const inspect = require('util').inspect;
-const chalk = require('chalk');
-const path = require('path');
-const fs = require('../fs-promisified');
-const basedir = require('xdg').basedir;
+const retry             = require('../retry');
+const inspect           = require('util').inspect;
+const chalk             = require('chalk');
+const path              = require('path');
+const fs                = require('../fs-promisified');
+const basedir           = require('xdg').basedir;
 
 
 function getTokenFiles() {
