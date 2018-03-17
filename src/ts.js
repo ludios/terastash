@@ -36,13 +36,13 @@ require('cache-require-paths');
 
 require('better-buffer-inspect');
 
-const terastash = require('.');
-const utils = require('./utils');
-const filename = require('./filename');
-const T = require('notmytype');
-const program = require('commander');
-const chalk = require('chalk');
-const Promise = require('bluebird');
+const terastash     = require('.');
+const utils         = require('./utils');
+const filename      = require('./filename');
+const T             = require('notmytype');
+const program       = require('commander');
+const chalk         = require('chalk');
+const Promise       = require('bluebird');
 const NativePromise = global.Promise;
 
 const EitherPromise = T.union([Promise, NativePromise]);
