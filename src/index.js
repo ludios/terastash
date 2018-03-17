@@ -521,7 +521,7 @@ async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, ty
 function findPath(stashName, p, options) {
 	T(stashName, T.maybe(T.string), p, T.string, options, T.object);
 	return doWithClient(getNewClient(), function findPath$doWithClient(client) {
-		return doWithPath(stashName, p, async function(stashInfo, dbPath, parentPath) {
+		return doWithPath(stashName, p, async function findPath$coro(stashInfo, dbPath, parentPath) {
 			await listRecursively(client, stashInfo, dbPath, dbPath, options.print0, options.type);
 		});
 	});
@@ -637,10 +637,10 @@ async function makeDirsInDb(client, stashName, p, dbPath) {
 	}
 };
 
-const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnOnStashTable$coro(client, stashName, columnName, type) {
+async function tryCreateColumnOnStashTable(client, stashName, columnName, type) {
 	T(client, CassandraClientType, stashName, T.string, columnName, T.string, type, T.string);
 	try {
-		yield runQuery(client,
+		await runQuery(client,
 			`ALTER TABLE "${KEYSPACE_PREFIX + stashName}".fs ADD
 			"${columnName}" ${type}`
 		);
@@ -649,7 +649,7 @@ const tryCreateColumnOnStashTable = Promise.coroutine(function* tryCreateColumnO
 			throw err;
 		}
 	}
-});
+}
 
 function makeKey() {
 	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
@@ -681,19 +681,19 @@ function makeUuid() {
 	return uuid;
 }
 
-const getChunkStore = Promise.coroutine(function* getChunkStore$coro(stashInfo) {
+async function getChunkStore(stashInfo) {
 	const storeName = stashInfo.chunkStore;
 	if(!storeName) {
 		throw new Error("stash info doesn't specify chunkStore key");
 	}
-	const config = yield getChunkStores();
+	const config = await getChunkStores();
 	const chunkStore = config.stores[storeName];
 	if(!chunkStore) {
 		throw new Error(`Chunk store ${storeName} is not defined in chunk-stores.json`);
 	}
 	chunkStore.name = storeName;
 	return chunkStore;
-});
+}
 
 let selfTests;
 selfTests = {
@@ -707,15 +707,15 @@ selfTests = {
 		gcmer.selfTest();
 		selfTests.gcm = noop;
 	}
-};
+}
 
-const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, dbPath) {
+async function dropFile(client, stashInfo, dbPath) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string);
-	const chunkStore = yield getChunkStore(stashInfo);
-	const parentUuid = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+	const chunkStore = await getChunkStore(stashInfo);
+	const parentUuid = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	let chunks = null;
 	try {
-		const row = yield getRowByParentBasename(
+		const row = await getRowByParentBasename(
 			client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
 			[`chunks_in_${chunkStore.name}`]
 		);
@@ -725,12 +725,12 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 			throw err;
 		}
 	}
-	const row = yield getRowByParentBasename(
+	const row = await getRowByParentBasename(
 		client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
 		["type", "uuid"]
 	);
 	if(row.type === 'd') {
-		const childRows = yield getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
+		const childRows = await getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
 		if(childRows.length) {
 			throw new DirectoryNotEmptyError(
 				`Refusing to drop ${inspect(dbPath)} because it is a non-empty directory`
@@ -739,7 +739,7 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 	}
 	// TODO: Instead of DELETE, mark file with 'deleting' or something in case
 	// the chunk-deletion process needs to be resumed later.
-	yield runQuery(
+	await runQuery(
 		client,
 		`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 		WHERE parent = ? AND basename = ?;`,
@@ -749,56 +749,56 @@ const dropFile = Promise.coroutine(function* dropFile$coro(client, stashInfo, db
 		validateChunksFixBigints(chunks);
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
-			yield localfs.deleteChunks(chunkStore.directory, chunks);
+			await localfs.deleteChunks(chunkStore.directory, chunks);
 		} else {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			yield gdriver.loadCredentials();
-			yield gdrive.deleteChunks(gdriver, chunks);
+			await gdriver.loadCredentials();
+			await gdrive.deleteChunks(gdriver, chunks);
 		}
 	}
-});
+}
 
 /**
  * Remove files from the Cassandra database and their corresponding chunks.
  */
 function dropFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(getNewClient(), Promise.coroutine(function* dropFiles$coro(client) {
-		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+	return doWithClient(getNewClient(), async function dropFiles$coro(client) {
+		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
-			yield dropFile(client, stashInfo, dbPath);
+			await dropFile(client, stashInfo, dbPath);
 		}
-	}));
+	});
 }
 
-const makeEmptySparseFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size) {
+async function makeEmptySparseFile(p, size) {
 	T(p, T.string, size, T.number);
 	// First delete the existing file because it may have hard links, and we
 	// don't want to overwrite the content of said hard links.
-	yield utils.tryUnlink(p);
-	const handle = yield fs.openAsync(p, "w");
+	await utils.tryUnlink(p);
+	const handle = await fs.openAsync(p, "w");
 	try {
-		yield fs.truncateAsync(handle, size);
+		await fs.truncateAsync(handle, size);
 	} finally {
-		yield fs.closeAsync(handle);
+		await fs.closeAsync(handle);
 	}
-});
+}
 
-const makeFakeFile = Promise.coroutine(function* makeEmptySparseFile$coro(p, size, mtime) {
+async function makeFakeFile(p, size, mtime) {
 	T(p, T.string, size, T.number, mtime, Date);
-	yield makeEmptySparseFile(p, size);
-	yield utils.utimesMilliseconds(p, mtime, mtime);
+	await makeEmptySparseFile(p, size);
+	await utils.utimesMilliseconds(p, mtime, mtime);
 	// TODO: do this without a stat?
-	const stat = yield fs.statAsync(p);
+	const stat = await fs.statAsync(p);
 	const withSticky = stat.mode | 0o1000;
-	yield fs.chmodAsync(p, withSticky);
-});
+	await fs.chmodAsync(p, withSticky);
+}
 
-const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, dbPath, showKeys) {
+async function infoFile(client, stashInfo, dbPath, showKeys) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, dbPath, T.string, showKeys, T.boolean);
-	const row = yield getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
+	const row = await getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
 	if(row.size !== null) {
 		utils.assertSafeNonNegativeLong(row.size);
 		row.size = Number(row.size);
@@ -824,27 +824,27 @@ const infoFile = Promise.coroutine(function* infoFile$coro(client, stashInfo, db
 		row.key = 'X'.repeat(row.key.length);
 	}
 	console.log(JSON.stringify(row, null, 2));
-});
+}
 
 function infoFiles(stashName, paths, showKeys) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string), showKeys, T.boolean);
-	return doWithClient(getNewClient(), Promise.coroutine(function* infoFiles$coro(client) {
-		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+	return doWithClient(getNewClient(), async function infoFiles$coro(client) {
+		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
-			yield infoFile(client, stashInfo, dbPath, showKeys);
+			await infoFile(client, stashInfo, dbPath, showKeys);
 		}
-	}));
+	});
 }
 
-const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p, justRemove, ignoreMtime) {
+async function shooFile(client, stashInfo, p, justRemove, ignoreMtime) {
 	T(client, CassandraClientType, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
-	const row = yield getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
+	const row = await getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
 	if(row.type === 'd') {
 		throw new NotAFileError(`Can't shoo dbPath=${inspect(dbPath)}; it is a directory`);
 	} else if(row.type === 'f') {
-		const stat = yield fs.statAsync(p);
+		const stat = await fs.statAsync(p);
 		T(stat.mtime, Date);
 		if(!ignoreMtime) {
 			if(stat.mtime.getTime() !== Number(row.mtime)) {
@@ -863,22 +863,22 @@ const shooFile = Promise.coroutine(function* shooFile$coro(client, stashInfo, p,
 			);
 		}
 		if(justRemove) {
-			yield utils.tryUnlink(p);
+			await utils.tryUnlink(p);
 		} else {
-			yield makeFakeFile(p, stat.size, row.mtime);
+			await makeFakeFile(p, stat.size, row.mtime);
 		}
 	} else {
 		throw new Error(`Unexpected type ${inspect(row.type)} for dbPath=${inspect(dbPath)}`);
 	}
-});
+}
 
 function shooFiles(paths, justRemove, continueOnError, ignoreMtime) {
 	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
-	return doWithClient(getNewClient(), Promise.coroutine(function* shooFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(paths);
+	return doWithClient(getNewClient(), async function shooFiles$coro(client) {
+		const stashInfo = await getStashInfoForPaths(paths);
 		for(const p of paths) {
 			try {
-				yield shooFile(client, stashInfo, p, justRemove, ignoreMtime);
+				await shooFile(client, stashInfo, p, justRemove, ignoreMtime);
 			} catch(err) {
 				if(!(err instanceof UnexpectedFileError ||
 					err instanceof NoSuchPathError)
@@ -888,7 +888,7 @@ function shooFiles(paths, justRemove, continueOnError, ignoreMtime) {
 				console.error(chalk.red(err.message));
 			}
 		}
-	}));
+	});
 }
 
 const GCM_TAG_SIZE = 16;
@@ -911,7 +911,7 @@ function checkChunkSize(size) {
  * If `dropOldIfDifferent`, if the path in db already exists and the corresponding local
  * file has a different (mtime, size, executable), drop the db path and add the new file.
  */
-const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=false, ignoreMtime=false) {
+async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=false, ignoreMtime=false) {
 	T(
 		client, CassandraClientType,
 		stashInfo, StashInfoType,
@@ -923,10 +923,10 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 	checkDbPath(dbPath);
 
 	let oldRow;
-	const throwIfAlreadyInDb = Promise.coroutine(function* throwIfAlreadyInDb$coro() {
+	async function throwIfAlreadyInDb() {
 		let caught = false;
 		try {
-			oldRow = yield getRowByPath(client, stashInfo.name, dbPath,
+			oldRow = await getRowByPath(client, stashInfo.name, dbPath,
 				ignoreMtime ?
 					['size', 'type', 'executable'] :
 					['size', 'type', 'executable', 'mtime']);
@@ -942,9 +942,9 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
 				` already exists as a ${oldRow.type === 'd' ? "directory" : "file"}`);
 		}
-	});
+	}
 
-	const stat = yield fs.statAsync(p);
+	const stat = await fs.statAsync(p);
 	if(!stat.isFile()) {
 		throw new Error(`Cannot add ${inspect(p)} because it is not a file`);
 	}
@@ -961,7 +961,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 	try {
 		// Check early to avoid uploading to chunk store and doing other work
-		yield throwIfAlreadyInDb();
+		await throwIfAlreadyInDb();
 	} catch(e) {
 		if(!(e instanceof PathAlreadyExistsError) || !dropOldIfDifferent) {
 			throw e;
@@ -987,13 +987,13 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 				table.push(['new', String(mtime), commaify(stat.size), executable]);
 			}
 			console.log(`Notice: replacing ${inspect(dbPath)} in db\n${table.toString()}`);
-			yield dropFile(client, stashInfo, dbPath);
+			await dropFile(client, stashInfo, dbPath);
 		} else {
 			throw e;
 		}
 	}
 
-	const chunkStore = yield getChunkStore(stashInfo);
+	const chunkStore = await getChunkStore(stashInfo);
 	let content = null;
 	let chunkInfo;
 	let size;
@@ -1034,7 +1034,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 		// because upload of a chunk may fail and need to be retried.   We don't
 		// want to re-read the entire file just to continue with the chunk we need
 		// again.
-		const getChunkStream = Promise.coroutine(function* getChunkStream$coro(lastChunkAgain) {
+		async function getChunkStream(lastChunkAgain) {
 			T(lastChunkAgain, T.boolean);
 
 			if(!lastChunkAgain) {
@@ -1050,7 +1050,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			}
 
 			// Ensure that file is still the same size before opening it again
-			const statAgain = yield fs.statAsync(p);
+			const statAgain = await fs.statAsync(p);
 			if(statAgain.size !== stat.size) {
 				throw new FileChangedError(
 					`Size of ${inspect(p)} changed from\n` +
@@ -1093,17 +1093,17 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			}
 
 			return outStream;
-		});
+		}
 
 		let _;
 		if(chunkStore.type === "localfs") {
 			localfs = loadNow(localfs);
-			_ = yield localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
+			_ = await localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			yield gdriver.loadCredentials();
-			_ = yield gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
+			await gdriver.loadCredentials();
+			_ = await gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
@@ -1121,7 +1121,7 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 
 		size = stat.size;
 	} else {
-		content = yield fs.readFileAsync(p);
+		content = await fs.readFileAsync(p);
 		hasher = loadNow(hasher);
 		sse4_crc32 = loadNow(sse4_crc32);
 		crc32c = hasher.crcToBuf(sse4_crc32.calculate(content));
@@ -1132,15 +1132,15 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			`${commaify(stat.size)} bytes; did file change during reading?`);
 	}
 
-	const insert = Promise.coroutine(function* insert$coro() {
+	async function insert() {
 		const parentPath = utils.getParentPath(dbPath);
 		if(parentPath) {
-			yield makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
+			await makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
 		// TODO: make makeDirsInDb return uuid so that we don't have to get it again
-		const parentUuid = yield getUuidForPath(client, stashInfo.name, parentPath);
+		const parentUuid = await getUuidForPath(client, stashInfo.name, parentPath);
 		const added_time = utils.dateNow();
-		return yield runQuery(
+		return await runQuery(
 			client,
 			`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
 			(basename, parent, type, content, key, "chunks_in_${chunkStore.name}", size,
@@ -1149,22 +1149,22 @@ const addFile = Promise.coroutine(function* addFile$coro(outCtx, client, stashIn
 			[utils.getBaseName(dbPath), parentUuid, type, content, key, chunkInfo, size,
 			crc32c, mtime, executable, version, block_size, uuid, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION]
 		);
-	});
+	}
 
 	// Check again to narrow the race condition
-	yield throwIfAlreadyInDb();
+	await throwIfAlreadyInDb();
 	try {
-		yield insert();
+		await insert();
 	} catch(err) {
 		if(!isColumnMissingError(err)) {
 			throw err;
 		}
-		yield tryCreateColumnOnStashTable(
+		await tryCreateColumnOnStashTable(
 			client, stashInfo.name, `chunks_in_${chunkStore.name}`, 'list<frozen<chunk>>');
-		yield throwIfAlreadyInDb();
-		yield insert();
+		await throwIfAlreadyInDb();
+		await insert();
 	}
-});
+}
 
 /**
  * Put files or directories into the Cassandra database.
@@ -1179,8 +1179,8 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 		justRemove,         T.boolean,
 		ignoreMtime,        T.boolean
 	);
-	return doWithClient(getNewClient(), Promise.coroutine(function* addFiles$coro(client) {
-		const stashInfo = yield getStashInfoForPaths(paths);
+	return doWithClient(getNewClient(), async function addFiles$coro(client) {
+		const stashInfo = await getStashInfoForPaths(paths);
 		// Shuffle the files so that the cloud storage provider has a harder time
 		// inferring what content was stored.  If we didn't shuffle, they would have
 		// additional information based on the sizes of the alphanumerically sorted
@@ -1214,7 +1214,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 				const dbPath = userPathToDatabasePath(stashInfo.path, p);
 				let error = null;
 				try {
-					yield addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent, ignoreMtime);
+					await addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent, ignoreMtime);
 				} catch(err) {
 					if(!(err instanceof PathAlreadyExistsError ||
 						err instanceof UnexpectedFileError /* was sticky */)
@@ -1225,7 +1225,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 					console.error(chalk.red(err.message));
 				}
 				if(thenShoo && !error) {
-					yield shooFile(client, stashInfo, p, justRemove, /*ignoreMtime=*/false);
+					await shooFile(client, stashInfo, p, justRemove, /*ignoreMtime=*/false);
 				}
 				if(stopNow) {
 					break;
@@ -1235,7 +1235,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 		} finally {
 			process.removeListener('SIGINT', stopSoon);
 		}
-	}));
+	});
 }
 
 function validateChunksFixBigints(chunks) {
@@ -1273,7 +1273,7 @@ function chunksToBlockRanges(chunks, blockSize) {
  * Get a readable stream with the file contents, whether the file is in the db
  * or in a chunk store.
  */
-const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo, parent, basename, ranges) {
+async function streamFile(client, stashInfo, parent, basename, ranges) {
 	T(client, CassandraClientType, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	if(ranges) {
 		A.eq(ranges.length, 1, "Only support 1 range right now");
@@ -1288,7 +1288,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 
 	let row;
 	try {
-		row = yield getRowByParentBasename(client, stashInfo.name, parent, basename,
+		row = await getRowByParentBasename(client, stashInfo.name, parent, basename,
 			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	} catch(err) {
@@ -1296,7 +1296,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
-		row = yield getRowByParentBasename(client, stashInfo.name, parent, basename,
+		row = await getRowByParentBasename(client, stashInfo.name, parent, basename,
 			["size", "type", "key", "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	}
@@ -1320,7 +1320,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 			`max supported version is ${MAX_SUPPORTED_VERSION}.`);
 	}
 
-	const chunkStore = (yield getChunkStores()).stores[storeName];
+	const chunkStore = (await getChunkStores()).stores[storeName];
 	const chunks = row[`chunks_in_${storeName}`] || null;
 	let bytesRead = 0;
 	let dataStream;
@@ -1417,7 +1417,7 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		} else if(chunkStore.type === "gdrive") {
 			gdrive = loadNow(gdrive);
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			yield gdriver.loadCredentials();
+			await gdriver.loadCredentials();
 			cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
@@ -1508,30 +1508,30 @@ const streamFile = Promise.coroutine(function* streamFile$coro(client, stashInfo
 		}
 	});
 	return [row, dataStream];
-});
+}
 
 /**
  * Get a file or directory from the Cassandra database.
  */
-const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPath, outputFilename, fake) {
+async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
-	yield mkdirpAsync(path.dirname(outputFilename));
+	await mkdirpAsync(path.dirname(outputFilename));
 
 	// Delete the existing file because it may
 	// 1) have hard links
 	// 2) have the sticky bit set
 	// 3) have other unwanted permissions set
-	yield utils.tryUnlink(outputFilename);
+	await utils.tryUnlink(outputFilename);
 
 	if(fake) {
-		const row               = yield getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
-		yield makeFakeFile(outputFilename, Number(row.size), row.mtime);
+		const row               = await getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
+		await makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
-		const parent            = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
+		const parent            = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const [row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
-		yield new Promise(function getFiles$Promise(resolve, reject) {
+		await new Promise(function getFiles$Promise(resolve, reject) {
 			writeStream.once('finish', function getFile$writeStream$finish() {
 				resolve();
 			});
@@ -1542,18 +1542,18 @@ const getFile = Promise.coroutine(function* getFile$coro(client, stashInfo, dbPa
 				reject(err);
 			});
 		});
-		yield utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
+		await utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
 		if(row.executable) {
 			// TODO: setting for 0o700 instead?
-			yield fs.chmodAsync(outputFilename, 0o770);
+			await fs.chmodAsync(outputFilename, 0o770);
 		}
 	}
-});
+}
 
 function getFiles(stashName, paths, fake) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean);
-	return doWithClient(getNewClient(), Promise.coroutine(function* getFiles$coro(client) {
-		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+	return doWithClient(getNewClient(), async function getFiles$coro(client) {
+		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			let dbPath;
 			let outputFilename;
@@ -1566,38 +1566,38 @@ function getFiles(stashName, paths, fake) {
 				outputFilename = stashInfo.path + '/' + dbPath;
 			}
 
-			yield getFile(client, stashInfo, dbPath, outputFilename, fake);
+			await getFile(client, stashInfo, dbPath, outputFilename, fake);
 		}
-	}));
+	});
 }
 
-const catFile = Promise.coroutine(function* catFile$coro(client, stashInfo, dbPath, ranges) {
+async function catFile(client, stashInfo, dbPath, ranges) {
 	T(client, CassandraClientType, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
-	const parent = yield getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-	const [row, readStream] = yield streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
+	const parent = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+	const [row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
 	utils.pipeWithErrors(readStream, process.stdout);
-	yield new Promise(function(resolve, reject) {
+	await new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
 		readStream.once('error', reject);
 	});
-});
+}
 
 function catFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(getNewClient(), Promise.coroutine(function* catFiles$coro(client) {
-		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+	return doWithClient(getNewClient(), async function catFiles$coro(client) {
+		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for(const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
-			yield catFile(client, stashInfo, dbPath);
+			await catFile(client, stashInfo, dbPath);
 		}
-	}));
+	});
 }
 
 function catRangedFiles(stashName, args) {
 	T(stashName, T.maybe(T.string), args, T.list(T.string));
-	return doWithClient(getNewClient(), Promise.coroutine(function* catFiles$coro(client) {
+	return doWithClient(getNewClient(), async function catFiles$coro(client) {
 		const paths = args.map(function(s) { return utils.rsplitString(s, "/", 1)[0]; });
-		const stashInfo = yield getStashInfoForNameOrPaths(stashName, paths);
+		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for(const a of args) {
 			const [p, range] = utils.rsplitString(a, "/", 1);
 			let [start, end] = utils.splitString(range, "-", 1);
@@ -1607,21 +1607,21 @@ function catRangedFiles(stashName, args) {
 			utils.assertSafeNonNegativeInteger(end);
 			const ranges = [[start, end]];
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
-			yield catFile(client, stashInfo, dbPath, ranges);
+			await catFile(client, stashInfo, dbPath, ranges);
 		}
-	}));
+	});
 }
 
 function makeDirectories(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	return doWithClient(getNewClient(), Promise.coroutine(function* makeDirectories$coro(client) {
+	return doWithClient(getNewClient(), async function makeDirectories$coro(client) {
 		let dbPaths;
 		let stashInfo;
 		if(stashName) { // Explicit stash name provided
-			stashInfo = yield getStashInfoByName(stashName);
+			stashInfo = await getStashInfoByName(stashName);
 			dbPaths = paths;
 		} else {
-			stashInfo = yield getStashInfoForPaths(paths);
+			stashInfo = await getStashInfoForPaths(paths);
 			dbPaths = paths.map(function(p) {
 				return userPathToDatabasePath(stashInfo.path, p);
 			});
@@ -1631,7 +1631,7 @@ function makeDirectories(stashName, paths) {
 			const dbPath = dbPaths[i];
 			checkDbPath(dbPath);
 			try {
-				yield mkdirpAsync(p);
+				await mkdirpAsync(p);
 			} catch(err) {
 				if(err.code !== 'EEXIST') {
 					throw err;
@@ -1641,23 +1641,23 @@ function makeDirectories(stashName, paths) {
 					` ${inspect(p)} already exists and is not a directory`
 				);
 			}
-			yield makeDirsInDb(client, stashInfo.name, p, dbPath);
+			await makeDirsInDb(client, stashInfo.name, p, dbPath);
 		}
-	}));
+	});
 }
 
 function moveFiles(stashName, sources, dest) {
 	T(stashName, T.maybe(T.string), sources, T.list(T.string), dest, T.string);
-	return doWithClient(getNewClient(), Promise.coroutine(function* moveFiles$coro(client) {
+	return doWithClient(getNewClient(), async function moveFiles$coro(client) {
 		let stashInfo;
 		let dbPathSources;
 		let dbPathDest;
 		if(stashName) { // Explicit stash name provided
-			stashInfo = yield getStashInfoByName(stashName);
+			stashInfo = await getStashInfoByName(stashName);
 			dbPathSources = sources;
 			dbPathDest = dest;
 		} else {
-			stashInfo = yield getStashInfoForPaths(sources.concat(dest));
+			stashInfo = await getStashInfoForPaths(sources.concat(dest));
 			dbPathSources = sources.map(function(p) {
 				return userPathToDatabasePath(stashInfo.path, p);
 			});
@@ -1666,13 +1666,13 @@ function moveFiles(stashName, sources, dest) {
 		checkDbPath(dbPathDest);
 
 		// This is inherently racy; type may be different by the time we mv
-		let destTypeInDb = yield getTypeInDbByPath(client, stashInfo.name, dbPathDest);
+		let destTypeInDb = await getTypeInDbByPath(client, stashInfo.name, dbPathDest);
 		// TODO XXX: is this right? what about when -n is specified?
 		const destInWorkDir = path.join(stashInfo.path, dbPathDest);
-		const destTypeInWorkDir = yield getTypeInWorkingDirectory(destInWorkDir);
+		const destTypeInWorkDir = await getTypeInWorkingDirectory(destInWorkDir);
 
 		if(destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
-			yield makeDirsInDb(client, stashInfo.name, dest, dbPathDest);
+			await makeDirsInDb(client, stashInfo.name, dest, dbPathDest);
 			destTypeInDb = DIRECTORY;
 		}
 
@@ -1690,17 +1690,17 @@ function moveFiles(stashName, sources, dest) {
 		}
 		if(destTypeInDb === DIRECTORY) {
 			for(const dbPathSource of dbPathSources) {
-				const parent = yield getUuidForPath(
+				const parent = await getUuidForPath(
 					client, stashInfo.name, utils.getParentPath(dbPathSource));
-				const row = yield getRowByParentBasename(
+				const row = await getRowByParentBasename(
 					client, stashInfo.name, parent, utils.getBaseName(dbPathSource), [utils.WILDCARD]);
-				row.parent = yield getUuidForPath(client, stashInfo.name, dbPathDest);
+				row.parent = await getUuidForPath(client, stashInfo.name, dbPathDest);
 				// row.basename is unchanged
 				const cols = Object.keys(row);
 				const qMarks = utils.filledArray(cols.length, "?");
 
 				// This one checks the actual dir/basename instead of the dir/
-				let actualDestTypeInDb = yield getTypeInDbByParentBasename(
+				let actualDestTypeInDb = await getTypeInDbByParentBasename(
 					client, stashInfo.name, row.parent, row.basename);
 				if(actualDestTypeInDb !== MISSING) {
 					throw new PathAlreadyExistsError(
@@ -1711,7 +1711,7 @@ function moveFiles(stashName, sources, dest) {
 
 				const actualDestInWorkDir = path.join(
 					stashInfo.path, dbPathDest, utils.getBaseName(dbPathSource));
-				const actualDestTypeInWorkDir = yield getTypeInWorkingDirectory(actualDestInWorkDir);
+				const actualDestTypeInWorkDir = await getTypeInWorkingDirectory(actualDestInWorkDir);
 				if(actualDestTypeInWorkDir !== MISSING) {
 					throw new PathAlreadyExistsError(
 						`Cannot mv in working directory: refusing to overwrite` +
@@ -1719,7 +1719,7 @@ function moveFiles(stashName, sources, dest) {
 					);
 				}
 
-				yield runQuery(
+				await runQuery(
 					client,
 					`INSERT INTO "${KEYSPACE_PREFIX + stashInfo.name}".fs
 					(${utils.colsAsString(cols)})
@@ -1727,7 +1727,7 @@ function moveFiles(stashName, sources, dest) {
 					cols.map(function(col) { return row[col]; })
 				);
 
-				yield runQuery(
+				await runQuery(
 					client,
 					`DELETE FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs
 					WHERE parent = ? AND basename = ?;`,
@@ -1735,10 +1735,10 @@ function moveFiles(stashName, sources, dest) {
 				);
 
 				// Now move the file in the working directory
-				yield mkdirpAsync(path.dirname(actualDestInWorkDir));
+				await mkdirpAsync(path.dirname(actualDestInWorkDir));
 				const srcInWorkDir = path.join(stashInfo.path, dbPathSource);
 				try {
-					yield fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
+					await fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
 				} catch(err) {
 					if(err.code !== "ENOENT") {
 						throw err;
@@ -1756,7 +1756,7 @@ function moveFiles(stashName, sources, dest) {
 			}
 		}*/
 		//console.log({dbPathSources, dbPathDest, destTypeInDb});
-	}));
+	});
 }
 
 /**
@@ -1779,16 +1779,16 @@ function listTerastashKeyspaces() {
 	});
 }
 
-const listChunkStores = Promise.coroutine(function* listChunkStores$coro() {
-	const config = yield getChunkStores();
+async function listChunkStores() {
+	const config = await getChunkStores();
 	for(const storeName of Object.keys(config.stores)) {
 		console.log(storeName);
 	}
-});
+}
 
-const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(storeName, opts) {
+async function defineChunkStore(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
-	const config = yield getChunkStores();
+	const config = await getChunkStores();
 	if(config.stores[storeName]) {
 		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
@@ -1820,12 +1820,12 @@ const defineChunkStore = Promise.coroutine(function* defineChunkStores$coro(stor
 		throw new UsageError(`Type must be "localfs" or "gdrive" but was ${opts.type}`);
 	}
 	config.stores[storeName] = storeDef;
-	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
-});
+	await utils.writeObjectToConfigFile("chunk-stores.json", config);
+}
 
-const configChunkStore = Promise.coroutine(function* configChunkStore$coro(storeName, opts) {
+async function configChunkStore(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
-	const config = yield getChunkStores();
+	const config = await getChunkStores();
 	if(!config.stores[storeName]) {
 		throw new Error(`${storeName} is not defined in chunk-stores.json`);
 	}
@@ -1849,10 +1849,10 @@ const configChunkStore = Promise.coroutine(function* configChunkStore$coro(store
 		T(opts.clientSecret, T.string);
 		config.stores[storeName].clientSecret = opts.clientSecret;
 	}
-	yield utils.writeObjectToConfigFile("chunk-stores.json", config);
-});
+	await utils.writeObjectToConfigFile("chunk-stores.json", config);
+}
 
-const questionAsync = function(question) {
+function questionAsync(question) {
 	T(question, T.string);
 	readline = loadNow(readline);
 	return new Promise(function questionAsync$Promise(resolve) {
@@ -1865,12 +1865,12 @@ const questionAsync = function(question) {
 			resolve(answer);
 		});
 	});
-};
+}
 
-const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
+async function authorizeGDrive(name) {
 	T(name, T.string);
 	gdrive = loadNow(gdrive);
-	const config = yield getChunkStores();
+	const config = await getChunkStores();
 	const stores = config.stores;
 	if(!(typeof stores === "object" && stores !== null)) {
 		throw new Error(`'stores' in chunk-stores.json is not an object`);
@@ -1893,43 +1893,43 @@ const authorizeGDrive = Promise.coroutine(function* authorizeGDrive$coro(name) {
 	console.log(url);
 	console.log("");
 	console.log("Then, copy the authorization code from the input box, paste it here, and press Enter:");
-	const authCode = yield questionAsync("Authorization code: ");
+	const authCode = await questionAsync("Authorization code: ");
 	console.log("OK, sending the authorization code to Google to get a refresh token...");
-	yield gdriver.importAuthCode(authCode);
+	await gdriver.importAuthCode(authCode);
 	console.log("OK, saved the refresh token and access token.");
-});
+}
 
-const updateGoogleTokens = Promise.coroutine(function* updateGoogleTokens$coro(tokensFilename, clientId, clientSecret) {
+async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
 	gdrive = loadNow(gdrive);
 	const gdriver     = new gdrive.GDriver(clientId, clientSecret);
 	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
 	gdriver._oauth2Client.setCredentials(credentials);
-	yield gdriver.refreshAccessToken();
+	await gdriver.refreshAccessToken();
 	fs.writeFileSync(tokensFilename, JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2));
-});
+}
 
 function assertName(name) {
 	T(name, T.string);
 	A(name, "Name must not be empty");
 }
 
-const destroyStash = Promise.coroutine(function* destroyStash$coro(stashName) {
+async function destroyStash(stashName) {
 	assertName(stashName);
-	yield doWithClient(getNewClient(), Promise.coroutine(function* destroyStash$doWithClient(client) {
-		yield runQuery(client, `DROP TABLE IF EXISTS "${KEYSPACE_PREFIX + stashName}".fs;`);
-		yield runQuery(client, `DROP TYPE IF EXISTS  "${KEYSPACE_PREFIX + stashName}".chunk;`);
-		yield runQuery(client, `DROP KEYSPACE        "${KEYSPACE_PREFIX + stashName}";`);
-	}));
-	const config = yield getStashes();
+	await doWithClient(getNewClient(), async function destroyStash$doWithClient(client) {
+		await runQuery(client, `DROP TABLE IF EXISTS "${KEYSPACE_PREFIX + stashName}".fs;`);
+		await runQuery(client, `DROP TYPE IF EXISTS  "${KEYSPACE_PREFIX + stashName}".chunk;`);
+		await runQuery(client, `DROP KEYSPACE        "${KEYSPACE_PREFIX + stashName}";`);
+	});
+	const config = await getStashes();
 	delete config.stashes[stashName];
-	yield utils.writeObjectToConfigFile("stashes.json", config);
+	await utils.writeObjectToConfigFile("stashes.json", config);
 	console.log(`Destroyed keyspace and removed config for ${stashName}.`);
-});
+}
 
 /**
  * Initialize a new stash
  */
-const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashName, options) {
+async function initStash(stashPath, stashName, options) {
 	T(
 		stashPath, T.string,
 		stashName, T.string,
@@ -1942,7 +1942,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 
 	let caught;
 	try {
-		yield getStashInfoByPath(stashPath);
+		await getStashInfoByPath(stashPath);
 	} catch(err) {
 		if(!(err instanceof NotInWorkingDirectoryError)) {
 			throw err;
@@ -1953,12 +1953,12 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
-	return doWithClient(getNewClient(), Promise.coroutine(function* initStash$coro$coro(client) {
-		yield runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
+	return doWithClient(getNewClient(), async function initStash$coro(client) {
+		await runQuery(client, `CREATE KEYSPACE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}"
 			WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };`);
 
 		// An individual chunk
-		yield runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + stashName}".chunk (
+		await runQuery(client, `CREATE TYPE "${KEYSPACE_PREFIX + stashName}".chunk (
 			idx     int,
 			file_id text,
 			md5     blob,
@@ -1966,7 +1966,7 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 			size    bigint
 		)`);
 
-		yield runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
+		await runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
 			basename      text,
 			type          ascii,
 			parent        blob,
@@ -1992,15 +1992,15 @@ const initStash = Promise.coroutine(function* initStash$coro(stashPath, stashNam
 		// <chunkStore, chunkInfo> because non-frozen, nested collections
 		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
 
-		const config = yield getStashes();
+		const config = await getStashes();
 		config.stashes[stashName] = {
 			path:           path.resolve(stashPath),
 			chunkStore:     options.chunkStore,
 			chunkThreshold: options.chunkThreshold
 		};
-		yield utils.writeObjectToConfigFile("stashes.json", config);
-	}));
-});
+		await utils.writeObjectToConfigFile("stashes.json", config);
+	});
+}
 
 let transitWriter;
 function getTransitWriter() {
@@ -2066,9 +2066,9 @@ class RowToTransit extends Transform {
 function exportDb(stashName) {
 	T(stashName, T.maybe(T.string));
 	return doWithClient(getNewClient(), function exportDb$doWithClient(client) {
-		return doWithPath(stashName, ".", Promise.coroutine(function* exportDb$coro(stashInfo, dbPath, parentPath) {
+		return doWithPath(stashName, ".", function exportDb$Promise(stashInfo, dbPath, parentPath) {
 			T(stashInfo.name, T.string);
-			yield new Promise(function(resolve, reject) {
+			return new Promise(function(resolve, reject) {
 				const rowStream = client.stream(
 					`SELECT * FROM "${KEYSPACE_PREFIX + stashInfo.name}".fs;`, [], {autoPage: true, prepare: true});
 				const transitStream = new RowToTransit();
@@ -2077,7 +2077,7 @@ function exportDb(stashName) {
 				transitStream.once('end', resolve);
 				transitStream.once('error', reject);
 			});
-		}));
+		});
 	});
 }
 
@@ -2093,7 +2093,7 @@ class TransitToInsert extends Transform {
 		hasher               = loadNow(hasher);
 	}
 
-	*_insertFromLine(lineBuf) {
+	async _insertFromLine(lineBuf) {
 		const line = lineBuf.toString('utf-8');
 		const obj = this._transitReader.read(line);
 
@@ -2152,7 +2152,7 @@ class TransitToInsert extends Transform {
 		for(const k of obj.keys()) {
 			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
 				if(!this._columnsCreated.has(k)) {
-					yield tryCreateColumnOnStashTable(
+					await tryCreateColumnOnStashTable(
 						this._client, this._stashName, k, 'list<frozen<chunk>>');
 					this._columnsCreated.add(k);
 				}
@@ -2213,7 +2213,7 @@ class TransitToInsert extends Transform {
 		const query  = `INSERT INTO "${KEYSPACE_PREFIX + this._stashName}".fs
 			(${utils.colsAsString(cols.concat(extraCols))})
 			VALUES (${qMarks.join(", ")});`;
-		yield runQuery(this._client, query, vals.concat(extraVals));
+		await runQuery(this._client, query, vals.concat(extraVals));
 		return obj;
 	}
 
@@ -2231,7 +2231,6 @@ class TransitToInsert extends Transform {
 		}
 	}
 }
-TransitToInsert.prototype._insertFromLine = Promise.coroutine(TransitToInsert.prototype._insertFromLine);
 
 function importDb(outCtx, stashName, dumpFile) {
 	T(outCtx, OutputContextType, stashName, T.string, dumpFile, T.string);
@@ -2240,7 +2239,7 @@ function importDb(outCtx, stashName, dumpFile) {
 		console.log('Note that files may be restored before directories, so you might ' +
 			'not see anything in the stash until the restore process is complete.');
 	}
-	return doWithClient(getNewClient(), Promise.coroutine(function* importDb$coro(client) {
+	return doWithClient(getNewClient(), async function importDb$coro(client) {
 		let inputStream;
 		if(dumpFile === '-') {
 			inputStream = process.stdin;
@@ -2281,12 +2280,12 @@ function importDb(outCtx, stashName, dumpFile) {
 				inserter.once('error', reject);
 			});
 		});
-		yield Promise.all(inserters);
+		await Promise.all(inserters);
 		if(outCtx.mode !== 'quiet') {
 			printProgress();
 			console.log('\nDone importing.');
 		}
-	}));
+	});
 }
 
 module.exports = {
