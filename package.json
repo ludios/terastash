@@ -26,7 +26,6 @@
     "mime-types": "^2.1.10",
     "mkdirp": "^0.5.1",
     "notmytype": "^2.0.0",
-    "request": "^2.71.0",
     "sse4_crc32": "^5.1.1",
     "streamifier": "^0.1.1",
     "transit-js": "^0.8.846",
@@ -43,7 +42,6 @@
   "resolutions": {
     "commander": "2.15.0",
     "mkdirp": "0.5.1",
-    "request": "2.85.0",
     "escape-string-regexp": "1.0.5",
     "strip-ansi": "4.0.0",
     "supports-color": "2.0.0",
