@@ -1,4 +1,3 @@
-// Can't "use strong" because we set properties on a function
 "use strict";
 
 const inspect = require('util').inspect;
