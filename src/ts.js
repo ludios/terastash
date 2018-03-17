@@ -69,10 +69,10 @@ function shutdownCassandraClient() {
  *
  * Some known errors are handled without printing a stack trace.
  */
-const catchAndLog = Promise.coroutine(function* catchAndLog$coro(p) {
+async function catchAndLog(p) {
 	T(p, EitherPromise);
 	try {
-		yield p;
+		await p;
 	} catch(err) {
 		if(
 		err instanceof terastash.DirectoryNotEmptyError ||
@@ -93,7 +93,7 @@ const catchAndLog = Promise.coroutine(function* catchAndLog$coro(p) {
 	} finally {
 		shutdownCassandraClient();
 	}
-});
+}
 
 // Ugly hack to avoid getting Function
 function stringOrNull(o) {

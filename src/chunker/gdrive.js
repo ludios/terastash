@@ -33,16 +33,16 @@ const getAllCredentialsOneFile = utils.makeConfigFileInitializer(
 	}
 );
 
-const getAllCredentials = Promise.coroutine(function* getAllCredentials$coro() {
+async function getAllCredentials() {
 	const tokenFiles = getTokenFiles();
 	if(tokenFiles) {
 		const tokenFile = tokenFiles[Math.floor(Math.random() * tokenFiles.length)];
-		const buf = yield fs.readFileAsync(tokenFile);
+		const buf = await fs.readFileAsync(tokenFile);
 		return JSON.parse(buf);
 	} else {
 		return getAllCredentialsOneFile();
 	}
-});
+}
 
 const idProp = utils.prop('id');
 
