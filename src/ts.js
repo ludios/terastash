@@ -16,15 +16,6 @@ process.on("unhandledRejection", function(err) {
 //new Promise(function(){ throw new Error("boom"); });
 //new Promise(function(){ throw 3; });
 
-const mkdirp = require('mkdirp');
-const basedir = require('xdg').basedir;
-mkdirp.sync(basedir.configPath("terastash"));
-if(!process.env.CACHE_REQUIRE_PATHS_FILE) {
-	process.env.CACHE_REQUIRE_PATHS_FILE =
-		basedir.configPath("terastash/internal-require-cache.json");
-}
-require('cache-require-paths');
-
 require('better-buffer-inspect');
 
 const terastash = require('.');
