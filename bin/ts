@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Enable "long stack traces" on bluebird promises
-export BLUEBIRD_DEBUG=1
-
 SELF="$(dirname "${BASH_SOURCE[0]}")"
 # On Windows, node needs a normal Windows path, not a cygwin path
 if [ -f /usr/bin/cygpath ]; then
