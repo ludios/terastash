@@ -33,10 +33,6 @@ const filename      = require('./filename');
 const T             = require('notmytype');
 const program       = require('commander');
 const chalk         = require('chalk');
-const Promise       = require('bluebird');
-const NativePromise = global.Promise;
-
-const EitherPromise = T.union([Promise, NativePromise]);
 
 const ERROR_EXIT_CODE = 255;
 
@@ -61,7 +57,7 @@ function shutdownCassandraClient() {
  * Some known errors are handled without printing a stack trace.
  */
 async function catchAndLog(p) {
-	T(p, EitherPromise);
+	T(p, Promise);
 	try {
 		await p;
 	} catch(err) {

@@ -1,7 +1,6 @@
 "use strict";
 
 const google            = require('googleapis');
-const Promise           = require('bluebird');
 const A                 = require('ayy');
 const T                 = require('notmytype');
 const Combine           = require('combine-streams');

@@ -2,7 +2,6 @@
 
 const A         = require('ayy');
 const T         = require('notmytype');
-const Promise   = require('bluebird');
 const net       = require('net');
 const inspect   = require('util').inspect;
 const utils     = require('./utils');

@@ -7,7 +7,6 @@ const T                     = require('notmytype');
 const utils                 = require('../utils');
 const line_reader           = require('../line_reader');
 const realistic_streamifier = require('../realistic_streamifier');
-const Promise               = require('bluebird');
 const PassThrough           = require('stream').PassThrough;
 
 const pow = Math.pow;

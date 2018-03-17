@@ -10,7 +10,6 @@ const os        = require('os');
 const crypto    = require('crypto');
 const path      = require('path');
 const utils     = require('../utils');
-const Promise   = require('bluebird');
 const gdrive    = require('../chunker/gdrive');
 
 describe('GDriver', function() {

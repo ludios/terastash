@@ -7,7 +7,6 @@ const A                     = require('ayy');
 const utils                 = require('../utils');
 const hasher                = require('../hasher');
 const realistic_streamifier = require('../realistic_streamifier');
-const Promise               = require('bluebird');
 const crypto                = require('crypto');
 
 describe('CRCWriter', function() {

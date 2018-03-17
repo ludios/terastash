@@ -7,9 +7,7 @@ const A                     = require('ayy');
 const utils                 = require('../utils');
 const gcmer                 = require('../gcmer');
 const realistic_streamifier = require('../realistic_streamifier');
-const Promise               = require('bluebird');
 const crypto                = require('crypto');
-
 
 describe('gcmer.blockNumberToIv()', function() {
 	it('returns correct results', function() {

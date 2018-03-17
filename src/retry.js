@@ -2,7 +2,6 @@
 
 const A       = require('ayy');
 const T       = require('notmytype');
-const Promise = require('bluebird');
 const utils   = require('./utils');
 
 class Decayer {

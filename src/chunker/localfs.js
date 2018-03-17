@@ -5,7 +5,6 @@ const T                 = require('notmytype');
 const fs                = require('../fs-promisified');
 const path              = require('path');
 const crypto            = require('crypto');
-const Promise           = require('bluebird');
 const Combine           = require('combine-streams');
 const utils             = require('../utils');
 const OutputContextType = utils.OutputContextType;

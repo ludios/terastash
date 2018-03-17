@@ -2,7 +2,6 @@
 
 const A                   = require('ayy');
 const T                   = require('notmytype');
-const Promise             = require('bluebird');
 const fs                  = require('./fs-promisified');
 const path                = require('path');
 const crypto              = require('crypto');
