@@ -1,6 +1,6 @@
 "use strict";
 
-const fs = require('fs');
+const fs      = require('fs');
 const Promise = require('bluebird');
 
 // Promisify only the functions we need to avoid a 24+ ms require
