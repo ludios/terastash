@@ -41,27 +41,27 @@ describe('gcmer.selfTest()', function() {
 const KEY = crypto.pseudoRandomBytes(16);
 
 describe('GCMWriter', function() {
-	it("yields 0-byte stream for 0-byte input", Promise.coroutine(function*() {
+	it("yields 0-byte stream for 0-byte input", async function() {
 		const inputBuf = Buffer.alloc(0);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new gcmer.GCMWriter(4096, KEY, 0);
 		utils.pipeWithErrors(inputStream, writer);
-		const outputBuf = yield utils.readableToBuffer(writer);
+		const outputBuf = await utils.readableToBuffer(writer);
 		A.eq(outputBuf.length, 0);
-	}));
+	});
 
-	it("yields 17-byte stream for 1-byte input", Promise.coroutine(function*() {
+	it("yields 17-byte stream for 1-byte input", async function() {
 		const inputBuf = Buffer.alloc(1);
 		const inputStream = realistic_streamifier.createReadStream(inputBuf);
 		const writer = new gcmer.GCMWriter(4096, KEY, 0);
 		utils.pipeWithErrors(inputStream, writer);
-		const outputBuf = yield utils.readableToBuffer(writer);
+		const outputBuf = await utils.readableToBuffer(writer);
 		A.eq(outputBuf.length, 17);
-	}));
+	});
 });
 
 describe('GCMWriter+GCMReader', function() {
-	it("works for all block sizes", Promise.coroutine(function*() {
+	it("works for all block sizes", async function() {
 		this.timeout(20000);
 		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256, 8 * 1024]) {
 			// Need 8KB / 32MB test to catch lack-of-'this._buf = EMPTY_BUF;' bug
@@ -75,15 +75,15 @@ describe('GCMWriter+GCMReader', function() {
 			let inputStream = realistic_streamifier.createReadStream(inputBuf);
 			const writer = new gcmer.GCMWriter(blockSize, KEY, 0);
 			utils.pipeWithErrors(inputStream, writer);
-			const buf = yield utils.writableToBuffer(writer);
+			const buf = await utils.writableToBuffer(writer);
 			A.eq(buf.length, size + (16 * Math.ceil(size / blockSize)));
 
 			// Now, read it back
 			const reader = new gcmer.GCMReader(blockSize, KEY, 0);
 			inputStream = realistic_streamifier.createReadStream(buf);
 			utils.pipeWithErrors(inputStream, reader);
-			const outputBuf = yield utils.readableToBuffer(reader);
+			const outputBuf = await utils.readableToBuffer(reader);
 			assert.deepStrictEqual(outputBuf, inputBuf);
 		}
-	}));
+	});
 });
