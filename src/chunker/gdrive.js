@@ -66,11 +66,11 @@ class DownloadError extends Error {
 class GDriver {
 	constructor(clientId, clientSecret) {
 		T(clientId, T.string, clientSecret, T.string);
-		this.clientId = clientId;
-		this.clientSecret = clientSecret;
-		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
+		this.clientId      = clientId;
+		this.clientSecret  = clientSecret;
+		const redirectUrl  = 'urn:ietf:wg:oauth:2.0:oob';
 		this._oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUrl);
-		this._drive = google.drive({version: 'v2', auth: this._oauth2Client});
+		this._drive        = google.drive({version: 'v2', auth: this._oauth2Client});
 	}
 
 	getAuthUrl() {
