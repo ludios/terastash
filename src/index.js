@@ -1847,7 +1847,8 @@ async function authorizeGDrive(name) {
 	console.log("Then, copy the authorization code from the input box, paste it here, and press Enter:");
 	const authCode = await questionAsync("Authorization code: ");
 	console.log("OK, sending the authorization code to Google to get a refresh token...");
-	await gdriver.importAuthCode(authCode);
+	const account = await questionAsync("Email address of Google account that you used: ");
+	await gdriver.importAuthCode(authCode, account);
 	console.log("OK, saved the refresh token and access token.");
 }
 

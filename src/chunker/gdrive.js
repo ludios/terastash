@@ -86,6 +86,11 @@ class GDriver {
 		return this._oauth2Client.credentials;
 	}
 
+	saveCredentials(account) {
+		const config = {credentials: {[this.clientId]: this._oauth2Client.credentials}};
+		return utils.writeObjectToConfigFile(`google-tokens/${account}.json`, config);
+	}
+
 	/**
 	 * Hit Google to get an access and refresh token based on `authCode`
 	 * and set the tokens on the `oauth2Client` object.
@@ -93,15 +98,15 @@ class GDriver {
 	 * Returns a Promise that resolves with null after the credentials are
 	 * saved.
 	 */
-	importAuthCode(authCode) {
-		T(authCode, T.string);
+	importAuthCode(authCode, account) {
+		T(authCode, T.string, account, T.string);
 		return new Promise(function(resolve, reject) {
 			this._oauth2Client.getToken(authCode, function(err, tokens) {
 				if(err) {
 					reject(err);
 				} else {
 					this._oauth2Client.setCredentials(tokens);
-					//resolve(this.saveCredentials());
+					resolve(this.saveCredentials(account));
 					resolve(null);
 				}
 			}.bind(this));
