@@ -70,13 +70,7 @@ class GDriver {
 		const redirectUrl  = 'urn:ietf:wg:oauth:2.0:oob';
 		const {google}     = require('googleapis');
 		this._oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUrl);
-		this._drive        = google.drive({
-			version:          "v2",
-			auth:             this._oauth2Client,
-			// Needs to be raised from the default 2GB:
-			// https://github.com/google/google-api-nodejs-client/issues/991
-			maxContentLength: 50 * 1024 * 1024 * 1024
-		});
+		this._drive        = google.drive({version: 'v2', auth: this._oauth2Client});
 	}
 
 	getAuthUrl() {
