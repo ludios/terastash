@@ -105,11 +105,13 @@ class GDriver {
 	}
 
 	async loadCredentials() {
-		const config = await getAllCredentialsForAccount(pickRandomAccount());
+		const account = pickRandomAccount();
+		const config  = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
 			this._oauth2Client.setCredentials(credentials);
 		}
+		return account;
 	}
 
 	refreshAccessToken() {
@@ -398,6 +400,7 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 		const decayer = new retry.Decayer(5*1000, 1.5, 3600*1000);
 		let lastChunkAgain = false;
 		let crc32Hasher;
+		let account;
 		const response = await retry.retryFunction(async function writeChunks$retry() {
 			// Make a new filename each time, in case server reports error
 			// when it actually succeeded.
@@ -410,8 +413,9 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			if(Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
+			account = pickRandomAccount();
 			// Load credentials on every try because one account might be overloaded while others are not.
-			await gdriver.loadCredentials();
+			await gdriver.loadCredentials(account);
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}, function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
@@ -428,11 +432,12 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 		// We can trust the md5Checksum in response; createFile checked it for us
 		const md5Digest = Buffer.from(response['md5Checksum'], 'hex');
 		chunkInfo.push({
-			idx,
+			idx:     idx,
 			file_id: response.id,
-			crc32c: crc32Hasher.hash.digest(),
-			md5: md5Digest,
-			size: crc32Hasher.length
+			crc32c:  crc32Hasher.hash.digest(),
+			md5:     md5Digest,
+			size:    crc32Hasher.length,
+			account: account
 		});
 		totalSize += crc32Hasher.length;
 		idx += 1;

@@ -1917,7 +1917,8 @@ async function initStash(stashPath, stashName, options) {
 			file_id text,
 			md5     blob,
 			crc32c  blob,
-			size    bigint
+			size    bigint,
+			account text
 		)`);
 
 		await runQuery(client, `CREATE TABLE IF NOT EXISTS "${KEYSPACE_PREFIX + stashName}".fs (
