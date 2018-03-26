@@ -31,10 +31,14 @@ const _getAllCredentialsOneFile = utils.makeConfigFileInitializer(
 	}
 );
 
-function pickRandomAccount() {
+function getAccounts() {
 	const tokenFiles = getTokenFiles();
-	const tokenFile  = tokenFiles[Math.floor(Math.random() * tokenFiles.length)];
-	const account    = tokenFile.replace(/\.json$/, "");
+	return tokenFiles.map((tokenFile) => tokenFile.replace(/\.json$/, ""));
+}
+
+function pickRandomAccount() {
+	const accounts = getAccounts();
+	const account  = accounts[Math.floor(Math.random() * accounts.length)];
 	return account;
 }
 
@@ -104,9 +108,8 @@ class GDriver {
 		}.bind(this));
 	}
 
-	async loadCredentials() {
-		const account = pickRandomAccount();
-		const config  = await getAllCredentialsForAccount(account);
+	async loadCredentials(account) {
+		const config = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
 			this._oauth2Client.setCredentials(credentials);
@@ -468,6 +471,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			if(destroyed) {
 				return;
 			}
+			await gdriver.loadCredentials(pickRandomAccount());
 			const [chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
 			currentChunkStream = chunkStream;
 			// Note: even when we're not checking whole-chunk CRC32C, we're still
@@ -515,7 +519,31 @@ async function deleteChunks(gdriver, chunks) {
 	T(gdriver, GDriver, chunks, utils.ChunksType);
 	for(const chunk of chunks) {
 		try {
-			await gdriver.deleteFile(chunk.file_id);
+			const account = chunk.account;
+			if(account) {
+				T(account, T.string);
+				if(account.indexOf("/") != -1) {
+					throw new Error(`Illegal character in account=${inspect(account)}` +
+						` in chunks=${inspect(chunks)}`);
+				}
+				await gdriver.loadCredentials(account);
+				await gdriver.deleteFile(chunk.file_id);
+			} else {
+				// Even if we use Drive permissions to share files with multiple accounts,
+				// Google lets us delete a file only from the account that uploaded it.
+				//
+				// Older versions of terastash did not record which account was used to
+				// upload each chunk.  If we did not record who owns a chunk, try every
+				// account.
+				for(const account_ of getAccounts()) {
+					try {
+						await gdriver.loadCredentials(account_);
+						await gdriver.deleteFile(chunk.file_id);
+						break;
+					} catch(_) {
+					}
+				}
+			}
 		} catch(err) {
 			console.error(chalk.red(
 				`Failed to delete chunk with file_id=${inspect(chunk.file_id)}` +
@@ -525,4 +553,4 @@ async function deleteChunks(gdriver, chunks) {
 	}
 }
 
-module.exports = {GDriver, writeChunks, readChunks, deleteChunks};
+module.exports = {GDriver, writeChunks, readChunks, deleteChunks, pickRandomAccount};

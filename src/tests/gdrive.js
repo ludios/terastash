@@ -23,7 +23,7 @@ describe('GDriver', function() {
 		}
 		A.eq(chunkStore.type, "gdrive");
 		const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-		await gdriver.loadCredentials();
+		await gdriver.loadCredentials(gdrive.pickRandomAccount());
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + String(Math.random()));
 		const fileLength = utils.randInt(1*1024, 5*1024);

@@ -726,7 +726,6 @@ async function dropFile(client, stashInfo, dbPath) {
 			await localfs.deleteChunks(chunkStore.directory, chunks);
 		} else {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			await gdriver.loadCredentials();
 			await gdrive.deleteChunks(gdriver, chunks);
 		}
 	}
@@ -1068,7 +1067,6 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			_ = await localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
 		} else if(chunkStore.type === "gdrive") {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			await gdriver.loadCredentials();
 			_ = await gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
@@ -1380,7 +1378,6 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			cipherStream = localfs.readChunks(chunksDir, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else if(chunkStore.type === "gdrive") {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			await gdriver.loadCredentials();
 			cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
