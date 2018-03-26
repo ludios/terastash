@@ -19,27 +19,30 @@ function getTokenFiles() {
 	try {
 		// google-tokens/ for multiple accounts
 		const dir = basedir.configPath(path.join("terastash", "google-tokens"));
-		tokenFiles = fs.readdirSync(dir).map(f => `${dir}/${f}`);
+		tokenFiles = fs.readdirSync(dir);
 	} catch(e) {}
 	return tokenFiles;
 }
 
-const getAllCredentialsOneFile = utils.makeConfigFileInitializer(
+const _getAllCredentialsOneFile = utils.makeConfigFileInitializer(
 	"google-tokens.json", {
 		credentials: {},
 		_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
 	}
 );
 
-async function getAllCredentials() {
+function pickRandomAccount() {
 	const tokenFiles = getTokenFiles();
-	if(tokenFiles) {
-		const tokenFile = tokenFiles[Math.floor(Math.random() * tokenFiles.length)];
-		const buf = await fs.readFileAsync(tokenFile);
-		return JSON.parse(buf);
-	} else {
-		return getAllCredentialsOneFile();
-	}
+	const tokenFile  = tokenFiles[Math.floor(Math.random() * tokenFiles.length)];
+	const account    = tokenFile.replace(/\.json$/, "");
+	return account;
+}
+
+async function getAllCredentialsForAccount(account) {
+	T(account, T.string);
+	const tokenFile = basedir.configPath(path.join("terastash", "google-tokens", `${account}.json`));
+	const buf       = await fs.readFileAsync(tokenFile);
+	return JSON.parse(buf);
 }
 
 const idProp = utils.prop('id');
@@ -94,25 +97,19 @@ class GDriver {
 					reject(err);
 				} else {
 					this._oauth2Client.setCredentials(tokens);
-					resolve(this.saveCredentials());
+					//resolve(this.saveCredentials());
+					resolve(null);
 				}
 			}.bind(this));
 		}.bind(this));
 	}
 
 	async loadCredentials() {
-		const config = await getAllCredentials();
+		const config = await getAllCredentialsForAccount(pickRandomAccount());
 		const credentials = config.credentials[this.clientId];
 		if(credentials) {
 			this._oauth2Client.setCredentials(credentials);
 		}
-	}
-
-	async saveCredentials() {
-		const config = await getAllCredentials();
-		config.credentials[this.clientId] = this._oauth2Client.credentials;
-		//console.log("Saving credentials", this._oauth2Client.credentials);
-		return utils.writeObjectToConfigFile("google-tokens.json", config);
 	}
 
 	refreshAccessToken() {
@@ -140,7 +137,7 @@ class GDriver {
 			//console.log("Refreshing access token...");
 			await this.refreshAccessToken();
 			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() + (minMinutes * 60 * 1000));
-			await this.saveCredentials();
+			//await this.saveCredentials();
 		}
 	}
 
