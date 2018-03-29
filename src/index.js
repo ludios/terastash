@@ -1853,10 +1853,10 @@ async function authorizeGDrive(name) {
 	console.log("OK, saved the refresh token and access token.");
 }
 
-function atomicWriteFileSync(filename, content, tempDirectory) {
-	const tempPath = `${tempDirectory}/.${path.basename(filename)}-${Math.random()}`;
+function atomicWriteFileSync(fname, content, tempDirectory) {
+	const tempPath = `${tempDirectory}/.${path.basename(fname)}-${Math.random()}`;
 	fs.writeFileSync(tempPath, content);
-	fs.renameSync(tempPath, filename);
+	fs.renameSync(tempPath, fname);
 }
 
 async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
