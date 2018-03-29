@@ -1853,12 +1853,24 @@ async function authorizeGDrive(name) {
 	console.log("OK, saved the refresh token and access token.");
 }
 
+function atomicWriteFileSync(filename, content, tempDirectory) {
+	const tempPath = `${tempDirectory}/.${path.basename(filename)}-${Math.random()}`;
+	fs.writeFileSync(tempPath, content);
+	fs.renameSync(tempPath, filename);
+}
+
 async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
 	const gdriver     = new gdrive.GDriver(clientId, clientSecret);
 	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
 	gdriver._oauth2Client.setCredentials(credentials);
 	await gdriver.refreshAccessToken();
-	fs.writeFileSync(tokensFilename, JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2));
+
+	// Write the file atomically to avoid the occasional
+	// `SyntaxError: Unexpected end of JSON input` while the file is still being written.
+	const tempPath = `${path.dirname(path.dirname(tokensFilename))}/temp`;
+	await utils.mkdirpAsync(tempPath);
+	const content = JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2);
+	atomicWriteFileSync(tokensFilename, content, tempPath);
 }
 
 function assertName(name) {
