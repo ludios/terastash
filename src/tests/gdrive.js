@@ -12,18 +12,23 @@ const path      = require('path');
 const utils     = require('../utils');
 const gdrive    = require('../chunker/gdrive');
 
+async function doSetup() {
+	const config = await terastash.getChunkStores();
+	const chunkStore = config.stores["terastash-tests-gdrive"];
+	if(!chunkStore) {
+		throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
+	}
+	A.eq(chunkStore.type, "gdrive");
+	const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+	await gdriver.loadCredentials(gdrive.pickRandomAccount());
+	return [gdriver, chunkStore];
+}
+
 describe('GDriver', function() {
 	it('can upload a file, create folder, get file, delete both', async function() {
 		this.timeout(20000);
 
-		const config = await terastash.getChunkStores();
-		const chunkStore = config.stores["terastash-tests-gdrive"];
-		if(!chunkStore) {
-			throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
-		}
-		A.eq(chunkStore.type, "gdrive");
-		const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-		await gdriver.loadCredentials(gdrive.pickRandomAccount());
+		const [gdriver, chunkStore] = await doSetup();
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + String(Math.random()));
 		const fileLength = utils.randInt(1*1024, 5*1024);
@@ -83,14 +88,7 @@ describe('GDriver', function() {
 	it('getData does not hang forever when Google Drives reports 404 for a fileId', async function() {
 		this.timeout(6000);
 
-		const config = await terastash.getChunkStores();
-		const chunkStore = config.stores["terastash-tests-gdrive"];
-		if(!chunkStore) {
-			throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
-		}
-		A.eq(chunkStore.type, "gdrive");
-		const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-		await gdriver.loadCredentials(gdrive.pickRandomAccount());
+		const [gdriver, _chunkStore] = await doSetup();
 
 		let caught;
 		try {
@@ -99,5 +97,30 @@ describe('GDriver', function() {
 			caught = e;
 		}
 		A(caught instanceof gdrive.DownloadError);
+	});
+
+	it('readChunks does not hang forever when Google Drives reports 404 for a fileId', async function() {
+		this.timeout(6000);
+
+		const [gdriver, _chunkStore] = await doSetup();
+
+		const wantedChunks = [{
+			"idx": 0,
+			"file_id": "bogus_file_id",
+			"crc32c": new Buffer("abcd"),
+			"size": 0
+		}];
+		const wantedRanges = [[0, 1]];
+		const checkWholeChunkCRC32C = false;
+
+		const cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
+		let doneCb;
+		let result;
+		const done = new Promise(function(resolve) { doneCb = resolve; });
+		cipherStream.once('end',   (ev) => { result = ["end"];       doneCb(); });
+		cipherStream.once('error', (ev) => { result = ["error", ev]; doneCb(); });
+		await done;
+		A.eq(result[0], "error");
+		A(result[1] instanceof gdrive.DownloadError);
 	});
 });
