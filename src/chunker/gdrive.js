@@ -536,7 +536,11 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 				}
 			}
 			if(!chunkStream) {
-				// All accounts failed to get the file
+				// All accounts failed to get the file.
+				//
+				// Note that sometimes the Google Drive backend returns spurious transient
+				// 404s for files that it actually has.  We don't handle that particular
+				// bit of insanity.
 				throw getDataError;
 			}
 			currentChunkStream = chunkStream;
