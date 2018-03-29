@@ -515,11 +515,15 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			// options to every file in a folder, leaving older files readable with
 			// (likely) the set of accounts that the folder was shared with
 			// at the time of file upload.
+			//
+			// We try three times because sometimes the Google Drive backend returns
+			// spurious transient 404s.
 			let accountsToTry;
 			if(chunk.account) {
-				accountsToTry = [chunk.account];
+				accountsToTry = [chunk.account, chunk.account, chunk.account];
 			} else {
-				accountsToTry = getAccounts();
+				const accounts = getAccounts();
+				accountsToTry = [].concat(accounts, accounts, accounts);
 			}
 
 			let getDataError, chunkStream, res;
@@ -536,11 +540,6 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 				}
 			}
 			if(!chunkStream) {
-				// All accounts failed to get the file.
-				//
-				// Note that sometimes the Google Drive backend returns spurious transient
-				// 404s for files that it actually has.  We don't handle that particular
-				// bit of insanity.
 				throw getDataError;
 			}
 			currentChunkStream = chunkStream;
