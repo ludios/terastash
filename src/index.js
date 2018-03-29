@@ -1529,11 +1529,12 @@ async function catFile(client, stashInfo, dbPath, ranges) {
 	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, ranges, T.optional(T.list(utils.RangeType)));
 	const parent = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
 	const [_row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath), ranges);
-	utils.pipeWithErrors(readStream, process.stdout);
-	await new Promise(function(resolve, reject) {
+	const p = new Promise(function(resolve, reject) {
 		readStream.on('end', resolve);
 		readStream.once('error', reject);
 	});
+	utils.pipeWithErrors(readStream, process.stdout);
+	await p;
 }
 
 function catFiles(stashName, paths) {
