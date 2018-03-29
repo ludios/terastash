@@ -79,4 +79,25 @@ describe('GDriver', function() {
 		}
 		A(caught instanceof Error, `deleteFile on nonexistent file did not throw Error; caught=${caught}`);
 	});
+
+	it('getData does not hang forever when Google Drives reports 404 for a fileId', async function() {
+		this.timeout(6000);
+
+		const config = await terastash.getChunkStores();
+		const chunkStore = config.stores["terastash-tests-gdrive"];
+		if(!chunkStore) {
+			throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
+		}
+		A.eq(chunkStore.type, "gdrive");
+		const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+		await gdriver.loadCredentials(gdrive.pickRandomAccount());
+
+		let caught;
+		try {
+			await gdriver.getData("bogus_file_id");
+		} catch(e) {
+			caught = e;
+		}
+		A(caught instanceof gdrive.DownloadError);
+	});
 });

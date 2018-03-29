@@ -591,4 +591,4 @@ async function deleteChunks(gdriver, chunks) {
 	}
 }
 
-module.exports = {GDriver, writeChunks, readChunks, deleteChunks, pickRandomAccount};
+module.exports = {GDriver, writeChunks, readChunks, deleteChunks, pickRandomAccount, DownloadError};
