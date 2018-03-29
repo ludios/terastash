@@ -509,8 +509,36 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			if(destroyed) {
 				return;
 			}
-			await gdriver.loadCredentials(pickRandomAccount());
-			const [chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
+
+			// Read using the account that was used to upload the file, because
+			// Google Drive apparently does not always apply the folder's sharing
+			// options to every file in a folder, leaving older files readable with
+			// (likely) the set of accounts that the folder was shared with
+			// at the time of file upload.
+			let accountsToTry;
+			if(chunk.account) {
+				accountsToTry = [chunk.account];
+			} else {
+				accountsToTry = getAccounts();
+			}
+
+			let getDataError, chunkStream, res;
+			for(const account of accountsToTry) {
+				try {
+					await gdriver.loadCredentials(account);
+					[chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
+					break;
+				} catch(e) {
+					if(!(e instanceof DownloadError)) {
+						throw e;
+					}
+					getDataError = e;
+				}
+			}
+			if(!chunkStream) {
+				// All accounts failed to get the file
+				throw getDataError;
+			}
 			currentChunkStream = chunkStream;
 			// Note: even when we're not checking whole-chunk CRC32C, we're still
 			// making sure Google is sending us the correct CRC32C for a file.

@@ -85,7 +85,7 @@ describe('GDriver', function() {
 		A(caught instanceof Error, `deleteFile on nonexistent file did not throw Error; caught=${caught}`);
 	});
 
-	it('getData does not hang forever when Google Drives reports 404 for a fileId', async function() {
+	it('getData does not hang forever when Google Drive reports 404 for a fileId', async function() {
 		this.timeout(6000);
 
 		const [gdriver, _chunkStore] = await doSetup();
@@ -99,7 +99,7 @@ describe('GDriver', function() {
 		A(caught instanceof gdrive.DownloadError);
 	});
 
-	it('readChunks does not hang forever when Google Drives reports 404 for a fileId', async function() {
+	it('readChunks does not hang forever when Google Drive reports 404 for a fileId', async function() {
 		this.timeout(6000);
 
 		const [gdriver, _chunkStore] = await doSetup();
@@ -117,10 +117,10 @@ describe('GDriver', function() {
 		let doneCb;
 		let result;
 		const done = new Promise(function(resolve) { doneCb = resolve; });
-		cipherStream.once('end',   (ev) => { result = ["end"];       doneCb(); });
+		cipherStream.once('end',   (_) =>  { result = ["end"];       doneCb(); });
 		cipherStream.once('error', (ev) => { result = ["error", ev]; doneCb(); });
 		await done;
 		A.eq(result[0], "error");
-		A(result[1] instanceof gdrive.DownloadError);
+		A(result[1] instanceof gdrive.DownloadError, result[1]);
 	});
 });
