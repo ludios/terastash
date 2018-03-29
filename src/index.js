@@ -1867,10 +1867,10 @@ async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
 
 	// Write the file atomically to avoid the occasional
 	// `SyntaxError: Unexpected end of JSON input` while the file is still being written.
-	const tempPath = `${path.dirname(path.dirname(tokensFilename))}/temp`;
+	const tempDirectory = `${path.dirname(path.dirname(tokensFilename))}/temp`;
 	await utils.mkdirpAsync(tempPath);
 	const content = JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2);
-	atomicWriteFileSync(tokensFilename, content, tempPath);
+	atomicWriteFileSync(tokensFilename, content, tempDirectory);
 }
 
 function assertName(name) {
