@@ -107,7 +107,7 @@ describe('GDriver', function() {
 		const wantedChunks = [{
 			"idx": 0,
 			"file_id": "bogus_file_id",
-			"crc32c": new Buffer("abcd"),
+			"crc32c": Buffer.from("abcd"),
 			"size": 0
 		}];
 		const wantedRanges = [[0, 1]];
