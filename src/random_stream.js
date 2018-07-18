@@ -10,7 +10,8 @@ function makeKey() {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'random-stream-key-counter'));
 		const buf = Buffer.alloc(128/8);
-		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
+		// Node writes 48 bits, the rest of the key is left zeroed
+		buf.writeIntBE(keyCounter.getNext(), 0, 6);
 		return buf;
 	} else {
 		return crypto.randomBytes(128/8);
