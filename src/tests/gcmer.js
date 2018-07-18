@@ -60,7 +60,7 @@ describe('GCMWriter', function() {
 
 describe('GCMWriter+GCMReader', function() {
 	it("works for all block sizes", async function() {
-		this.timeout(20000);
+		this.timeout(30000);
 		for(const blockSize of [1, 2, 4, 10, 32, 64, 255, 256, 8 * 1024]) {
 			// Need 8KB / 32MB test to catch lack-of-'this._buf = EMPTY_BUF;' bug
 			const size =
