@@ -644,11 +644,11 @@ function makeKey() {
 	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-key-counter'));
-		const buf = Buffer.alloc(128/8);
-		buf.writeIntBE(keyCounter.getNext(), 0, 128/8);
+		const buf = Buffer.alloc(16);
+		buf.writeIntBE(keyCounter.getNext(), 16 - 6 , 6);
 		return buf;
 	} else {
-		return crypto.randomBytes(128/8);
+		return crypto.randomBytes(16);
 	}
 }
 
@@ -657,14 +657,14 @@ function makeUuid() {
 	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const uuidCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-uuid-counter'), 1);
-		const buf = Buffer.alloc(128/8);
-		buf.writeIntBE(uuidCounter.getNext(), 0, 128/8);
+		const buf = Buffer.alloc(16);
+		buf.writeIntBE(uuidCounter.getNext(), 16 - 6, 6);
 		uuid = buf;
 	} else {
-		uuid = crypto.randomBytes(128/8);
+		uuid = crypto.randomBytes(16);
 	}
 	A(
-		!uuid.equals(Buffer.alloc(128/8)),
+		!uuid.equals(Buffer.alloc(16)),
 		"uuid must not be 0 because root directory is 0"
 	);
 	return uuid;
