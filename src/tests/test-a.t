@@ -77,11 +77,11 @@ Continue
   [255]
   $ ts add -d sample1 # different now, can replace
   Notice: replacing 'sample1' in db
-  ┌───────┬─────────────────────────────────────────┬──────┬────────────┐
-  │ which │ mtime                                   │ size │ executable │
-  │ old   │ Thu Jan 01 1970 00:00:00 GMT+0000 (GMT) │ 12   │ false      │
-  │ new   │ Fri Jan 01 1971 00:00:00 GMT+0000 (GMT) │ 12   │ false      │
-  └───────┴─────────────────────────────────────────┴──────┴────────────┘
+  ┌───────┬─────────────────────────────────────────────────────────┬──────┬────────────┐
+  │ which │ mtime                                                   │ size │ executable │
+  │ old   │ Thu Jan 01 1970 00:00:00 GMT+0000 (Greenwich Mean Time) │ 12   │ false      │
+  │ new   │ Fri Jan 01 1971 00:00:00 GMT+0000 (Greenwich Mean Time) │ 12   │ false      │
+  └───────┴─────────────────────────────────────────────────────────┴──────┴────────────┘
   $ mv adir adir.1
   $ touch adir
   $ ts add adir # can't add again
