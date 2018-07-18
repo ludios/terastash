@@ -401,8 +401,8 @@ async function getUuidForPath(client, stashName, p) {
 	}
 
 	const parentPath = utils.getParentPath(p);
-	const parent = await getUuidForPath(client, stashName, parentPath);
-	const basename = p.split("/").pop();
+	const parent     = await getUuidForPath(client, stashName, parentPath);
+	const basename   = p.split("/").pop();
 
 	const row = await getRowByParentBasename(client, stashName, parent, basename, ['type', 'uuid']);
 	if(row.type !== "d") {
