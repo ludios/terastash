@@ -11,7 +11,7 @@ module.exports = {
 	readFileAsync:     promisify(fs.readFile),
 	renameAsync:       promisify(fs.rename),
 	statAsync:         promisify(fs.stat),
-	truncateAsync:     promisify(fs.truncate),
+	ftruncateAsync:    promisify(fs.ftruncate),
 	unlinkAsync:       promisify(fs.unlink),
 	writeFileAsync:    promisify(fs.writeFile),
 

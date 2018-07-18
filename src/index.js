@@ -752,7 +752,7 @@ async function makeEmptySparseFile(p, size) {
 	await utils.tryUnlink(p);
 	const handle = await fs.openAsync(p, "w");
 	try {
-		await fs.truncateAsync(handle, size);
+		await fs.ftruncateAsync(handle, size);
 	} finally {
 		await fs.closeAsync(handle);
 	}
