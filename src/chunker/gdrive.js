@@ -25,13 +25,6 @@ function getTokenFiles() {
 	return tokenFiles;
 }
 
-const _getAllCredentialsOneFile = utils.makeConfigFileInitializer(
-	"google-tokens.json", {
-		credentials: {},
-		_comment: "Access tokens expire quickly; refresh tokens never expire unless revoked."
-	}
-);
-
 function getAccounts() {
 	const tokenFiles = getTokenFiles();
 	return tokenFiles.map((tokenFile) => tokenFile.replace(/\.json$/, ""));
@@ -169,9 +162,9 @@ class GDriver {
 	}
 
 	async _maybeRefreshAndSaveToken() {
-		// If we have a google-tokens/, don't update the tokens because another process
-		// is responsible for updating them.
-		if(getTokenFiles()) {
+		// Typically, another process is responsible for updating the tokens and
+		// copying them to all the machines that might need them.
+		if(!Number(process.env.TERASTASH_REFRESH_GOOGLE_TOKENS)) {
 			return;
 		}
 		// Access tokens last for 60 minutes; make sure we have at least 50 minutes
