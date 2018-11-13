@@ -47,3 +47,16 @@ Limitations
 * `ts` takes 300ms to start up because node needs to compile JavaScript every time
 
 * `ts export-db` runs out of memory on large databases because of [a bug in the node Cassandra driver](https://github.com/datastax/nodejs-driver/pull/89#issuecomment-141602222).  The only reliable way to back up a large database is to back up the Cassandra data directories.
+
+
+Notice
+---
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+You have to be doubly crazy to store your data in Google Drive and then trust some JavaScript software to manage it.  You will probably lose your data.  Do not blame me, I warned you.
