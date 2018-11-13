@@ -48,6 +48,8 @@ Limitations
 
 * `ts export-db` runs out of memory on large databases because of [a bug in the node Cassandra driver](https://github.com/datastax/nodejs-driver/pull/89#issuecomment-141602222).  The only reliable way to back up a large database is to back up the Cassandra data directories.
 
+* Interrupted uploads can leave file chunks in Google Drive that are not recorded in the database or garbage-collected.
+
 
 Notice
 ---
