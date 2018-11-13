@@ -8,7 +8,7 @@ terastash stores all metadata (e.g. filenames and directory structure) locally a
 You should probably use [rclone](https://rclone.org/) instead, unless you really know what you're doing.
 
 
-Things that work
+Things that appear to work for me
 ---
 
 * Adding, retrieving, listing, and dropping files using a command line interface
