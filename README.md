@@ -1,7 +1,7 @@
 terastash
 ===
 
-terastash is a half-baked filesystem for storing a lot of data in Google Drive.  It has been used in production at one site since June 2015 to store petabytes of data.
+terastash is a half-baked filesystem for storing a lot of data in Google Drive.  It has been used in production at one site since June 2015 to store petabytes of data.  Your mileage will vary.
 
 terastash stores all metadata (e.g. filenames and directory structure) locally and file contents remotely in one or more Google Drive accounts.  The file contents are chunked, encrypted with AES-GCM, and padded (in a poor attempt to conceal file sizes).
 
