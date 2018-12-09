@@ -1953,7 +1953,7 @@ async function initStash(stashPath, stashName, options) {
 		);`);
 		// The above PRIMARY KEY lets us select on both parent and (parent, basename)
 
-		// Note: chunks_in_* columns are added by defineChunkStore.
+		// Note: chunks_in_* columns are added by tryCreateColumnOnStashTable.
 		// We use column-per-chunk-store instead of having a map of
 		// <chunkStore, chunkInfo> because non-frozen, nested collections
 		// aren't implemented: https://issues.apache.org/jira/browse/CASSANDRA-7826
