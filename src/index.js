@@ -434,7 +434,7 @@ function getChildrenForParent(client, stashName, parent, cols, limit) {
 		rowStream.once('error', reject);
 		rowStream.on('readable', function getChildForParent$rowStream$readable() {
 			let row;
-			while(row = this.read()) {
+			while (row = this.read()) {
 				rows.push(row);
 			}
 		});
