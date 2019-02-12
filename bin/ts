@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SELF="$(dirname "${BASH_SOURCE[0]}")"
 # On Windows, node needs a normal Windows path, not a cygwin path
