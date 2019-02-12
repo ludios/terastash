@@ -37,7 +37,7 @@ const transit             = require('transit-js');
 let TERASTASH_VERSION;
 let HOSTNAME;
 let USERNAME;
-if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 	TERASTASH_VERSION = 'test-version';
 	HOSTNAME = 'test-hostname';
 	USERNAME = 'test-username';
@@ -58,14 +58,14 @@ const KEYSPACE_PREFIX = "ts_";
 
 class CustomRetryPolicy extends RetryPolicy {
 	onReadTimeout(requestInfo, _consistency, _received, _blockFor, _isDataPresent) {
-		if(requestInfo.nbRetry > 10) {
+		if (requestInfo.nbRetry > 10) {
 			return this.rethrowResult();
 		}
 		return this.retryResult();
 	}
 
 	onWriteTimeout(requestInfo, _consistency, _received, _blockFor, _writeType) {
-		if(requestInfo.nbRetry > 10) {
+		if (requestInfo.nbRetry > 10) {
 			return this.rethrowResult();
 		}
 		// We assume it's safe to retry our writes
@@ -172,7 +172,7 @@ const StashInfoType = T.shape({path: T.string});
 async function getStashInfoByPath(pathname) {
 	T(pathname, T.string);
 	const config = await getStashes();
-	if(!config.stashes || typeof config.stashes !== "object") {
+	if (!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
@@ -180,7 +180,7 @@ async function getStashInfoByPath(pathname) {
 	for(const stashName of Object.keys(config.stashes)) {
 		const stash = config.stashes[stashName];
 		//console.log(resolvedPathname, stash.path);
-		if(resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + path.sep)) {
+		if (resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + path.sep)) {
 			stash.name = stashName;
 			return stash;
 		}
@@ -195,12 +195,12 @@ async function getStashInfoByPath(pathname) {
 async function getStashInfoByName(stashName) {
 	T(stashName, T.string);
 	const config = await getStashes();
-	if(!config.stashes || typeof config.stashes !== "object") {
+	if (!config.stashes || typeof config.stashes !== "object") {
 		throw new Error(`terastash config has no "stashes" or not an object`);
 	}
 
 	const stash = config.stashes[stashName];
-	if(!stash) {
+	if (!stash) {
 		throw new Error(`No stash with name ${stashName}`);
 	}
 	stash.name = stashName;
@@ -215,7 +215,7 @@ async function getStashInfoByName(stashName) {
 function userPathToDatabasePath(base, p) {
 	T(base, T.string, p, T.string);
 	const resolved = path.resolve(p);
-	if(resolved === base) {
+	if (resolved === base) {
 		return "";
 	} else {
 		const dbPath = resolved.replace(base + "/", "").replace(/\\/g, "/");
@@ -238,7 +238,7 @@ async function getStashInfoForPaths(paths) {
 		stashInfos.push(await getStashInfoByPath(path.resolve(p)));
 	}
 	const stashNames = stashInfos.map(utils.prop('name'));
-	if(!utils.allIdentical(stashNames)) {
+	if (!utils.allIdentical(stashNames)) {
 		throw new DifferentStashesError(
 			`All paths used in command must be in the same stash;` +
 			` stashes were ${inspect(stashNames)}`);
@@ -248,7 +248,7 @@ async function getStashInfoForPaths(paths) {
 
 async function getStashInfoForNameOrPaths(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
-	if(stashName !== null) {
+	if (stashName !== null) {
 		return await getStashInfoByName(stashName);
 	} else {
 		return await getStashInfoForPaths(paths);
@@ -260,7 +260,7 @@ async function getStashInfoForNameOrPaths(stashName, paths) {
  */
 function eitherPathToDatabasePath(stashName, base, p) {
 	T(stashName, T.maybe(T.string), base, T.string, p, T.string);
-	if(stashName === null) {
+	if (stashName === null) {
 		return userPathToDatabasePath(base, p);
 	}
 	return p;
@@ -283,14 +283,14 @@ function runQuery(client, statement, queryArgs) {
 	//console.log(`runQuery(${client}, ${inspect(statement)}, ${inspect(queryArgs)})`);
 	return new Promise(function runQuery$Promise(resolve, reject) {
 		client.execute(statement, queryArgs, {prepare: true}, function(err, result) {
-			if(err) {
+			if (err) {
 				reject(err);
 			} else {
 				resolve(result);
 			}
 		});
 	}).catch(function runQuery$catch(err) {
-		if(isKeyspaceMissingError(err)) {
+		if (isKeyspaceMissingError(err)) {
 			throw new KeyspaceMissingError(err.message);
 		}
 		throw err;
@@ -329,7 +329,7 @@ async function doWithPath(stashName, p, fn) {
 	const resolvedPathname = path.resolve(p);
 	let dbPath;
 	let stashInfo;
-	if(stashName) { // Explicit stash name provided
+	if (stashName) { // Explicit stash name provided
 		stashInfo = await getStashInfoByName(stashName);
 		dbPath = p;
 	} else {
@@ -385,7 +385,7 @@ async function getRowByParentBasename(client, stashName, parent, basename, cols)
 		[parent, basename]
 	);
 	A.lte(result.rows.length, 1);
-	if(!result.rows.length) {
+	if (!result.rows.length) {
 		throw new NoSuchPathError(
 			`No entry with parent=${parent.toString('hex')}` +
 			` and basename=${inspect(basename)}`);
@@ -395,7 +395,7 @@ async function getRowByParentBasename(client, stashName, parent, basename, cols)
 
 async function getUuidForPath(client, stashName, p) {
 	T(client, cassandra.Client, stashName, T.string, p, T.string);
-	if(p === "") {
+	if (p === "") {
 		// root directory is 0
 		return Buffer.alloc(128/8);
 	}
@@ -405,7 +405,7 @@ async function getUuidForPath(client, stashName, p) {
 	const basename   = p.split("/").pop();
 
 	const row = await getRowByParentBasename(client, stashName, parent, basename, ['type', 'uuid']);
-	if(row.type !== "d") {
+	if (row.type !== "d") {
 		throw new NoSuchPathError(`${inspect(p)} in ${stashName} is not a directory`);
 	}
 	T(row.uuid, Buffer);
@@ -456,23 +456,23 @@ async function lsPath(client, stashName, options, p) {
 		client, stashInfo.name, parent,
 		justBasenames ? ["basename"] : ["basename", "type", "size", "mtime", "executable"]
 	);
-	if(options.sortByMtime) {
+	if (options.sortByMtime) {
 		rows.sort(options.reverse ? mtimeSorterAsc : mtimeSorterDesc);
-	} else if(options.sortBySize) {
+	} else if (options.sortBySize) {
 		rows.sort(options.reverse ? sizeSorterAsc : sizeSorterDesc);
 	} else {
 		rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
 	}
 	for(const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
-		if(options.justNames) {
+		if (options.justNames) {
 			console.log(row.basename);
 		} else {
 			let decoratedName = row.basename;
-			if(row.type === 'd') {
+			if (row.type === 'd') {
 				decoratedName = chalk.bold.blue(decoratedName);
 				decoratedName += '/';
-			} else if(row.executable) {
+			} else if (row.executable) {
 				decoratedName = chalk.bold.green(decoratedName);
 				decoratedName += '*';
 			}
@@ -496,11 +496,11 @@ async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, ty
 	for(const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 		let fullPath = `${dbPath}/${row.basename}`;
-		if(type === undefined || type === row.type) {
+		if (type === undefined || type === row.type) {
 			const pathWithoutBase = fullPath.replace(baseDbPath + "/", "");
 			process.stdout.write(pathWithoutBase + (print0 ? "\0" : "\n"));
 		}
-		if(row.type === "d") {
+		if (row.type === "d") {
 			await listRecursively(client, stashInfo, baseDbPath, fullPath, print0, type);
 		}
 	}
@@ -526,14 +526,14 @@ async function getTypeInDbByParentBasename(client, stashName, parent, basename) 
 	try {
 		row = await getRowByParentBasename(client, stashName, parent, basename, ['type']);
 	} catch(err) {
-		if(!(err instanceof NoSuchPathError)) {
+		if (!(err instanceof NoSuchPathError)) {
 			throw err;
 		}
 		return MISSING;
 	}
-	if(row.type === "f") {
+	if (row.type === "f") {
 		return FILE;
-	} else if(row.type === "d") {
+	} else if (row.type === "d") {
 		return DIRECTORY;
 	} else {
 		throw new Error(
@@ -545,7 +545,7 @@ async function getTypeInDbByParentBasename(client, stashName, parent, basename) 
 
 async function getTypeInDbByPath(client, stashName, dbPath) {
 	T(client, cassandra.Client, stashName, T.string, dbPath, T.string);
-	if(dbPath === "") {
+	if (dbPath === "") {
 		// The root directory
 		return DIRECTORY;
 	}
@@ -557,13 +557,13 @@ async function getTypeInWorkingDirectory(p) {
 	T(p, T.string);
 	try {
 		const stat = await fs.statAsync(p);
-		if(stat.isDirectory()) {
+		if (stat.isDirectory()) {
 			return DIRECTORY;
 		} else {
 			return FILE;
 		}
 	} catch(err) {
-		if(err.code !== 'ENOENT') {
+		if (err.code !== 'ENOENT') {
 			throw err;
 		}
 		return MISSING;
@@ -582,7 +582,7 @@ const CURRENT_VERSION       = 3;
 
 function checkDbPath(dbPath) {
 	T(dbPath, T.string);
-	if(!dbPath) {
+	if (!dbPath) {
 		// Empty dbPath is OK; it means root directory
 		return;
 	}
@@ -597,16 +597,16 @@ async function makeDirsInDb(client, stashName, p, dbPath) {
 	try {
 		mtime = (await fs.statAsync(p)).mtime;
 	} catch(err) {
-		if(err.code !== 'ENOENT') {
+		if (err.code !== 'ENOENT') {
 			throw err;
 		}
 	}
 	const parentPath = utils.getParentPath(dbPath);
-	if(parentPath) {
+	if (parentPath) {
 		await makeDirsInDb(client, stashName, p, parentPath);
 	}
 	const typeInDb = await getTypeInDbByPath(client, stashName, dbPath);
-	if(typeInDb === MISSING) {
+	if (typeInDb === MISSING) {
 		const parentUuid = await getUuidForPath(client, stashName, utils.getParentPath(dbPath));
 		const uuid = makeUuid();
 		const added_time = utils.dateNow();
@@ -616,12 +616,12 @@ async function makeDirsInDb(client, stashName, p, dbPath) {
 			(basename, parent, uuid, type, mtime, version, added_time, added_user, added_host, added_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 			[utils.getBaseName(dbPath), parentUuid, uuid, 'd', mtime, CURRENT_VERSION, added_time, USERNAME, HOSTNAME, TERASTASH_VERSION]
 		);
-	} else if(typeInDb === FILE) {
+	} else if (typeInDb === FILE) {
 		throw new PathAlreadyExistsError(
 			`Cannot mkdir in database:` +
 			` ${inspect(dbPath)} in stash ${inspect(stashName)}` +
 			` already exists as a file`);
-	} else if(typeInDb === DIRECTORY) {
+	} else if (typeInDb === DIRECTORY) {
 		// do nothing
 	}
 };
@@ -634,14 +634,14 @@ async function tryCreateColumnOnStashTable(client, stashName, columnName, type) 
 			"${columnName}" ${type}`
 		);
 	} catch(err) {
-		if(!(/^ResponseError: Invalid column name.*conflicts with an existing column$/.test(String(err)))) {
+		if (!(/^ResponseError: Invalid column name.*conflicts with an existing column$/.test(String(err)))) {
 			throw err;
 		}
 	}
 }
 
 function makeKey() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-key-counter'));
 		const buf = Buffer.alloc(16);
@@ -654,7 +654,7 @@ function makeKey() {
 
 function makeUuid() {
 	let uuid;
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const uuidCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'file-uuid-counter'), 1);
 		const buf = Buffer.alloc(16);
@@ -672,12 +672,12 @@ function makeUuid() {
 
 async function getChunkStore(stashInfo) {
 	const storeName = stashInfo.chunkStore;
-	if(!storeName) {
+	if (!storeName) {
 		throw new Error("stash info doesn't specify chunkStore key");
 	}
 	const config = await getChunkStores();
 	const chunkStore = config.stores[storeName];
-	if(!chunkStore) {
+	if (!chunkStore) {
 		throw new Error(`Chunk store ${storeName} is not defined in chunk-stores.json`);
 	}
 	chunkStore.name = storeName;
@@ -696,7 +696,7 @@ async function dropFile(client, stashInfo, dbPath) {
 		);
 		chunks = row[`chunks_in_${chunkStore.name}`];
 	} catch(err) {
-		if(!isColumnMissingError(err)) {
+		if (!isColumnMissingError(err)) {
 			throw err;
 		}
 	}
@@ -704,9 +704,9 @@ async function dropFile(client, stashInfo, dbPath) {
 		client, stashInfo.name, parentUuid, utils.getBaseName(dbPath),
 		["type", "uuid"]
 	);
-	if(row.type === 'd') {
+	if (row.type === 'd') {
 		const childRows = await getChildrenForParent(client, stashInfo.name, row.uuid, ["basename"], 1);
-		if(childRows.length) {
+		if (childRows.length) {
 			throw new DirectoryNotEmptyError(
 				`Refusing to drop ${inspect(dbPath)} because it is a non-empty directory`
 			);
@@ -720,9 +720,9 @@ async function dropFile(client, stashInfo, dbPath) {
 		WHERE parent = ? AND basename = ?;`,
 		[parentUuid, utils.getBaseName(dbPath)]
 	);
-	if(chunks !== null) {
+	if (chunks !== null) {
 		validateChunksFixBigints(chunks);
-		if(chunkStore.type === "localfs") {
+		if (chunkStore.type === "localfs") {
 			await localfs.deleteChunks(chunkStore.directory, chunks);
 		} else {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
@@ -771,20 +771,20 @@ async function makeFakeFile(p, size, mtime) {
 async function infoFile(client, stashInfo, dbPath, showKeys) {
 	T(client, cassandra.Client, stashInfo, StashInfoType, dbPath, T.string, showKeys, T.boolean);
 	const row = await getRowByPath(client, stashInfo.name, dbPath, [utils.WILDCARD]);
-	if(row.size !== null) {
+	if (row.size !== null) {
 		utils.assertSafeNonNegativeLong(row.size);
 		row.size = Number(row.size);
 	}
 	for(const k of Object.keys(row)) {
-		if(row[k] instanceof Buffer) {
+		if (row[k] instanceof Buffer) {
 			row[k] = row[k].toString('hex');
 		}
-		if(k.startsWith('chunks_in') && row[k]) {
+		if (k.startsWith('chunks_in') && row[k]) {
 			for(const chunkInfo of row[k]) {
-				if(chunkInfo.crc32c) {
+				if (chunkInfo.crc32c) {
 					chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
 				}
-				if(chunkInfo.md5) {
+				if (chunkInfo.md5) {
 					chunkInfo.md5 = chunkInfo.md5.toString('hex');
 				}
 				utils.assertSafeNonNegativeLong(chunkInfo.size);
@@ -792,7 +792,7 @@ async function infoFile(client, stashInfo, dbPath, showKeys) {
 			}
 		}
 	}
-	if(!showKeys && row.key) {
+	if (!showKeys && row.key) {
 		row.key = 'X'.repeat(row.key.length);
 	}
 	console.log(JSON.stringify(row, null, 2));
@@ -813,13 +813,13 @@ async function shooFile(client, stashInfo, p, justRemove, ignoreMtime) {
 	T(client, cassandra.Client, stashInfo, StashInfoType, p, T.string, justRemove, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	const dbPath = userPathToDatabasePath(stashInfo.path, p);
 	const row = await getRowByPath(client, stashInfo.name, dbPath, ['mtime', 'size', 'type']);
-	if(row.type === 'd') {
+	if (row.type === 'd') {
 		throw new NotAFileError(`Can't shoo dbPath=${inspect(dbPath)}; it is a directory`);
-	} else if(row.type === 'f') {
+	} else if (row.type === 'f') {
 		const stat = await fs.statAsync(p);
 		T(stat.mtime, Date);
-		if(!ignoreMtime) {
-			if(stat.mtime.getTime() !== Number(row.mtime)) {
+		if (!ignoreMtime) {
+			if (stat.mtime.getTime() !== Number(row.mtime)) {
 				throw new UnexpectedFileError(
 					`mtime for working directory file ${inspect(p)} is \n${stat.mtime.toISOString()}` +
 					` but mtime for dbPath=${inspect(dbPath)} is` +
@@ -828,13 +828,13 @@ async function shooFile(client, stashInfo, p, justRemove, ignoreMtime) {
 			}
 		}
 		T(stat.size, T.number);
-		if(stat.size !== Number(row.size)) {
+		if (stat.size !== Number(row.size)) {
 			throw new UnexpectedFileError(
 				`size for working directory file ${inspect(p)} is \n${commaify(stat.size)}` +
 				` but size for dbPath=${inspect(dbPath)} is \n${commaify(Number(row.size))}`
 			);
 		}
-		if(justRemove) {
+		if (justRemove) {
 			await utils.tryUnlink(p);
 		} else {
 			await makeFakeFile(p, stat.size, row.mtime);
@@ -852,7 +852,7 @@ function shooFiles(paths, justRemove, continueOnError, ignoreMtime) {
 			try {
 				await shooFile(client, stashInfo, p, justRemove, ignoreMtime);
 			} catch(err) {
-				if(!(err instanceof UnexpectedFileError ||
+				if (!(err instanceof UnexpectedFileError ||
 					err instanceof NoSuchPathError)
 				|| !continueOnError) {
 					throw err;
@@ -871,7 +871,7 @@ function checkChunkSize(size) {
 	T(size, T.number);
 	// (GCM block size + GCM tag length) must be a multiple of chunkSize, for
 	// implementation convenience.
-	if(size % (DEFAULT_GCM_BLOCK_SIZE + GCM_TAG_SIZE) !== 0) {
+	if (size % (DEFAULT_GCM_BLOCK_SIZE + GCM_TAG_SIZE) !== 0) {
 		throw new Error(`Chunk size must be a multiple of ` +
 			`${DEFAULT_GCM_BLOCK_SIZE + GCM_TAG_SIZE}; got ${size}`);
 	}
@@ -903,12 +903,12 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 					['size', 'type', 'executable'] :
 					['size', 'type', 'executable', 'mtime']);
 		} catch(e) {
-			if(!(e instanceof NoSuchPathError)) {
+			if (!(e instanceof NoSuchPathError)) {
 				throw e;
 			}
 			caught = true;
 		}
-		if(!caught) {
+		if (!caught) {
 			throw new PathAlreadyExistsError(
 				`Cannot add to database:` +
 				` ${inspect(dbPath)} in stash ${inspect(stashInfo.name)}` +
@@ -917,14 +917,14 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 	}
 
 	const stat = await fs.statAsync(p);
-	if(!stat.isFile()) {
+	if (!stat.isFile()) {
 		throw new Error(`Cannot add ${inspect(p)} because it is not a file`);
 	}
 	const type       = 'f';
 	const mtime      = stat.mtime;
 	const executable = Boolean(stat.mode & 0o100); /* S_IXUSR */
 	const sticky     = Boolean(stat.mode & 0o1000);
-	if(sticky) {
+	if (sticky) {
 		throw new UnexpectedFileError(
 			`Refusing to add file ${inspect(p)} because it has sticky bit set,` +
 			` which may have been set by 'ts shoo'`
@@ -935,7 +935,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 		// Check early to avoid uploading to chunk store and doing other work
 		await throwIfAlreadyInDb();
 	} catch(e) {
-		if(!(e instanceof PathAlreadyExistsError) || !dropOldIfDifferent) {
+		if (!(e instanceof PathAlreadyExistsError) || !dropOldIfDifferent) {
 			throw e;
 		}
 		// User wants to replace old file in db, but only if new file is different
@@ -944,14 +944,14 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			{type: 'f', mtime, executable, size: stat.size};
 		oldRow.size = Number(oldRow.size);
 		//console.log({newFile, oldRow});
-		if(!deepEqual(newFile, oldRow)) {
+		if (!deepEqual(newFile, oldRow)) {
 			const table = new Table({
 				chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''},
 				head: ignoreMtime ?
 					['which', 'size', 'executable'] :
 					['which', 'mtime', 'size', 'executable']
 			});
-			if(ignoreMtime) {
+			if (ignoreMtime) {
 				table.push(['old', commaify(oldRow.size), oldRow.executable]);
 				table.push(['new', commaify(stat.size), executable]);
 			} else {
@@ -976,7 +976,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 	let key = null;
 	let block_size = null;
 
-	if(stat.size >= stashInfo.chunkThreshold || p.endsWith(".jpg")) {
+	if (stat.size >= stashInfo.chunkThreshold || p.endsWith(".jpg")) {
 		key = makeKey();
 		block_size = DEFAULT_GCM_BLOCK_SIZE;
 
@@ -1006,27 +1006,27 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 		async function getChunkStream(lastChunkAgain) {
 			T(lastChunkAgain, T.boolean);
 
-			if(!lastChunkAgain) {
+			if (!lastChunkAgain) {
 				startData += dataBytesPerChunk;
 				startChunk += chunkStore.chunkSize;
 			}
 			utils.assertSafeNonNegativeInteger(startData);
 			utils.assertSafeNonNegativeInteger(startChunk);
 
-			if(startChunk >= concealedSize) {
+			if (startChunk >= concealedSize) {
 				// No more chunk streams
 				return null;
 			}
 
 			// Ensure that file is still the same size before opening it again
 			const statAgain = await fs.statAsync(p);
-			if(statAgain.size !== stat.size) {
+			if (statAgain.size !== stat.size) {
 				throw new FileChangedError(
 					`Size of ${inspect(p)} changed from\n` +
 					`${commaify(stat.size)} to\n${commaify(statAgain.size)}`
 				);
 			}
-			if(statAgain.mtime.getTime() !== stat.mtime.getTime()) {
+			if (statAgain.mtime.getTime() !== stat.mtime.getTime()) {
 				throw new FileChangedError(
 					`mtime of ${inspect(p)} changed from\n` +
 					`${inspect(stat.mtime)} to\n${inspect(statAgain.mtime)}`
@@ -1050,7 +1050,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			// Last chunk and need padding?
 			const needPadding = startChunk + chunkStore.chunkSize > sizeWithTags;
 			let outStream;
-			if(needPadding) {
+			if (needPadding) {
 				outStream = new Combine();
 				outStream.append(cipherStream);
 				outStream.append(new random_stream.SecureRandomStream(concealedSize - sizeWithTags));
@@ -1063,9 +1063,9 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 		}
 
 		let _;
-		if(chunkStore.type === "localfs") {
+		if (chunkStore.type === "localfs") {
 			_ = await localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
-		} else if(chunkStore.type === "gdrive") {
+		} else if (chunkStore.type === "gdrive") {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			_ = await gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
 		} else {
@@ -1096,7 +1096,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 
 	async function insert() {
 		const parentPath = utils.getParentPath(dbPath);
-		if(parentPath) {
+		if (parentPath) {
 			await makeDirsInDb(client, stashInfo.name, path.dirname(p), parentPath);
 		}
 		// TODO: make makeDirsInDb return uuid so that we don't have to get it again
@@ -1120,7 +1120,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 	try {
 		await insert();
 	} catch(err) {
-		if(!isColumnMissingError(err)) {
+		if (!isColumnMissingError(err)) {
 			throw err;
 		}
 		await tryCreateColumnOnStashTable(
@@ -1154,7 +1154,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 		// Shuffling instead of sorting helps both 1) reduce "Error: User rate limit exceeded"
 		// that happens when uploading a lot of small files and 2) reduce the
 		// sawtooth pattern in our upstream bandwidth use.
-		if(!Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+		if (!Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 			utils.shuffleArray(paths);
 		}
 
@@ -1171,7 +1171,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 		try {
 			let count = 1;
 			for(const p of paths) {
-				if(outCtx.mode === 'terminal') {
+				if (outCtx.mode === 'terminal') {
 					utils.clearOrLF(process.stdout);
 					process.stdout.write(`${count}/${paths.length}...`);
 				}
@@ -1180,7 +1180,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 				try {
 					await addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent, ignoreMtime);
 				} catch(err) {
-					if(!(err instanceof PathAlreadyExistsError ||
+					if (!(err instanceof PathAlreadyExistsError ||
 						err instanceof UnexpectedFileError /* was sticky */)
 					|| !continueOnExists) {
 						throw err;
@@ -1188,10 +1188,10 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 					error = err;
 					console.error(chalk.red(err.message));
 				}
-				if(thenShoo && !error) {
+				if (thenShoo && !error) {
 					await shooFile(client, stashInfo, p, justRemove, /*ignoreMtime=*/false);
 				}
-				if(stopNow) {
+				if (stopNow) {
 					break;
 				}
 				count++;
@@ -1239,14 +1239,14 @@ function chunksToBlockRanges(chunks, blockSize) {
  */
 async function streamFile(client, stashInfo, parent, basename, ranges) {
 	T(client, cassandra.Client, stashInfo, T.object, parent, Buffer, basename, T.string, ranges, T.optional(T.list(utils.RangeType)));
-	if(ranges) {
+	if (ranges) {
 		A.eq(ranges.length, 1, "Only support 1 range right now");
 		utils.assertSafeNonNegativeInteger(ranges[0][0]);
 		utils.assertSafeNonNegativeInteger(ranges[0][1]);
 	}
 	// TODO: instead of checking just this one stash, check all stashes
 	const storeName = stashInfo.chunkStore;
-	if(!storeName) {
+	if (!storeName) {
 		throw new Error("stash info doesn't specify chunkStore key");
 	}
 
@@ -1256,7 +1256,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			["size", "type", "key", `chunks_in_${storeName}`, "crc32c", "content", "mtime", "executable", "version", "block_size"]
 		);
 	} catch(err) {
-		if(!isColumnMissingError(err)) {
+		if (!isColumnMissingError(err)) {
 			throw err;
 		}
 		// chunks_in_${storeName} doesn't exist, try the query without it
@@ -1269,17 +1269,17 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		return `parent=${parent.toString('hex')} basename=${inspect(basename)}`;
 	}
 
-	if(row.type !== 'f') {
+	if (row.type !== 'f') {
 		throw new NotAFileError(
 			`Object ${describe()} in stash ${inspect(stashInfo.name)} is not a file; got type ${inspect(row.type)}`);
 	}
 
 	utils.assertSafeNonNegativeInteger(row.version);
-	if(row.version < MIN_SUPPORTED_VERSION) {
+	if (row.version < MIN_SUPPORTED_VERSION) {
 		throw new Error(`File ${describe()} has version ${row.version}; ` +
 			`min supported version is ${MIN_SUPPORTED_VERSION}.`);
 	}
-	if(row.version > MAX_SUPPORTED_VERSION) {
+	if (row.version > MAX_SUPPORTED_VERSION) {
 		throw new Error(`File ${describe()} has version ${row.version}; ` +
 			`max supported version is ${MAX_SUPPORTED_VERSION}.`);
 	}
@@ -1288,7 +1288,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 	const chunks = row[`chunks_in_${storeName}`] || null;
 	let bytesRead = 0;
 	let dataStream;
-	if(chunks !== null) {
+	if (chunks !== null) {
 		validateChunksFixBigints(chunks);
 		A.eq(row.content, null);
 		A.eq(row.key.length, 128/8);
@@ -1306,7 +1306,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		// User requested a range, so we have to determine which chunks we actually
 		// need to read and also carefully map the range to read on AES-128-CTR
 		// or AES-128-GCM boundaries.
-		if(ranges) {
+		if (ranges) {
 			wantedChunks = [];
 			wantedRanges = [];
 			// block_size > 0 uses AES-128-GCM, block size == 0 uses AES-128-CTR with no
@@ -1332,7 +1332,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			let blocksSeen = 0;
 			scaledChunkRanges.forEach(function(scaledChunkRange, idx) {
 				const intersection = utils.intersect(scaledChunkRange, scaledRequestedRange);
-				if(intersection !== null) {
+				if (intersection !== null) {
 					wantedChunks.push(chunks[idx]);
 					// (- blockSeen) because we need to scale numbers back to ranges
 					// relative to the start of each chunk.
@@ -1344,7 +1344,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 				}
 				let blocksInChunk = chunks[idx].size / encodedBlockSize;
 				// Last chunk might not be divisible by encodedBlockSize
-				if(idx === scaledChunkRanges.length - 1) {
+				if (idx === scaledChunkRanges.length - 1) {
 					blocksInChunk = Math.ceil(blocksInChunk);
 				}
 				utils.assertSafeNonNegativeInteger(blocksInChunk);
@@ -1373,10 +1373,10 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		A.eq(wantedChunks.length, wantedRanges.length);
 
 		let cipherStream;
-		if(chunkStore.type === "localfs") {
+		if (chunkStore.type === "localfs") {
 			const chunksDir = chunkStore.directory;
 			cipherStream = localfs.readChunks(chunksDir, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
-		} else if(chunkStore.type === "gdrive") {
+		} else if (chunkStore.type === "gdrive") {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
 			cipherStream = gdrive.readChunks(gdriver, wantedChunks, wantedRanges, checkWholeChunkCRC32C);
 		} else {
@@ -1388,7 +1388,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		// is part of the last block, and authentication will fail.
 		const sizeWithoutLeading = Number(row.size) - returnedDataRange[0];
 		utils.assertSafeNonNegativeInteger(sizeWithoutLeading);
-		if(row.block_size > 0) {
+		if (row.block_size > 0) {
 			const sizeOfTags   = GCM_TAG_SIZE * Math.ceil(sizeWithoutLeading / row.block_size);
 			const sizeWithTags = sizeWithoutLeading + sizeOfTags;
 			utils.assertSafeNonNegativeInteger(sizeWithTags);
@@ -1408,12 +1408,12 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		}
 		// Warning: dataStream may be rebound right below
 
-		if(truncateLeft !== null) {
+		if (truncateLeft !== null) {
 			const _dataStream = dataStream;
 			dataStream = new padded_stream.LeftTruncate(truncateLeft);
 			utils.pipeWithErrors(_dataStream, dataStream);
 		}
-		if(truncateRight !== null) {
+		if (truncateRight !== null) {
 			const _dataStream = dataStream;
 			dataStream = new padded_stream.RightTruncate(truncateRight);
 			utils.pipeWithErrors(_dataStream, dataStream);
@@ -1440,7 +1440,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 		bytesRead = content.length;
 		const crc32c = hasher.crcToBuf(sse4_crc32.calculate(row.content));
 		// Note: only in-db content has a crc32c for entire file content
-		if(!crc32c.equals(row.crc32c)) {
+		if (!crc32c.equals(row.crc32c)) {
 			dataStream.emit('error', new Error(
 				`For ${describe()}, CRC32C is allegedly\n` +
 				`${row.crc32c.toString('hex')} but CRC32C of data is\n` +
@@ -1453,7 +1453,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 			ranges ?
 				ranges[0][1] - ranges[0][0] :
 				Number(row.size);
-		if(bytesRead !== expectedBytesRead) {
+		if (bytesRead !== expectedBytesRead) {
 			dataStream.emit('error', new Error(
 				`For ${describe()}, expected length of content to be\n` +
 				`${commaify(expectedBytesRead)} but was\n` +
@@ -1477,7 +1477,7 @@ async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 	// 3) have other unwanted permissions set
 	await utils.tryUnlink(outputFilename);
 
-	if(fake) {
+	if (fake) {
 		const row               = await getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
 		await makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
@@ -1497,7 +1497,7 @@ async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 			});
 		});
 		await utils.utimesMilliseconds(outputFilename, row.mtime, row.mtime);
-		if(row.executable) {
+		if (row.executable) {
 			// TODO: setting for 0o700 instead?
 			await fs.chmodAsync(outputFilename, 0o770);
 		}
@@ -1512,7 +1512,7 @@ function getFiles(stashName, paths, fake) {
 			let dbPath;
 			let outputFilename;
 			// If stashName was given, write file to current directory
-			if(stashName) {
+			if (stashName) {
 				dbPath = p;
 				outputFilename = p;
 			} else {
@@ -1572,7 +1572,7 @@ function makeDirectories(stashName, paths) {
 	return doWithClient(getNewClient(), async function makeDirectories$coro(client) {
 		let dbPaths;
 		let stashInfo;
-		if(stashName) { // Explicit stash name provided
+		if (stashName) { // Explicit stash name provided
 			stashInfo = await getStashInfoByName(stashName);
 			dbPaths = paths;
 		} else {
@@ -1588,7 +1588,7 @@ function makeDirectories(stashName, paths) {
 			try {
 				await utils.mkdirpAsync(p);
 			} catch(err) {
-				if(err.code !== 'EEXIST') {
+				if (err.code !== 'EEXIST') {
 					throw err;
 				}
 				throw new PathAlreadyExistsError(
@@ -1607,7 +1607,7 @@ function moveFiles(stashName, sources, dest) {
 		let stashInfo;
 		let dbPathSources;
 		let dbPathDest;
-		if(stashName) { // Explicit stash name provided
+		if (stashName) { // Explicit stash name provided
 			stashInfo = await getStashInfoByName(stashName);
 			dbPathSources = sources;
 			dbPathDest = dest;
@@ -1626,24 +1626,24 @@ function moveFiles(stashName, sources, dest) {
 		const destInWorkDir = path.join(stashInfo.path, dbPathDest);
 		const destTypeInWorkDir = await getTypeInWorkingDirectory(destInWorkDir);
 
-		if(destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
+		if (destTypeInDb === MISSING && destTypeInWorkDir === DIRECTORY) {
 			await makeDirsInDb(client, stashInfo.name, dest, dbPathDest);
 			destTypeInDb = DIRECTORY;
 		}
 
-		if(destTypeInDb === FILE) {
+		if (destTypeInDb === FILE) {
 			throw new PathAlreadyExistsError(
 				`Cannot mv in database: destination ${inspect(dbPathDest)}` +
 				` already exists in stash ${inspect(stashInfo.name)}`
 			);
 		}
-		if(destTypeInWorkDir === FILE) {
+		if (destTypeInWorkDir === FILE) {
 			throw new PathAlreadyExistsError(
 				`Cannot mv in working directory: refusing to overwrite ${inspect(dest)}` +
 				` in working directory`
 			);
 		}
-		if(destTypeInDb === DIRECTORY) {
+		if (destTypeInDb === DIRECTORY) {
 			for(const dbPathSource of dbPathSources) {
 				const parent = await getUuidForPath(
 					client, stashInfo.name, utils.getParentPath(dbPathSource));
@@ -1657,7 +1657,7 @@ function moveFiles(stashName, sources, dest) {
 				// This one checks the actual dir/basename instead of the dir/
 				let actualDestTypeInDb = await getTypeInDbByParentBasename(
 					client, stashInfo.name, row.parent, row.basename);
-				if(actualDestTypeInDb !== MISSING) {
+				if (actualDestTypeInDb !== MISSING) {
 					throw new PathAlreadyExistsError(
 						`Cannot mv in database: destination parent=${row.parent.toString('hex')}` +
 						` basename=${inspect(row.basename)} already exists in stash ${inspect(stashInfo.name)}`
@@ -1667,7 +1667,7 @@ function moveFiles(stashName, sources, dest) {
 				const actualDestInWorkDir = path.join(
 					stashInfo.path, dbPathDest, utils.getBaseName(dbPathSource));
 				const actualDestTypeInWorkDir = await getTypeInWorkingDirectory(actualDestInWorkDir);
-				if(actualDestTypeInWorkDir !== MISSING) {
+				if (actualDestTypeInWorkDir !== MISSING) {
 					throw new PathAlreadyExistsError(
 						`Cannot mv in working directory: refusing to overwrite` +
 						` ${inspect(actualDestInWorkDir)}`
@@ -1695,7 +1695,7 @@ function moveFiles(stashName, sources, dest) {
 				try {
 					await fs.renameAsync(srcInWorkDir, actualDestInWorkDir);
 				} catch(err) {
-					if(err.code !== "ENOENT") {
+					if (err.code !== "ENOENT") {
 						throw err;
 					}
 					// It's okay if the file was missing in work dir
@@ -1705,8 +1705,8 @@ function moveFiles(stashName, sources, dest) {
 			throw new Error("Haven't implemented mv to a non-dir dest yet");
 		}
 
-		/*else if(destTypeInDb === MISSING) {
-			if(dbPathSources.length > 1) {
+		/*else if (destTypeInDb === MISSING) {
+			if (dbPathSources.length > 1) {
 
 			}
 		}*/
@@ -1726,7 +1726,7 @@ function listTerastashKeyspaces() {
 		).then(function listTerastashKeyspaces$then(result) {
 			for(const row of result.rows) {
 				const name = row.keyspace_name;
-				if(name.startsWith(KEYSPACE_PREFIX)) {
+				if (name.startsWith(KEYSPACE_PREFIX)) {
 					console.log(name.replace(KEYSPACE_PREFIX, ""));
 				}
 			}
@@ -1744,28 +1744,28 @@ async function listChunkStores() {
 async function defineChunkStore(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = await getChunkStores();
-	if(config.stores[storeName]) {
+	if (config.stores[storeName]) {
 		throw new Error(`${storeName} is already defined in chunk-stores.json`);
 	}
-	if(typeof opts.chunkSize !== "number") {
+	if (typeof opts.chunkSize !== "number") {
 		throw new UsageError(`.chunkSize is missing or not a number on ${inspect(opts)}`);
 	}
 	const storeDef = {type: opts.type, chunkSize: opts.chunkSize};
-	if(opts.type === "localfs") {
-		if(typeof opts.directory !== "string") {
+	if (opts.type === "localfs") {
+		if (typeof opts.directory !== "string") {
 			throw new UsageError(`Chunk store type localfs requires a -d/--directory ` +
 				`parameter with a string; got ${opts.directory}`
 			);
 		}
 		storeDef.directory = opts.directory;
-	} else if(opts.type === "gdrive") {
-		if(typeof opts.clientId !== "string") {
+	} else if (opts.type === "gdrive") {
+		if (typeof opts.clientId !== "string") {
 			throw new UsageError(`Chunk store type gdrive requires a --client-id ` +
 				`parameter with a string; got ${opts.clientId}`
 			);
 		}
 		storeDef.clientId = opts.clientId;
-		if(typeof opts.clientSecret !== "string") {
+		if (typeof opts.clientSecret !== "string") {
 			throw new UsageError(`Chunk store type gdrive requires a --client-secret ` +
 				`parameter with a string; got ${opts.clientSecret}`
 			);
@@ -1781,26 +1781,26 @@ async function defineChunkStore(storeName, opts) {
 async function configChunkStore(storeName, opts) {
 	T(storeName, T.string, opts, T.object);
 	const config = await getChunkStores();
-	if(!config.stores[storeName]) {
+	if (!config.stores[storeName]) {
 		throw new Error(`${storeName} is not defined in chunk-stores.json`);
 	}
-	if(opts.type !== undefined) {
+	if (opts.type !== undefined) {
 		T(opts.type, T.string);
 		config.stores[storeName].type = opts.type;
 	}
-	if(opts.chunkSize !== undefined) {
+	if (opts.chunkSize !== undefined) {
 		T(opts.chunkSize, T.number);
 		config.stores[storeName].chunkSize = opts.chunkSize;
 	}
-	if(opts.directory !== undefined) {
+	if (opts.directory !== undefined) {
 		T(opts.directory, T.string);
 		config.stores[storeName].directory = opts.directory;
 	}
-	if(opts.clientId !== undefined) {
+	if (opts.clientId !== undefined) {
 		T(opts.clientId, T.string);
 		config.stores[storeName].clientId = opts.clientId;
 	}
-	if(opts.clientSecret !== undefined) {
+	if (opts.clientSecret !== undefined) {
 		T(opts.clientSecret, T.string);
 		config.stores[storeName].clientSecret = opts.clientSecret;
 	}
@@ -1825,17 +1825,17 @@ async function authorizeGDrive(name) {
 	T(name, T.string);
 	const config = await getChunkStores();
 	const stores = config.stores;
-	if(!(typeof stores === "object" && stores !== null)) {
+	if (!(typeof stores === "object" && stores !== null)) {
 		throw new Error(`'stores' in chunk-stores.json is not an object`);
 	}
 	const chunkStore = stores[name];
-	if(!(typeof chunkStore === "object" && chunkStore !== null)) {
+	if (!(typeof chunkStore === "object" && chunkStore !== null)) {
 		throw new Error(`Chunk store ${name} was ${chunkStore}, should be an object`);
 	}
-	if(!chunkStore.clientId) {
+	if (!chunkStore.clientId) {
 		throw new Error(`Chunk store ${name} is missing a clientId`);
 	}
-	if(!chunkStore.clientSecret) {
+	if (!chunkStore.clientSecret) {
 		throw new Error(`Chunk store ${name} is missing a clientSecret`);
 	}
 	const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
@@ -1909,12 +1909,12 @@ async function initStash(stashPath, stashName, options) {
 	try {
 		await getStashInfoByPath(stashPath);
 	} catch(err) {
-		if(!(err instanceof NotInWorkingDirectoryError)) {
+		if (!(err instanceof NotInWorkingDirectoryError)) {
 			throw err;
 		}
 		caught = true;
 	}
-	if(!caught) {
+	if (!caught) {
 		throw new Error(`${stashPath} is already configured as a stash`);
 	}
 
@@ -1970,7 +1970,7 @@ async function initStash(stashPath, stashName, options) {
 
 let transitWriter;
 function getTransitWriter() {
-	if(!transitWriter) {
+	if (!transitWriter) {
 		transitWriter = transit.writer("json-verbose", {
 			/* Don't need a cache because we're using json-verbose */
 			cache: false,
@@ -1994,7 +1994,7 @@ function getTransitWriter() {
 
 let transitReader;
 function getTransitReader() {
-	if(!transitReader) {
+	if (!transitReader) {
 		transitReader = transit.reader("json-verbose", {handlers: {
 			"Long": v => {
 				const long = cassandra.types.Long.fromString(v);
@@ -2058,7 +2058,7 @@ class TransitToInsert extends Transform {
 		const obj = this._transitReader.read(line);
 
 		function undefinedToNull(o, k) {
-			if(o.get(k) === undefined) {
+			if (o.get(k) === undefined) {
 				o.set(k, null);
 			}
 		}
@@ -2073,20 +2073,20 @@ class TransitToInsert extends Transform {
 		T(obj.get('parent'),   Buffer);
 		A.eq(obj.get('parent').length, 128/8);
 
-		if(obj.get('version') === null) {
+		if (obj.get('version') === null) {
 			A.eq(obj.get('block_size'), null);
-			if(obj.get('type') === 'f' && obj.get('content') === null) {
+			if (obj.get('type') === 'f' && obj.get('content') === null) {
 				obj.set('block_size', 0);
 			}
 			obj.set('version', 2);
 		}
 
-		if(obj.get('version') === 2) {
-			if(obj.get('type') === 'f') {
+		if (obj.get('version') === 2) {
+			if (obj.get('type') === 'f') {
 				// Pre-version 3 rows don't have uuid for files, so we must add one.
 				A.eq(obj.get('uuid'), null);
 				obj.set('uuid', makeUuid());
-			} else if(obj.get('type') === 'd') {
+			} else if (obj.get('type') === 'd') {
 				T(obj.get('uuid'), Buffer);
 			}
 
@@ -2110,8 +2110,8 @@ class TransitToInsert extends Transform {
 		const extraVals = [];
 		let totalChunksSize = 0;
 		for(const k of obj.keys()) {
-			if(k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
-				if(!this._columnsCreated.has(k)) {
+			if (k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
+				if (!this._columnsCreated.has(k)) {
 					await tryCreateColumnOnStashTable(
 						this._client, this._stashName, k, 'list<frozen<chunk>>');
 					this._columnsCreated.add(k);
@@ -2125,9 +2125,9 @@ class TransitToInsert extends Transform {
 			}
 		}
 
-		if(obj.get('type') === 'f') {
-			if(obj.get('crc32c') === null) {
-				if(obj.get('content') !== null) {
+		if (obj.get('type') === 'f') {
+			if (obj.get('crc32c') === null) {
+				if (obj.get('content') !== null) {
 					// Generate crc32c for version null dumps, which have blake2b224
 					// instead of crc32c.
 					T(obj.get('content'), Buffer);
@@ -2141,7 +2141,7 @@ class TransitToInsert extends Transform {
 			utils.assertSafeNonNegativeLong(obj.get('size'));
 			const size = Number(obj.get('size'));
 
-			if(obj.get('content') === null) {
+			if (obj.get('content') === null) {
 				T(obj.get('key'), Buffer);
 				A.eq(obj.get('key').length, 128/8);
 
@@ -2157,7 +2157,7 @@ class TransitToInsert extends Transform {
 				A.eq(size, obj.get('content').length);
 			}
 			T(obj.get('executable'), T.boolean);
-		} else if(obj.get('type') === 'd') {
+		} else if (obj.get('type') === 'd') {
 			A.eq(obj.get('content'),    null);
 			A.eq(obj.get('executable'), null);
 			A.eq(obj.get('crc32c'),     null);
@@ -2194,14 +2194,14 @@ class TransitToInsert extends Transform {
 
 function importDb(outCtx, stashName, dumpFile) {
 	T(outCtx, OutputContextType, stashName, T.string, dumpFile, T.string);
-	if(outCtx.mode !== 'quiet') {
+	if (outCtx.mode !== 'quiet') {
 		console.log(`Restoring from ${dumpFile === '-' ? 'stdin' : inspect(dumpFile)} into stash ${inspect(stashName)}.`);
 		console.log('Note that files may be restored before directories, so you might ' +
 			'not see anything in the stash until the restore process is complete.');
 	}
 	return doWithClient(getNewClient(), async function importDb$coro(client) {
 		let inputStream;
-		if(dumpFile === '-') {
+		if (dumpFile === '-') {
 			inputStream = process.stdin;
 		} else {
 			inputStream = fs.createReadStream(dumpFile);
@@ -2226,9 +2226,9 @@ function importDb(outCtx, stashName, dumpFile) {
 			inserter.on('data', function(_obj) {
 				count += 1;
 				// Print every 100th to avoid getting 30% slowdown by just terminal output
-				if(outCtx.mode === 'terminal' && count % 100 === 0) {
+				if (outCtx.mode === 'terminal' && count % 100 === 0) {
 					printProgress();
-				} else if(outCtx.mode === 'log' && count % 1000 === 0) {
+				} else if (outCtx.mode === 'log' && count % 1000 === 0) {
 					printProgress();
 				}
 			});
@@ -2239,7 +2239,7 @@ function importDb(outCtx, stashName, dumpFile) {
 			});
 		});
 		await Promise.all(inserters);
-		if(outCtx.mode !== 'quiet') {
+		if (outCtx.mode !== 'quiet') {
 			printProgress();
 			console.log('\nDone importing.');
 		}
