@@ -115,9 +115,9 @@ class StashServer {
 						];
 					}
 				}
-				const mimeType = mime.lookup(dbPath) || "application/octet-stream";
+				let mimeType = mime.lookup(dbPath) || "application/octet-stream";
 				// Don't let active content execute on this domain
-				if(mimeType === "text/html") {
+				if (mimeType === "text/html") {
 					mimeType = "text/plain";
 				}
 				res.setHeader("Content-Length", String(Number(parent.size)));
