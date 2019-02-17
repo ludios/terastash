@@ -2,3 +2,4 @@
 /.terastash.json
 /src/tests/*.err
 /trash
+/.idea
