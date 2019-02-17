@@ -17,7 +17,7 @@
     "chalk": "^2.3.2",
     "cli-table": "^0.3.1",
     "combine-streams": "^1.0.0",
-    "commander": "^2.15.0",
+    "commander": "^2.19.0",
     "deep-equal": "^1.0.1",
     "escape-html": "^1.0.3",
     "googleapis": "^9.0.0",
