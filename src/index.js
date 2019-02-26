@@ -1145,18 +1145,6 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 	);
 	return doWithClient(getNewClient(), async function addFiles$coro(client) {
 		const stashInfo = await getStashInfoForPaths(paths);
-		// Shuffle the files so that the cloud storage provider has a harder time
-		// inferring what content was stored.  If we didn't shuffle, they would have
-		// additional information based on the sizes of the alphanumerically sorted
-		// files, rather than just a set of sizes.  For best results, also use a larger
-		// -n / -s with xargs.
-		//
-		// Shuffling instead of sorting helps both 1) reduce "Error: User rate limit exceeded"
-		// that happens when uploading a lot of small files and 2) reduce the
-		// sawtooth pattern in our upstream bandwidth use.
-		if (!Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
-			utils.shuffleArray(paths);
-		}
 
 		// Capture ctrl-c and don't exit until the entire upload is done because
 		// we want to avoid leaving around unreferenced chunks in our chunk stores.
