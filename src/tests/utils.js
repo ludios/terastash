@@ -206,22 +206,3 @@ describe('utils.zip()', function() {
 		assert.deepStrictEqual(Array.from(utils.zip([1, 2, 3], [4, 5, 6], yielder())), [[1, 4, 7], [2, 5, 8], [3, 6, 9]]);
 	});
 });
-
-describe('utils.shuffleArray()', function() {
-	it('returns the same Array if of length 0', function() {
-		assert.deepStrictEqual(utils.shuffleArray([]), []);
-	});
-
-	it('returns the same Array if of length 1', function() {
-		assert.deepStrictEqual(utils.shuffleArray([3]), [3]);
-	});
-
-	it('returns a shuffled Array', function() {
-		const shuffled = utils.shuffleArray([3, 4]);
-		try {
-			assert.deepStrictEqual(shuffled, [3, 4]);
-		} catch(e) {
-			assert.deepStrictEqual(shuffled, [4, 3]);
-		}
-	});
-});
