@@ -23,7 +23,7 @@ async function writeChunks(outCtx, directory, getChunkStream) {
 		if(chunkStream === null) {
 			break;
 		}
-		const tempFname   = path.join(directory, '.temp-' + crypto.randomBytes(128/8).toString('hex'));
+		const tempFname   = path.join(directory, '.temp-' + crypto.randomBytes(128 / 8).toString('hex'));
 		const writeStream = fs.createWriteStream(tempFname);
 
 		const hasher = utils.streamHasher(chunkStream, 'crc32c');
@@ -72,7 +72,7 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 				return;
 			}
 			const digest = chunk.crc32c;
-			A.eq(digest.length, 32/8);
+			A.eq(digest.length, 32 / 8);
 
 			const chunkStream = fs.createReadStream(
 				path.join(directory, chunk.file_id),

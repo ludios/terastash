@@ -52,7 +52,7 @@ class GCMWriter extends Transform {
 		utils.assertSafeNonNegativeInteger(blockSize);
 		utils.assertSafeNonNegativeInteger(initialBlockNum);
 		A.gt(blockSize, 0);
-		A.eq(key.length, 128/8);
+		A.eq(key.length, 128 / 8);
 		super();
 		this._blockSize = blockSize;
 		this._key = key;
@@ -71,7 +71,7 @@ class GCMWriter extends Transform {
 		const ret = cipher.final();
 		A.eq(ret.length, 0);
 		const tag = cipher.getAuthTag();
-		A.eq(tag.length, 128/8);
+		A.eq(tag.length, 128 / 8);
 		this.push(tag);
 		this.push(encryptedBuf);
 	}
@@ -119,7 +119,7 @@ class GCMReader extends Transform {
 		utils.assertSafeNonNegativeInteger(blockSize);
 		utils.assertSafeNonNegativeInteger(initialBlockNum);
 		A.gt(blockSize, 0);
-		A.eq(key.length, 128/8);
+		A.eq(key.length, 128 / 8);
 		super();
 		this._blockSize = blockSize;
 		this._key = key;

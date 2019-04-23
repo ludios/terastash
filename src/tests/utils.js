@@ -58,14 +58,14 @@ describe('getConcealmentSize', function() {
 		A.eq(utils.getConcealmentSize(2 * 1024), 32);
 		A.eq(utils.getConcealmentSize(128 * 1024), 2048);
 
-		A.eq(utils.getConcealmentSize(1024), 1024/64);
+		A.eq(utils.getConcealmentSize(1024), 1024 / 64);
 
-		A.eq(utils.getConcealmentSize(1024 * 1024), 1024 * 1024/64);
+		A.eq(utils.getConcealmentSize(1024 * 1024), 1024 * 1024 / 64);
 
-		A.eq(utils.getConcealmentSize(1024 ** 3 - 1),           1024 ** 3/128);
-		A.eq(utils.getConcealmentSize(1024 ** 3),               1024 ** 3/64);
-		A.eq(utils.getConcealmentSize(1024 ** 3 + 1),           1024 ** 3/64);
-		A.eq(utils.getConcealmentSize(1024 ** 3 + 1024 * 1024), 1024 ** 3/64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 - 1),           1024 ** 3 / 128);
+		A.eq(utils.getConcealmentSize(1024 ** 3),               1024 ** 3 / 64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 + 1),           1024 ** 3 / 64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 + 1024 * 1024), 1024 ** 3 / 64);
 	});
 });
 
@@ -84,8 +84,8 @@ describe('concealSize', function() {
 
 		A.eq(utils.concealSize(1024 ** 3 - 1),         1024 ** 3);
 		A.eq(utils.concealSize(1024 ** 3),             1024 ** 3);
-		A.eq(utils.concealSize(1024 ** 3 + 1),         1024 ** 3 + 1024 ** 2 * 1024/64);
-		A.eq(utils.concealSize(1024 ** 3 + 1024 ** 2), 1024 ** 3 + 1024 ** 2 * 1024/64);
+		A.eq(utils.concealSize(1024 ** 3 + 1),         1024 ** 3 + 1024 ** 2 * 1024 / 64);
+		A.eq(utils.concealSize(1024 ** 3 + 1024 ** 2), 1024 ** 3 + 1024 ** 2 * 1024 / 64);
 	});
 });
 

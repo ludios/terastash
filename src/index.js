@@ -397,7 +397,7 @@ async function getUuidForPath(client, stashName, p) {
 	T(client, cassandra.Client, stashName, T.string, p, T.string);
 	if (p === "") {
 		// root directory is 0
-		return Buffer.alloc(128/8);
+		return Buffer.alloc(128 / 8);
 	}
 
 	const parentPath = utils.getParentPath(p);
@@ -1279,7 +1279,7 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 	if (chunks !== null) {
 		validateChunksFixBigints(chunks);
 		A.eq(row.content, null);
-		A.eq(row.key.length, 128/8);
+		A.eq(row.key.length, 128 / 8);
 		utils.assertSafeNonNegativeInteger(row.block_size);
 		// To save CPU time, we check whole-chunk CRC32C's only for chunks
 		// that don't have embedded authentication tags.
@@ -2059,7 +2059,7 @@ class TransitToInsert extends Transform {
 		T(obj.get('type'),     T.string);
 		T(obj.get('mtime'),    Date);
 		T(obj.get('parent'),   Buffer);
-		A.eq(obj.get('parent').length, 128/8);
+		A.eq(obj.get('parent').length, 128 / 8);
 
 		if (obj.get('version') === null) {
 			A.eq(obj.get('block_size'), null);
@@ -2092,7 +2092,7 @@ class TransitToInsert extends Transform {
 		T(obj.get('added_host'),    T.string);
 		T(obj.get('added_version'), T.string);
 		T(obj.get('uuid'),          Buffer);
-		A.eq(obj.get('uuid').length, 128/8);
+		A.eq(obj.get('uuid').length, 128 / 8);
 
 		const extraCols = [];
 		const extraVals = [];
@@ -2131,7 +2131,7 @@ class TransitToInsert extends Transform {
 
 			if (obj.get('content') === null) {
 				T(obj.get('key'), Buffer);
-				A.eq(obj.get('key').length, 128/8);
+				A.eq(obj.get('key').length, 128 / 8);
 
 				// Check size
 				const sizeOfTags =
