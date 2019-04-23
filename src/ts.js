@@ -422,7 +422,7 @@ program
 	.description(d(`
 		Define a chunk store. Name cannot be changed later.`))
 	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
-	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisble by 16.  Defaults to 1024*1024*1024.')
+	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisble by 16.  Defaults to 1024 ** 3.')
 	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
 	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
@@ -431,7 +431,7 @@ program
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		} else {
-			options.chunkSize = 1024 * 1024 * 1024;
+			options.chunkSize = 1024 ** 3;
 		}
 		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.defineChunkStore(storeName, options));
@@ -442,7 +442,7 @@ program
 	.description(d(`
 		Change a setting on a chunk store.`))
 	.option('-t, --type <type>', 'Type of chunk store. Either localfs or gdrive.')
-	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisible by 16.  Defaults to 1024*1024*1024.')
+	.option('-s, --chunk-size <chunk-size>', 'Chunk size in bytes; must be divisible by 16.  Defaults to 1024 ** 3.')
 	.option('-d, --directory <directory>', '[localfs] Absolute path to directory to store chunks in')
 	.option('--client-id <client-id>', '[gdrive] A Client ID that has Google Drive API enabled')
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')

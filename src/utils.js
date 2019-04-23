@@ -337,12 +337,12 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 
 function evalMultiplications(s) {
 	T(s, T.string);
-	if(/^[\d\*]+$/.test(s)) {
+	if(/^[ \d\*]+$/.test(s)) {
 		/* eslint-disable no-new-func */
 		return new Function(`return (${s});`)();
 		/* eslint-enable no-new-func */
 	} else {
-		throw new Error(`${s} contained something other than digits and '*'`);
+		throw new Error(`${s} contained something other than space, digits, and '*'`);
 	}
 }
 
