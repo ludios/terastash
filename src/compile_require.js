@@ -67,7 +67,7 @@ function maybeCompileAndRequire(name, verbose=false) {
 					[0, 1, 2] :
 					[0, 'pipe', 'pipe'],
 				cwd,
-				maxBuffer: 4*1024*1024
+				maxBuffer: 4 * 1024 * 1024
 			}
 		);
 		if(child.status === 0) {

@@ -31,7 +31,7 @@ describe('GDriver', function() {
 		const [gdriver, chunkStore] = await doSetup();
 
 		const tempFname = path.join(os.tmpdir(), 'terastash-gdrive-tests-' + String(Math.random()));
-		const fileLength = utils.randInt(1*1024, 5*1024);
+		const fileLength = utils.randInt(1 * 1024, 5 * 1024);
 		const buf = crypto.pseudoRandomBytes(fileLength);
 		A.eq(buf.length, fileLength);
 		await fs.writeFileAsync(tempFname, buf);

@@ -431,7 +431,7 @@ program
 		if(options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		} else {
-			options.chunkSize = 1024*1024*1024;
+			options.chunkSize = 1024 * 1024 * 1024;
 		}
 		terastash.checkChunkSize(options.chunkSize);
 		catchAndLog(terastash.defineChunkStore(storeName, options));
