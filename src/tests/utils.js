@@ -62,30 +62,30 @@ describe('getConcealmentSize', function() {
 
 		A.eq(utils.getConcealmentSize(1024 * 1024), 1024 * 1024/64);
 
-		A.eq(utils.getConcealmentSize(1024 * 1024 * 1024 - 1), 1024 * 1024 * 1024/128);
-		A.eq(utils.getConcealmentSize(1024 * 1024 * 1024), 1024 * 1024 * 1024/64);
-		A.eq(utils.getConcealmentSize(1024 * 1024 * 1024 + 1), 1024 * 1024 * 1024/64);
-		A.eq(utils.getConcealmentSize(1024 * 1024 * 1024 + 1024 * 1024), 1024 * 1024 * 1024/64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 - 1),           1024 ** 3/128);
+		A.eq(utils.getConcealmentSize(1024 ** 3),               1024 ** 3/64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 + 1),           1024 ** 3/64);
+		A.eq(utils.getConcealmentSize(1024 ** 3 + 1024 * 1024), 1024 ** 3/64);
 	});
 });
 
 
 describe('concealSize', function() {
 	it('returns the concealed file size', function() {
-		A.eq(utils.concealSize(0), 16);
-		A.eq(utils.concealSize(1), 16);
-		A.eq(utils.concealSize(128), 128);
-		A.eq(utils.concealSize(256), 256);
-		A.eq(utils.concealSize(1024), 1024);
-		A.eq(utils.concealSize(1025), 1024 + 16);
-		A.eq(utils.concealSize(1.5 * 1024), 1.5 * 1024);
-		A.eq(utils.concealSize(2 * 1024), 2 * 1024);
-		A.eq(utils.concealSize(2 * 1024+1), 2 * 1024 + 32);
+		A.eq(utils.concealSize(0),            16);
+		A.eq(utils.concealSize(1),            16);
+		A.eq(utils.concealSize(128),          128);
+		A.eq(utils.concealSize(256),          256);
+		A.eq(utils.concealSize(1024),         1024);
+		A.eq(utils.concealSize(1025),         1024 + 16);
+		A.eq(utils.concealSize(1.5 * 1024),   1.5 * 1024);
+		A.eq(utils.concealSize(2 * 1024),     2 * 1024);
+		A.eq(utils.concealSize(2 * 1024 + 1), 2 * 1024 + 32);
 
-		A.eq(utils.concealSize(1024 * 1024 * 1024 - 1), 1024 * 1024 * 1024);
-		A.eq(utils.concealSize(1024 * 1024 * 1024), 1024 * 1024 * 1024);
-		A.eq(utils.concealSize(1024 * 1024 * 1024 + 1), 1024 * 1024 * 1024 + 1024 * 1024 * 1024/64);
-		A.eq(utils.concealSize(1024 * 1024 * 1024 + 1024 * 1024), 1024 * 1024 * 1024 + 1024 * 1024 * 1024/64);
+		A.eq(utils.concealSize(1024 ** 3 - 1),         1024 ** 3);
+		A.eq(utils.concealSize(1024 ** 3),             1024 ** 3);
+		A.eq(utils.concealSize(1024 ** 3 + 1),         1024 ** 3 + 1024 ** 2 * 1024/64);
+		A.eq(utils.concealSize(1024 ** 3 + 1024 ** 2), 1024 ** 3 + 1024 ** 2 * 1024/64);
 	});
 });
 
