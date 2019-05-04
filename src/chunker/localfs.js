@@ -20,7 +20,7 @@ async function writeChunks(outCtx, directory, getChunkStream) {
 
 	while (true) {
 		const chunkStream = await getChunkStream(false);
-		if(chunkStream === null) {
+		if (chunkStream === null) {
 			break;
 		}
 		const tempFname   = path.join(directory, '.temp-' + crypto.randomBytes(128 / 8).toString('hex'));
@@ -68,7 +68,7 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 	// the coroutine does the work of writing to the stream.
 	(async function readChunks$coro() {
 		for (const [chunk, range] of utils.zip(chunks, ranges)) {
-			if(destroyed) {
+			if (destroyed) {
 				return;
 			}
 			const digest = chunk.crc32c;
@@ -79,7 +79,7 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 				{start: range[0], end: range[1] - 1}); // end is inclusive
 			currentChunkStream = chunkStream;
 			let hasher;
-			if(checkWholeChunkCRC32C) {
+			if (checkWholeChunkCRC32C) {
 				hasher = utils.streamHasher(chunkStream, 'crc32c');
 				cipherStream.append(hasher.stream);
 			} else {
@@ -87,12 +87,12 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 			}
 			await new Promise(function readChunks$Promise(resolve, reject) {
 				(hasher ? hasher.stream : chunkStream).once('end', function() {
-					if(!checkWholeChunkCRC32C) {
+					if (!checkWholeChunkCRC32C) {
 						resolve();
 						return;
 					}
 					const readDigest = hasher.hash.digest();
-					if(readDigest.equals(digest)) {
+					if (readDigest.equals(digest)) {
 						resolve();
 					} else {
 						reject(new BadChunk(

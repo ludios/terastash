@@ -72,7 +72,7 @@ class FixedOAuth2 extends OAuth2 {
 	getRequestMetadata(optUri, metadataCb) {
 		const thisCreds = this.credentials;
 
-		if(!thisCreds.access_token && !thisCreds.refresh_token) {
+		if (!thisCreds.access_token && !thisCreds.refresh_token) {
 			return metadataCb(new Error('No access or refresh token is set.'), null);
 		}
 
@@ -80,7 +80,7 @@ class FixedOAuth2 extends OAuth2 {
 		const expiryDate = thisCreds.expiry_date;
 		const isTokenExpired = expiryDate ? expiryDate <= (new Date()).getTime() : false;
 
-		if(thisCreds.access_token && !isTokenExpired) {
+		if (thisCreds.access_token && !isTokenExpired) {
 			thisCreds.token_type = thisCreds.token_type || 'Bearer';
 			const headers = {'Authorization': thisCreds.token_type + ' ' + thisCreds.access_token};
 			return metadataCb(null, headers, null);
@@ -129,7 +129,7 @@ class GDriver {
 		T(authCode, T.string, account, T.string);
 		return new Promise(function(resolve, reject) {
 			this._oauth2Client.getToken(authCode, function(err, tokens) {
-				if(err) {
+				if (err) {
 					reject(err);
 				} else {
 					this._oauth2Client.setCredentials(tokens);
@@ -143,7 +143,7 @@ class GDriver {
 	async loadCredentials(account) {
 		const config = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
-		if(credentials) {
+		if (credentials) {
 			this._oauth2Client.setCredentials(credentials);
 		}
 		return account;
@@ -152,7 +152,7 @@ class GDriver {
 	refreshAccessToken() {
 		return new Promise(function(resolve, reject) {
 			this._oauth2Client.refreshAccessToken(function(err) {
-				if(err) {
+				if (err) {
 					reject(err);
 				} else {
 					resolve(null);
@@ -164,13 +164,13 @@ class GDriver {
 	async _maybeRefreshAndSaveToken() {
 		// Typically, another process is responsible for updating the tokens and
 		// copying them to all the machines that might need them.
-		if(!Number(process.env.TERASTASH_REFRESH_GOOGLE_TOKENS)) {
+		if (!Number(process.env.TERASTASH_REFRESH_GOOGLE_TOKENS)) {
 			return;
 		}
 		// Access tokens last for 60 minutes; make sure we have at least 50 minutes
 		// left on the clock, in case our upload takes a while.
 		const minMinutes = 50;
-		if(!(this._oauth2Client.credentials.expiry_date >= Date.now() + (minMinutes * 60 * 1000))) {
+		if (!(this._oauth2Client.credentials.expiry_date >= Date.now() + (minMinutes * 60 * 1000))) {
 			//console.log("Refreshing access token...");
 			await this.refreshAccessToken();
 			A.gte(this._oauth2Client.credentials.expiry_date, Date.now() + (minMinutes * 60 * 1000));
@@ -216,7 +216,7 @@ class GDriver {
 			}
 		};
 		let hasher;
-		if(stream !== null) {
+		if (stream !== null) {
 			hasher = utils.streamHasher(stream, 'md5');
 			insertOpts.media = {
 				mimeType: mimeType,
@@ -226,8 +226,8 @@ class GDriver {
 
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
-				if(err) {
-					if(err.code === 404 &&
+				if (err) {
+					if (err.code === 404 &&
 					err.errors instanceof Array &&
 					err.errors.length >= 1 &&
 					err.errors[0].reason === 'notFound') {
@@ -242,38 +242,38 @@ class GDriver {
 					resolve(obj);
 				}
 			});
-			if(requestCb) {
+			if (requestCb) {
 				requestCb(requestObj);
 			}
 		}.bind(this)).then(function(obj) {
 			T(obj, T.object);
-			if(obj.kind !== "drive#file") {
+			if (obj.kind !== "drive#file") {
 				throw new UploadError(`Expected Google Drive to create an` +
 					` object with kind='drive#file' but was ${inspect(obj.kind)}`
 				);
 			}
-			if(typeof obj.id !== "string") {
+			if (typeof obj.id !== "string") {
 				throw new UploadError(`Expected Google Drive to create a` +
 					` file with id=(string) but was id=${inspect(obj.id)}`
 				);
 			}
-			if(stream && obj.fileSize !== String(hasher.length)) {
+			if (stream && obj.fileSize !== String(hasher.length)) {
 				throw new UploadError(`Expected Google Drive to create a` +
 					` file with fileSize=${inspect(String(hasher.length))} but was ${inspect(obj.fileSize)}`
 				);
 			}
-			if(parents.length !== 0) {
+			if (parents.length !== 0) {
 				const parentsInDrive = obj.parents.map(idProp).sort();
-				if(!utils.sameArrayValues(parentsInDrive, parents)) {
+				if (!utils.sameArrayValues(parentsInDrive, parents)) {
 					throw new UploadError(`Expected Google Drive to create a file` +
 						` with parents=${inspect(parents)} but was ${inspect(parentsInDrive)}.\n` +
 						`Make sure you specified the correct folder IDs.`
 					);
 				}
 			}
-			if(stream) {
+			if (stream) {
 				const expectedHexDigest = hasher.hash.digest('hex');
-				if(obj.md5Checksum !== expectedHexDigest) {
+				if (obj.md5Checksum !== expectedHexDigest) {
 					throw new UploadError(`Expected Google Drive to create a` +
 						` file with md5Checksum=${inspect(expectedHexDigest)}` +
 						` but was ${inspect(obj.md5Checksum)}`
@@ -306,7 +306,7 @@ class GDriver {
 		await this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			this._drive.files.delete({fileId}, function(err, obj) {
-				if(err) {
+				if (err) {
 					reject(err);
 				} else {
 					resolve(obj);
@@ -325,7 +325,7 @@ class GDriver {
 					updateViewedDate: false
 				},
 				function(err, obj) {
-					if(err) {
+					if (err) {
 						reject(err);
 					} else {
 						resolve(obj);
@@ -337,13 +337,13 @@ class GDriver {
 
 	_getHeaders() {
 		const credentials = this._oauth2Client.credentials;
-		if(!credentials) {
+		if (!credentials) {
 			throw new Error("Lack credentials");
 		}
-		if(!credentials.token_type) {
+		if (!credentials.token_type) {
 			throw new Error("Credentials lack token_type");
 		}
-		if(!credentials.access_token) {
+		if (!credentials.access_token) {
 			throw new Error("Credentials lack access_token");
 		}
 		return {"Authorization": `${credentials.token_type} ${credentials.access_token}`};
@@ -359,12 +359,12 @@ class GDriver {
 	 */
 	async getData(fileId, range, checkCRC32CifReceived=true) {
 		T(fileId, T.string, range, T.optional(utils.RangeType), checkCRC32CifReceived, T.boolean);
-		if(range) {
+		if (range) {
 			utils.checkRange(range);
 		}
 		await this._maybeRefreshAndSaveToken();
 		const reqHeaders = this._getHeaders();
-		if(range) {
+		if (range) {
 			reqHeaders["Range"] = `bytes=${range[0]}-${range[1] - 1}`;
 		}
 		const res = await utils.makeHttpsRequest({
@@ -373,11 +373,11 @@ class GDriver {
 			path: `/drive/v2/files/${fileId}?alt=media`,
 			headers: reqHeaders
 		});
-		if((!range && res.statusCode === 200) || (range && res.statusCode === 206)) {
-			if(res.statusCode === 206) {
+		if ((!range && res.statusCode === 200) || (range && res.statusCode === 206)) {
+			if (res.statusCode === 206) {
 				const contentRange = res.headers['content-range'];
 				const expectedContentRange = `bytes ${range[0]}-${range[1] - 1}/`;
-				if(!contentRange.startsWith(expectedContentRange)) {
+				if (!contentRange.startsWith(expectedContentRange)) {
 					throw new Error(`Expected 'content-range' header to start with` +
 						` ${expectedContentRange} but was ${contentRange}`
 					);
@@ -386,17 +386,17 @@ class GDriver {
 			const googHash = res.headers['x-goog-hash'];
 			// x-goog-hash header should always be present on 200 responses;
 			// also on 206 responses if you requested all of the bytes.
-			if(res.statusCode === 200 && !googHash) {
+			if (res.statusCode === 200 && !googHash) {
 				throw new Error("x-goog-hash header was missing on a 200 response");
 			}
 			let hasher;
-			if(googHash && checkCRC32CifReceived) {
+			if (googHash && checkCRC32CifReceived) {
 				hasher = utils.streamHasher(res, 'crc32c');
 				A(googHash.startsWith("crc32c="), googHash);
 				const googCRC = Buffer.from(googHash.replace("crc32c=", ""), "base64");
 				hasher.stream.once('end', function getData$hasher$end() {
 					const computedCRC = hasher.hash.digest();
-					if(!computedCRC.equals(googCRC)) {
+					if (!computedCRC.equals(googCRC)) {
 						hasher.stream.emit('error', new Error(
 							`CRC32c check failed on fileId=${inspect(fileId)}:` +
 							` expected ${googCRC.toString("hex")},` +
@@ -408,7 +408,7 @@ class GDriver {
 			return [(hasher ? hasher.stream : res), res];
 		} else {
 			let body = await utils.readableToBuffer(res);
-			if((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
+			if ((res.headers['content-type'] || "").toLowerCase() === 'application/json; charset=utf-8') {
 				try {
 					body = JSON.parse(body);
 				} catch(e) {
@@ -440,11 +440,11 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			// when it actually succeeded.
 			const fname = utils.makeChunkFilename();
 			const chunkStream = await getChunkStream(lastChunkAgain);
-			if(chunkStream === null) {
+			if (chunkStream === null) {
 				return null;
 			}
 			crc32Hasher = utils.streamHasher(chunkStream, 'crc32c');
-			if(Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
+			if (Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
 			account = pickRandomAccount();
@@ -453,14 +453,14 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}, function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
-			if(outCtx.mode !== 'quiet') {
+			if (outCtx.mode !== 'quiet') {
 				console.error(`Error while uploading chunk ${idx}:\n`);
 				console.error(e.stack);
 				console.error(`\n${utils.pluralize(triesLeft, 'try', 'tries')} left; ` +
 					`trying again in ${decayer.getNextDelay()/1000} seconds...`);
 			}
 		}, 50, decayer);
-		if(response === null) {
+		if (response === null) {
 			break;
 		}
 		// We can trust the md5Checksum in response; createFile checked it for us
@@ -499,7 +499,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	// the coroutine does the work of writing to the stream.
 	(async function readChunks$coro() {
 		for (const [chunk, range] of utils.zip(chunks, ranges)) {
-			if(destroyed) {
+			if (destroyed) {
 				return;
 			}
 
@@ -512,7 +512,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			// We try three times because sometimes the Google Drive backend returns
 			// spurious transient 404s.
 			let accountsToTry;
-			if(chunk.account) {
+			if (chunk.account) {
 				accountsToTry = [chunk.account, chunk.account, chunk.account];
 			} else {
 				const accounts = getAccounts();
@@ -526,13 +526,13 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 					[chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
 					break;
 				} catch(e) {
-					if(!(e instanceof DownloadError)) {
+					if (!(e instanceof DownloadError)) {
 						throw e;
 					}
 					getDataError = e;
 				}
 			}
-			if(!chunkStream) {
+			if (!chunkStream) {
 				throw getDataError;
 			}
 			currentChunkStream = chunkStream;
@@ -541,8 +541,8 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			// Though we don't have the opportunity to do this when we're getting a
 			// range that is not the whole file.
 			const googHash = res.headers['x-goog-hash'];
-			if(googHash === undefined) {
-				if(range[1] - range[0] === chunk.size) {
+			if (googHash === undefined) {
+				if (range[1] - range[0] === chunk.size) {
 					throw new Error(`Downloading a whole file, but did not receive ` +
 						`x-goog-hash in headers:\n${inspect(res.headers)}`);
 				}
@@ -550,7 +550,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 				T(googHash, T.string);
 				A(googHash.startsWith("crc32c="), googHash);
 				const googCRC = Buffer.from(googHash.replace("crc32c=", ""), "base64");
-				if(!chunk.crc32c.equals(googCRC)) {
+				if (!chunk.crc32c.equals(googCRC)) {
 					throw new BadChunk(
 						`For chunk with file_id=${inspect(chunk.file_id)} (chunk #${chunk.idx} for file),\n` +
 						`expected Google to send crc32c\n` +
@@ -582,9 +582,9 @@ async function deleteChunks(gdriver, chunks) {
 	for (const chunk of chunks) {
 		try {
 			const account = chunk.account;
-			if(account) {
+			if (account) {
 				T(account, T.string);
-				if(account.indexOf("/") != -1) {
+				if (account.indexOf("/") != -1) {
 					throw new Error(`Illegal character in account=${inspect(account)}` +
 						` in chunks=${inspect(chunks)}`);
 				}

@@ -45,11 +45,11 @@ function prop(name) {
 function sameArrayValues(arr1, arr2) {
 	T(arr1, Array, arr2, Array);
 	const length = arr1.length;
-	if(length !== arr2.length) {
+	if (length !== arr2.length) {
 		return false;
 	}
 	for (let i=0; i < length; i++) {
-		if(!Object.is(arr1[i], arr2[i])) {
+		if (!Object.is(arr1[i], arr2[i])) {
 			return false;
 		}
 	}
@@ -113,9 +113,9 @@ function ol(s) {
 function comparator(pred) {
 	T(pred, T.function);
 	return function(x, y) {
-		if(pred(x, y)) {
+		if (pred(x, y)) {
 			return -1;
-		} else if(pred(y, x)) {
+		} else if (pred(y, x)) {
 			return 1;
 		} else {
 			return 0;
@@ -129,7 +129,7 @@ function comparator(pred) {
  */
 function comparedBy(mapping, reverse=false) {
 	T(mapping, T.function, reverse, T.boolean);
-	if(!reverse) {
+	if (!reverse) {
 		return comparator(function(x, y) {
 			return mapping(x) < mapping(y);
 		});
@@ -171,7 +171,7 @@ function makeConfigFileInitializer(fname, defaultConfig) {
 		try {
 			return (await readObjectFromConfigFile(fname));
 		} catch(err) {
-			if(err.code !== 'ENOENT') {
+			if (err.code !== 'ENOENT') {
 				throw err;
 			}
 			// If there is no config file, write defaultConfig.
@@ -235,7 +235,7 @@ function makeHttpsRequest(options, stream) {
 		const req = https.request(options, resolve).once('error', function(err) {
 			reject(err);
 		});
-		if(stream) {
+		if (stream) {
 			pipeWithErrors(stream, req);
 		} else {
 			req.end();
@@ -284,7 +284,7 @@ function crc32$digest(encoding) {
 	T(encoding, T.optional(T.string));
 	const buf = Buffer.allocUnsafe(4);
 	buf.writeUIntBE(this.crc(), 0, 4);
-	if(encoding === undefined) {
+	if (encoding === undefined) {
 		return buf;
 	} else {
 		return buf.toString(encoding);
@@ -306,9 +306,9 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 	);
 	assertSafeNonNegativeInteger(existingLength);
 	let hash;
-	if(typeof algoOrExistingHash === "string") {
+	if (typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
-		if(algo === "crc32c") {
+		if (algo === "crc32c") {
 			hash = new sse4_crc32.CRC32();
 			hash.digest = crc32$digest;
 		} else {
@@ -337,7 +337,7 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 
 function evalMultiplications(s) {
 	T(s, T.string);
-	if(/^[ \d\*]+$/.test(s)) {
+	if (/^[ \d\*]+$/.test(s)) {
 		/* eslint-disable no-new-func */
 		return new Function(`return (${s});`)();
 		/* eslint-enable no-new-func */
@@ -347,7 +347,7 @@ function evalMultiplications(s) {
 }
 
 function dateNow() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		return new Date(0);
 	} else {
 		return new Date();
@@ -356,7 +356,7 @@ function dateNow() {
 
 let filenameCounter = 0;
 function makeChunkFilename() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const s = `deterministic-filename-${filenameCounter}`;
 		filenameCounter += 1;
 		return s;
@@ -380,7 +380,7 @@ const ChunksType = T.list(
 function allIdentical(arr) {
 	T(arr, Array);
 	for (let n=0; n < arr.length; n++) {
-		if(arr[n] !== arr[0]) {
+		if (arr[n] !== arr[0]) {
 			return false;
 		}
 	}
@@ -406,7 +406,7 @@ class PersistentCounter {
 		try {
 			n = Number(fs.readFileSync(this.fname));
 		} catch(err) {
-			if(err.code !== 'ENOENT') {
+			if (err.code !== 'ENOENT') {
 				throw err;
 			}
 			n = this.start;
@@ -433,7 +433,7 @@ function colsAsString(cols) {
 	T(cols, ColsType);
 	// TODO: validate cols for lack of injection?
 	return cols.map(function(k) {
-		if(k === WILDCARD) {
+		if (k === WILDCARD) {
 			return "*";
 		} else {
 			return JSON.stringify(k);
@@ -465,7 +465,7 @@ async function tryUnlink(fname) {
 	try {
 		await fs.unlinkAsync(fname);
 	} catch(err) {
-		if(err.code !== "ENOENT") {
+		if (err.code !== "ENOENT") {
 			throw err;
 		}
 		// else, ignore error
@@ -493,13 +493,13 @@ class JoinedBuffers {
 	}
 
 	joinPop() {
-		if(!this._bufs.length) {
+		if (!this._bufs.length) {
 			return EMPTY_BUF;
 		}
 		const bufs = this._bufs;
 		this._bufs = [];
 		this.length = 0;
-		if(bufs.length === 1) {
+		if (bufs.length === 1) {
 			return bufs[0];
 		} else {
 			return Buffer.concat(bufs);
@@ -508,7 +508,7 @@ class JoinedBuffers {
 }
 
 function clearOrLF(stdStream) {
-	if(stdStream.clearLine && stdStream.cursorTo) {
+	if (stdStream.clearLine && stdStream.cursorTo) {
 		stdStream.clearLine();
 		stdStream.cursorTo(0);
 	} else {
@@ -527,7 +527,7 @@ function splitBuffer(buf, blockSize) {
 	const bufs = [];
 	while (true) {
 		const block = buf.slice(start, start + blockSize);
-		if(block.length < blockSize) {
+		if (block.length < blockSize) {
 			return [bufs, block];
 		}
 		bufs.push(block);
@@ -548,13 +548,13 @@ function splitBuffer(buf, blockSize) {
  */
 function splitString(s, sep, maxsplit) {
 	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
-	if(maxsplit === undefined || maxsplit < 0) {
+	if (maxsplit === undefined || maxsplit < 0) {
 		return s.split(sep);
 	}
 	const pieces = s.split(sep);
 	const head = pieces.splice(0, maxsplit);
 	// after the splice, pieces is shorter and no longer has the `head` elements.
-	if(pieces.length > 0) {
+	if (pieces.length > 0) {
 		const tail = pieces.join(sep);
 		head.push(tail); // no longer just the head.
 	}
@@ -573,13 +573,13 @@ function splitString(s, sep, maxsplit) {
  */
 function rsplitString(s, sep, maxsplit) {
 	T(s, T.string, sep, T.string, maxsplit, T.optional(T.number));
-	if(maxsplit === undefined || maxsplit < 0) {
+	if (maxsplit === undefined || maxsplit < 0) {
 		return s.split(sep);
 	}
 	const pieces = s.split(sep);
 	const tail = pieces.splice(pieces.length - maxsplit, pieces.length);
 	// after the splice, pieces is shorter and no longer has the C{tail} elements.
-	if(pieces.length > 0) {
+	if (pieces.length > 0) {
 		const head = pieces.join(sep);
 		tail.splice(0, 0, head); // no longer just the tail.
 	}
@@ -602,7 +602,7 @@ function intersect(range1, range2) {
 	// Range is the max of the beginnings to the min of the ends
 	const start = Math.max(range1[0], range2[0]);
 	const end = Math.min(range1[1], range2[1]);
-	if(!(start < end)) {
+	if (!(start < end)) {
 		return null;
 	}
 	return [start, end];
@@ -610,7 +610,7 @@ function intersect(range1, range2) {
 
 function* zip(...iterables) {
 	T(iterables, T.list(T.any));
-	if(!iterables.length) {
+	if (!iterables.length) {
 		return;
 	}
 	iterables = iterables.map(iterable => iterable[Symbol.iterator]());

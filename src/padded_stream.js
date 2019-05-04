@@ -17,7 +17,7 @@ class Padder extends Transform {
 	}
 
 	_flush(callback) {
-		if(this._padToLength > this.bytesRead) {
+		if (this._padToLength > this.bytesRead) {
 			this.push(Buffer.alloc(this._padToLength - this.bytesRead));
 		}
 		callback();
@@ -34,12 +34,12 @@ class RightTruncate extends Transform {
 
 	_transform(data, encoding, callback) {
 		// If we already read past the length we want, drop the rest of the data.
-		if(this.bytesRead >= this._desiredLength) {
+		if (this.bytesRead >= this._desiredLength) {
 			callback();
 			return;
 		}
 		this.bytesRead += data.length;
-		if(this.bytesRead <= this._desiredLength) {
+		if (this.bytesRead <= this._desiredLength) {
 			callback(null, data);
 		} else {
 			callback(null, data.slice(0, data.length - (this.bytesRead - this._desiredLength)));
@@ -56,7 +56,7 @@ class LeftTruncate extends Transform {
 	}
 
 	_transform(data, encoding, callback) {
-		if(this.bytesRead >= this._skipBytes) {
+		if (this.bytesRead >= this._skipBytes) {
 			this.push(data);
 		} else {
 			this.push(data.slice(this._skipBytes - this.bytesRead));

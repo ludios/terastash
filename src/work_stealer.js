@@ -29,11 +29,11 @@ class WorkStealer extends Readable {
 	}
 
 	_inputReadable() {
-		if(this._stopped || !this._waiting) {
+		if (this._stopped || !this._waiting) {
 			return;
 		}
 		const obj = this._inputStream.read();
-		if(obj === null) {
+		if (obj === null) {
 			return;
 		}
 		this._waiting = false;
@@ -41,7 +41,7 @@ class WorkStealer extends Readable {
 	}
 
 	_stop() {
-		if(this._stopped) {
+		if (this._stopped) {
 			return;
 		}
 		this._stopped = true;
@@ -56,7 +56,7 @@ class WorkStealer extends Readable {
 	_read() {
 		const obj = this._inputStream.read();
 		//console.log("WorkStealer._read got", obj);
-		if(obj === null) {
+		if (obj === null) {
 			this._waiting = true;
 		} else {
 			this.push(obj);

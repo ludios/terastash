@@ -17,11 +17,11 @@ function maybeCompileAndRequire(name, verbose=false) {
 	try {
 		return require(name);
 	} catch(requireErr) {
-		if(verbose) {
+		if (verbose) {
 			console.error(`${name} doesn't appear to be built; building it...\n`);
 		}
 		let candidates;
-		if(process.platform === "win32") {
+		if (process.platform === "win32") {
 			candidates = [
 				// Official node.js release
 				path.join(
@@ -44,17 +44,17 @@ function maybeCompileAndRequire(name, verbose=false) {
 		}
 		let nodeGyp;
 		for (const candidate of candidates) {
-			if(fs.existsSync(candidate)) {
+			if (fs.existsSync(candidate)) {
 				nodeGyp = candidate;
 				break;
 			}
 		}
-		if(!fs.existsSync(nodeGyp)) {
+		if (!fs.existsSync(nodeGyp)) {
 			throw new Error("Could not find node-gyp");
 		}
 		const cwd = path.join(__dirname, '../node_modules', name);
 		A(fs.lstatSync(cwd).isDirectory(), `${inspect(cwd)} missing or not a directory`);
-		if(!child_process) {
+		if (!child_process) {
 			child_process = require('child_process');
 		}
 		let child;
@@ -70,20 +70,20 @@ function maybeCompileAndRequire(name, verbose=false) {
 				maxBuffer: 4 * 1024 * 1024
 			}
 		);
-		if(child.status === 0) {
+		if (child.status === 0) {
 			return require(name);
 		} else {
 			console.error(chalk.bold(`\nFailed to build ${name}; you may need to install additional tools.`));
 			console.error("See https://github.com/TooTallNate/node-gyp#installation");
 			console.error("");
 			console.error(chalk.bold("Build error was:"));
-			if(child.error) {
+			if (child.error) {
 				console.error(child.error);
 			}
-			if(child.stdout) {
+			if (child.stdout) {
 				process.stderr.write(child.stdout);
 			}
-			if(child.stderr) {
+			if (child.stderr) {
 				process.stderr.write(child.stderr);
 			}
 			console.error("");

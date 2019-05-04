@@ -15,7 +15,7 @@ const gdrive    = require('../chunker/gdrive');
 async function doSetup() {
 	const config = await terastash.getChunkStores();
 	const chunkStore = config.stores["terastash-tests-gdrive"];
-	if(!chunkStore) {
+	if (!chunkStore) {
 		throw new Error("Please define a terastash-tests-gdrive chunk store to run this test");
 	}
 	A.eq(chunkStore.type, "gdrive");

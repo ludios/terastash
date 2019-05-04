@@ -35,7 +35,7 @@ class CRCWriter extends Transform {
 	_transform(data, encoding, callback) {
 		this._joined.push(data);
 		// Can write out at least one new block?
-		if(this._joined.length >= this._blockSize) {
+		if (this._joined.length >= this._blockSize) {
 			const [splitBufs, remainder] = utils.splitBuffer(this._joined.joinPop(), this._blockSize);
 			this._joined.push(remainder);
 
@@ -48,7 +48,7 @@ class CRCWriter extends Transform {
 
 	_flush(callback) {
 		// Need to write out the last block, even if it's under-sized
-		if(this._joined.length > 0) {
+		if (this._joined.length > 0) {
 			const buf = this._joined.joinPop();
 			this._pushCRCAndBuf(buf);
 			this._joined = null;
@@ -83,7 +83,7 @@ class CRCReader extends Transform {
 	}
 
 	_checkCRC(callback, actual, expect) {
-		if(actual !== expect) {
+		if (actual !== expect) {
 			callback(new BadData(
 				`CRC32C of block ${commaify(this._counter)} is allegedly\n` +
 				`${crcToBuf(expect).toString('hex')} but CRC32C of data is\n` +
@@ -98,7 +98,7 @@ class CRCReader extends Transform {
 		this._joined.push(newData);
 		// Don't bother processing anything if we don't have enough to decode
 		// a CRC or a block.
-		if(this._mode === MODE_CRC && this._joined.length < 4 ||
+		if (this._mode === MODE_CRC && this._joined.length < 4 ||
 		this._mode === MODE_DATA && this._joined.length < this._blockSize) {
 			callback();
 			return;
@@ -106,8 +106,8 @@ class CRCReader extends Transform {
 		let data = this._joined.joinPop();
 		while (data.length) {
 			//console.error(this._counter, data.length, this._mode);
-			if(this._mode === MODE_CRC) {
-				if(data.length >= 4) {
+			if (this._mode === MODE_CRC) {
+				if (data.length >= 4) {
 					this._crc = bufToCrc(data.slice(0, 4));
 					this._mode = MODE_DATA;
 					data = data.slice(4);
@@ -115,11 +115,11 @@ class CRCReader extends Transform {
 					this._joined.push(data);
 					data = EMPTY_BUF;
 				}
-			} else if(this._mode === MODE_DATA) {
-				if(data.length >= this._blockSize) {
+			} else if (this._mode === MODE_DATA) {
+				if (data.length >= this._blockSize) {
 					const block = data.slice(0, this._blockSize);
 					const crc = sse4_crc32.calculate(block);
-					if(!this._checkCRC(callback, crc, this._crc)) {
+					if (!this._checkCRC(callback, crc, this._crc)) {
 						return;
 					}
 					this.push(block);
@@ -138,19 +138,19 @@ class CRCReader extends Transform {
 	_flush(callback) {
 		// Last block might not be full-size, and now that we know we've reached
 		// the end, we handle it here.
-		if(!this._joined.length) {
+		if (!this._joined.length) {
 			callback();
 			return;
 		}
 		let buf = this._joined.joinPop();
-		if(this._mode === MODE_CRC) {
+		if (this._mode === MODE_CRC) {
 			callback(new BadData(`Stream ended in the middle of a CRC32C: ${buf.toString('hex')}`));
 			return;
 		}
 		// It should be smaller than the block size, else it would have been handled in _transform
 		A(buf.length < this._blockSize, buf.length);
 		const crc = sse4_crc32.calculate(buf);
-		if(!this._checkCRC(callback, crc, this._crc)) {
+		if (!this._checkCRC(callback, crc, this._crc)) {
 			return;
 		}
 		this.push(buf);

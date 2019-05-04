@@ -5,7 +5,7 @@
 process.on("unhandledRejection", function(err) {
 	const red = "\u001b[31m";
 	const reset = "\u001b[39m";
-	if(typeof err.stack === "string") {
+	if (typeof err.stack === "string") {
 		process.stderr.write(`${red}Unhandled rejection in a Promise:\n${err.stack}${reset}\n`);
 	} else {
 		process.stderr.write(`${red}Unhandled rejection in a Promise:\n${err}\n[no stack trace available]${reset}\n`);
@@ -34,7 +34,7 @@ const ERROR_EXIT_CODE = 255;
 
 let client;
 function shutdownCassandraClient() {
-	if(client) {
+	if (client) {
 		try {
 			client.shutdown();
 		} catch(e) {
@@ -57,7 +57,7 @@ async function catchAndLog(p) {
 	try {
 		await p;
 	} catch(err) {
-		if(
+		if (
 			err instanceof terastash.DirectoryNotEmptyError ||
 			err instanceof terastash.NoSuchPathError ||
 			err instanceof terastash.NotAFileError ||
@@ -109,9 +109,9 @@ function a(f) {
 
 function getOutputContext() {
 	let mode;
-	if(process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
+	if (process.env.TERASTASH_OUTPUT_MODE) { // terminal, log, quiet
 		mode = process.env.TERASTASH_OUTPUT_MODE;
-	} else if(process.stdout.clearLine) {
+	} else if (process.stdout.clearLine) {
 		mode = 'terminal';
 	} else {
 		mode = 'log';
@@ -137,12 +137,12 @@ program
 				chunkThreshold: T.optional(T.string)
 			})
 		);
-		if(options.chunkThreshold !== undefined) {
+		if (options.chunkThreshold !== undefined) {
 			options.chunkThreshold = utils.evalMultiplications(options.chunkThreshold);
 		} else {
 			options.chunkThreshold = 4096;
 		}
-		if(options.chunkStore === undefined) {
+		if (options.chunkStore === undefined) {
 			console.error("-c/--chunk-store is required");
 			process.exit(ERROR_EXIT_CODE);
 		}
@@ -174,7 +174,7 @@ program
 	.action(a(function(dumpFile, options) {
 		T(dumpFile, T.string, options, T.object);
 		const name = stringOrNull(options.name);
-		if(name === null) {
+		if (name === null) {
 			console.error("-n/--name is required");
 			process.exit(ERROR_EXIT_CODE);
 		}
@@ -359,12 +359,12 @@ program
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		if(name !== null && !paths.length) {
+		if (name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
 			process.exit(ERROR_EXIT_CODE);
 		}
 		// When not using -n, and no path given, use '.'
-		if(name === null && !paths.length) {
+		if (name === null && !paths.length) {
 			paths[0] = '.';
 		}
 		catchAndLog(terastash.lsPath(
@@ -388,12 +388,12 @@ program
 	.action(a(function(paths, options) {
 		T(paths, T.list(T.string), options, T.object);
 		const name = stringOrNull(options.name);
-		if(name !== null && !paths.length) {
+		if (name !== null && !paths.length) {
 			console.error("When using -n/--name, a database path is required");
 			process.exit(ERROR_EXIT_CODE);
 		}
 		// When not using -n, and no path given, use '.'
-		if(name === null && !paths.length) {
+		if (name === null && !paths.length) {
 			paths[0] = '.';
 		}
 		catchAndLog(terastash.findPath(
@@ -428,7 +428,7 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
-		if(options.chunkSize !== undefined) {
+		if (options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		} else {
 			options.chunkSize = 1024 ** 3;
@@ -448,7 +448,7 @@ program
 	.option('--client-secret <client-secret>', '[gdrive] The Client Secret corresponding to the Client ID')
 	.action(a(function(storeName, options) {
 		T(storeName, T.string, options, T.object);
-		if(options.chunkSize !== undefined) {
+		if (options.chunkSize !== undefined) {
 			options.chunkSize = utils.evalMultiplications(options.chunkSize);
 		}
 		terastash.checkChunkSize(options.chunkSize);
@@ -481,14 +481,14 @@ program
 	.option('-p, --port <interface>', 'Listen on this port')
 	.option('-s, --stashes <stashes>', 'A comma-separated list of stashes to serve')
 	.action(a(function(options) {
-		if(options.interface === undefined) {
+		if (options.interface === undefined) {
 			options.interface = '127.0.0.1';
 		}
-		if(options.port === undefined) {
+		if (options.port === undefined) {
 			console.error("http server requires -p/--port option");
 			process.exit(ERROR_EXIT_CODE);
 		}
-		if(!options.stashes) {
+		if (!options.stashes) {
 			console.error("http server requires non-empty -s/--stashes option");
 			process.exit(ERROR_EXIT_CODE);
 		}
@@ -515,7 +515,7 @@ program
 
 program.parse(process.argv);
 
-if(!ranCommand) {
+if (!ranCommand) {
 	console.error(chalk.bold(chalk.red(`Unknown command: ${program.args[0]}; see ts help`)));
 	process.exit(ERROR_EXIT_CODE);
 }

@@ -6,7 +6,7 @@ const utils    = require('./utils');
 const Readable = require('stream').Readable;
 
 function makeKey() {
-	if(Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
+	if (Number(process.env.TERASTASH_INSECURE_AND_DETERMINISTIC)) {
 		const keyCounter = new utils.PersistentCounter(
 			path.join(process.env.TERASTASH_COUNTERS_DIR, 'random-stream-key-counter'));
 		const buf = Buffer.alloc(16);
@@ -30,7 +30,7 @@ class SecureRandomStream extends Readable {
 
 	_read() {
 		let randomBuf = this._cipher.update(ZERO_64KB);
-		if(this._bytesWritten + randomBuf.length > this._wantLength) {
+		if (this._bytesWritten + randomBuf.length > this._wantLength) {
 			randomBuf = randomBuf.slice(0, this._wantLength - this._bytesWritten);
 			this.push(randomBuf);
 			this.push(null);

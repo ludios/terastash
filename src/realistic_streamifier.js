@@ -25,7 +25,7 @@ class MultiStream extends Readable {
 		T(this._buf, Buffer);
 		const slice = this._buf.slice(this._idx, this._idx + this._readSize);
 		this._idx += this._readSize;
-		if(slice.length) {
+		if (slice.length) {
 			this.push(slice);
 		} else {
 			this.push(null);

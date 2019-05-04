@@ -20,7 +20,7 @@ function makeLines(lineLength, numLines) {
 		bufs.push(buf);
 		bufs.push(LF);
 	}
-	if(Math.random() < 0.5) {
+	if (Math.random() < 0.5) {
 		// Results should be the same whether or not the last LF is present
 		bufs.pop();
 	}

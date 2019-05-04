@@ -27,7 +27,7 @@ class DelimitedBufferDecoder extends Transform {
 		while (true) {
 			// Search only the new data for the delimiter, not all of this._joined
 			const idx = data.indexOf(this._delimiter);
-			if(idx !== -1) {
+			if (idx !== -1) {
 				this._joined.push(data.slice(0, idx));
 				this.push(this._joined.joinPop());
 				// + 1 to skip over the delimiter
@@ -41,7 +41,7 @@ class DelimitedBufferDecoder extends Transform {
 	}
 
 	_flush(callback) {
-		if(this._joined.length) {
+		if (this._joined.length) {
 			// Need to write out the last line, even if didn't end with delimiter
 			this.push(this._joined.joinPop());
 		}

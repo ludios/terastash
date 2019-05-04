@@ -76,13 +76,13 @@ class StashServer {
 		res.setHeader("X-Content-Type-Options", "nosniff");
 		res.setHeader("X-XSS-Protection",       "1; mode=block");
 		res.setHeader("X-UA-Compatible",        "IE=edge");
-		if(req.url === '/') {
+		if (req.url === '/') {
 			res.setHeader("Content-Type", "text/html; charset=utf-8");
 			for (const stash of this.stashes) {
 				res.write(`<li><a href="${encodeURIComponent(stash)}/">${escape(stash)}</a>\n`);
 			}
 			res.end();
-		} else if(req.url === '/favicon.ico') {
+		} else if (req.url === '/favicon.ico') {
 			res.end();
 		} else {
 			let [_, stashName, dbPath] = utils.splitString(req.url, '/', 2);
@@ -92,14 +92,14 @@ class StashServer {
 			const stashInfo = await terastash.getStashInfoByName(stashName);
 			let parent;
 			// TODO: fix getRowByPath
-			if(dbPath === "") {
+			if (dbPath === "") {
 				parent      = {};
 				parent.uuid = Buffer.alloc(128/8);
 				parent.type = "d";
 			} else {
 				parent = await terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid', 'size']);
 			}
-			if(parent.type === "d") {
+			if (parent.type === "d") {
 				// If no trailing slash, redirect with trailing slash to avoid broken links
 				if (!req.url.endsWith("/")) {
 					res.statusCode = 302;
@@ -111,11 +111,11 @@ class StashServer {
 			} else {
 				// streamFile only supports 1 range anyway
 				let firstRange = null;
-				if(req.headers.range) {
+				if (req.headers.range) {
 					const matches = req.headers.range.match(/^bytes=(\d+)-(\d+)?/);
 					const start   = matches[1];
 					const end     = matches[2];
-					if(start !== undefined) {
+					if (start !== undefined) {
 						firstRange = [
 							parseInt(start, 10),
 							end !== undefined ? parseInt(end, 10) : Number(parent.size)
@@ -130,7 +130,7 @@ class StashServer {
 				res.setHeader("Content-Length", String(Number(parent.size)));
 				res.setHeader("Accept-Ranges",  "bytes");
 				res.setHeader("Content-Type",   mimeType);
-				if(firstRange) {
+				if (firstRange) {
 					// Even if we're sending the whole file after a bytes=0-, the client should
 					// get a 206 response so that they know they can do Range requests.
 					// (e.g. mpv will refuse to seek unless it gets a 206?).
