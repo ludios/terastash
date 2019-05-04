@@ -8,7 +8,7 @@ const terastash = require('../');
 function makeChunks(sizes) {
 	const chunks = [];
 	let idx = 0;
-	for(const s of sizes) {
+	for (const s of sizes) {
 		chunks.push({size: s, idx: idx, file_id: "", crc32c: Buffer.alloc(4)});
 		idx++;
 	}

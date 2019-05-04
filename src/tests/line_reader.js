@@ -29,7 +29,7 @@ function makeLines(lineLength, numLines) {
 
 describe('DelimitedBufferDecoder', function() {
 	it("can split lines", async function() {
-		for(const lineLength of [1, 4, 32, 63, 65, 255, 256, 8 * 1024, pow(2, 16 - 1), pow(2, 16), pow(2, 16) + 1, 15 * 1000 * 1000]) {
+		for (const lineLength of [1, 4, 32, 63, 65, 255, 256, 8 * 1024, pow(2, 16 - 1), pow(2, 16), pow(2, 16) + 1, 15 * 1000 * 1000]) {
 			//console.log({lineLength});
 			const numLines =
 				lineLength < 100000 ?

@@ -43,7 +43,7 @@ function maybeCompileAndRequire(name, verbose=false) {
 			];
 		}
 		let nodeGyp;
-		for(const candidate of candidates) {
+		for (const candidate of candidates) {
 			if(fs.existsSync(candidate)) {
 				nodeGyp = candidate;
 				break;

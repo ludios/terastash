@@ -48,7 +48,7 @@ function sameArrayValues(arr1, arr2) {
 	if(length !== arr2.length) {
 		return false;
 	}
-	for(let i=0; i < length; i++) {
+	for (let i=0; i < length; i++) {
 		if(!Object.is(arr1[i], arr2[i])) {
 			return false;
 		}
@@ -379,7 +379,7 @@ const ChunksType = T.list(
 
 function allIdentical(arr) {
 	T(arr, Array);
-	for(let n=0; n < arr.length; n++) {
+	for (let n=0; n < arr.length; n++) {
 		if(arr[n] !== arr[0]) {
 			return false;
 		}
@@ -615,7 +615,7 @@ function* zip(...iterables) {
 	}
 	iterables = iterables.map(iterable => iterable[Symbol.iterator]());
 	const rest = iterables.slice(1);
-	for(const item of iterables[0]) {
+	for (const item of iterables[0]) {
 		yield [item].concat(rest.map(iterable => iterable.next().value));
 	}
 }

@@ -498,7 +498,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	(async function readChunks$coro() {
-		for(const [chunk, range] of utils.zip(chunks, ranges)) {
+		for (const [chunk, range] of utils.zip(chunks, ranges)) {
 			if(destroyed) {
 				return;
 			}
@@ -520,7 +520,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			}
 
 			let getDataError, chunkStream, res;
-			for(const account of accountsToTry) {
+			for (const account of accountsToTry) {
 				try {
 					await gdriver.loadCredentials(account);
 					[chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
@@ -579,7 +579,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
  */
 async function deleteChunks(gdriver, chunks) {
 	T(gdriver, GDriver, chunks, utils.ChunksType);
-	for(const chunk of chunks) {
+	for (const chunk of chunks) {
 		try {
 			const account = chunk.account;
 			if(account) {
@@ -597,7 +597,7 @@ async function deleteChunks(gdriver, chunks) {
 				// Older versions of terastash did not record which account was used to
 				// upload each chunk.  If we did not record who owns a chunk, try every
 				// account.
-				for(const account_ of getAccounts()) {
+				for (const account_ of getAccounts()) {
 					try {
 						await gdriver.loadCredentials(account_);
 						await gdriver.deleteFile(chunk.file_id);

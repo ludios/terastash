@@ -39,7 +39,7 @@ class CRCWriter extends Transform {
 			const [splitBufs, remainder] = utils.splitBuffer(this._joined.joinPop(), this._blockSize);
 			this._joined.push(remainder);
 
-			for(const buf of splitBufs) {
+			for (const buf of splitBufs) {
 				this._pushCRCAndBuf(buf);
 			}
 		}

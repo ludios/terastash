@@ -67,7 +67,7 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
 	// We don't return this Promise; we return the stream and
 	// the coroutine does the work of writing to the stream.
 	(async function readChunks$coro() {
-		for(const [chunk, range] of utils.zip(chunks, ranges)) {
+		for (const [chunk, range] of utils.zip(chunks, ranges)) {
 			if(destroyed) {
 				return;
 			}
@@ -120,7 +120,7 @@ function readChunks(directory, chunks, ranges, checkWholeChunkCRC32C) {
  */
 async function deleteChunks(directory, chunks) {
 	T(directory, T.string, chunks, utils.ChunksType);
-	for(const chunk of chunks) {
+	for (const chunk of chunks) {
 		try {
 			await fs.unlinkAsync(path.join(directory, chunk.file_id));
 		} catch(err) {

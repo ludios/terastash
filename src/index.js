@@ -177,7 +177,7 @@ async function getStashInfoByPath(pathname) {
 	}
 
 	const resolvedPathname = path.resolve(pathname);
-	for(const stashName of Object.keys(config.stashes)) {
+	for (const stashName of Object.keys(config.stashes)) {
 		const stash = config.stashes[stashName];
 		//console.log(resolvedPathname, stash.path);
 		if (resolvedPathname === stash.path || resolvedPathname.startsWith(stash.path + path.sep)) {
@@ -234,7 +234,7 @@ async function getStashInfoForPaths(paths) {
 	// Make sure all paths are in the same stash
 	const stashInfos = [];
 	// Don't use Promise.all to avoid having too many file handles open
-	for(const p of paths) {
+	for (const p of paths) {
 		stashInfos.push(await getStashInfoByPath(path.resolve(p)));
 	}
 	const stashNames = stashInfos.map(utils.prop('name'));
@@ -463,7 +463,7 @@ async function lsPath(client, stashName, options, p) {
 	} else {
 		rows.sort(options.reverse ? pathsorterDesc : pathsorterAsc);
 	}
-	for(const row of rows) {
+	for (const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 		if (options.justNames) {
 			console.log(row.basename);
@@ -493,7 +493,7 @@ async function listRecursively(client, stashInfo, baseDbPath, dbPath, print0, ty
 		["basename", "type"]
 	);
 	rows.sort(pathsorterAsc);
-	for(const row of rows) {
+	for (const row of rows) {
 		A(!/[\r\n]/.test(row.basename), `${inspect(row.basename)} contains CR or LF`);
 		let fullPath = `${dbPath}/${row.basename}`;
 		if (type === undefined || type === row.type) {
@@ -738,7 +738,7 @@ function dropFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(getNewClient(), async function dropFiles$coro(client) {
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
-		for(const p of paths) {
+		for (const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			await dropFile(client, stashInfo, dbPath);
 		}
@@ -775,12 +775,12 @@ async function infoFile(client, stashInfo, dbPath, showKeys) {
 		utils.assertSafeNonNegativeLong(row.size);
 		row.size = Number(row.size);
 	}
-	for(const k of Object.keys(row)) {
+	for (const k of Object.keys(row)) {
 		if (row[k] instanceof Buffer) {
 			row[k] = row[k].toString('hex');
 		}
 		if (k.startsWith('chunks_in') && row[k]) {
-			for(const chunkInfo of row[k]) {
+			for (const chunkInfo of row[k]) {
 				if (chunkInfo.crc32c) {
 					chunkInfo.crc32c = chunkInfo.crc32c.toString('hex');
 				}
@@ -802,7 +802,7 @@ function infoFiles(stashName, paths, showKeys) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string), showKeys, T.boolean);
 	return doWithClient(getNewClient(), async function infoFiles$coro(client) {
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
-		for(const p of paths) {
+		for (const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			await infoFile(client, stashInfo, dbPath, showKeys);
 		}
@@ -848,7 +848,7 @@ function shooFiles(paths, justRemove, continueOnError, ignoreMtime) {
 	T(paths, T.list(T.string), justRemove, T.optional(T.boolean), continueOnError, T.optional(T.boolean), ignoreMtime, T.optional(T.boolean));
 	return doWithClient(getNewClient(), async function shooFiles$coro(client) {
 		const stashInfo = await getStashInfoForPaths(paths);
-		for(const p of paths) {
+		for (const p of paths) {
 			try {
 				await shooFile(client, stashInfo, p, justRemove, ignoreMtime);
 			} catch(err) {
@@ -1074,7 +1074,7 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 
 		const totalSize = _[0];
 		chunkInfo = _[1];
-		for(const info of chunkInfo) {
+		for (const info of chunkInfo) {
 			A.lte(info.size, chunkStore.chunkSize, `uploaded a too-big chunk:\n${inspect(info)}`);
 		}
 		A.eq(totalSize, concealedSize,
@@ -1158,7 +1158,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 		process.on('SIGINT', stopSoon);
 		try {
 			let count = 1;
-			for(const p of paths) {
+			for (const p of paths) {
 				if (outCtx.mode === 'terminal') {
 					utils.clearOrLF(process.stdout);
 					process.stdout.write(`${count}/${paths.length}...`);
@@ -1193,7 +1193,7 @@ function addFiles(outCtx, paths, continueOnExists=false, dropOldIfDifferent=fals
 function validateChunksFixBigints(chunks) {
 	T(chunks, T.list(T.shape({size: T.object, idx: T.number})));
 	let expectIdx = 0;
-	for(const chunk of chunks) {
+	for (const chunk of chunks) {
 		utils.assertSafeNonNegativeLong(chunk.size);
 		chunk.size = Number(chunk.size);
 		A.eq(chunk.idx, expectIdx, "Bad chunk data from database");
@@ -1211,7 +1211,7 @@ function chunksToBlockRanges(chunks, blockSize) {
 	utils.assertSafeNonNegativeInteger(blockSize);
 	const blockRanges = [];
 	let start = 0;
-	for(const c of chunks) {
+	for (const c of chunks) {
 		// Last chunk might not be divisible by blockSize
 		const scaledSize = Math.ceil(c.size / blockSize);
 		utils.assertSafeNonNegativeInteger(scaledSize);
@@ -1496,7 +1496,7 @@ function getFiles(stashName, paths, fake) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean);
 	return doWithClient(getNewClient(), async function getFiles$coro(client) {
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
-		for(const p of paths) {
+		for (const p of paths) {
 			let dbPath;
 			let outputFilename;
 			// If stashName was given, write file to current directory
@@ -1529,7 +1529,7 @@ function catFiles(stashName, paths) {
 	T(stashName, T.maybe(T.string), paths, T.list(T.string));
 	return doWithClient(getNewClient(), async function catFiles$coro(client) {
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
-		for(const p of paths) {
+		for (const p of paths) {
 			const dbPath = eitherPathToDatabasePath(stashName, stashInfo.path, p);
 			await catFile(client, stashInfo, dbPath);
 		}
@@ -1541,7 +1541,7 @@ function catRangedFiles(stashName, args) {
 	return doWithClient(getNewClient(), async function catFiles$coro(client) {
 		const paths = args.map(function(s) { return utils.rsplitString(s, "/", 1)[0]; });
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
-		for(const a of args) {
+		for (const a of args) {
 			const [p, range] = utils.rsplitString(a, "/", 1);
 			let [start, end] = utils.splitString(range, "-", 1);
 			start = Number(start);
@@ -1569,7 +1569,7 @@ function makeDirectories(stashName, paths) {
 				return userPathToDatabasePath(stashInfo.path, p);
 			});
 		}
-		for(let i=0; i < dbPaths.length; i++) {
+		for (let i=0; i < dbPaths.length; i++) {
 			const p = paths[i];
 			const dbPath = dbPaths[i];
 			checkDbPath(dbPath);
@@ -1632,7 +1632,7 @@ function moveFiles(stashName, sources, dest) {
 			);
 		}
 		if (destTypeInDb === DIRECTORY) {
-			for(const dbPathSource of dbPathSources) {
+			for (const dbPathSource of dbPathSources) {
 				const parent = await getUuidForPath(
 					client, stashInfo.name, utils.getParentPath(dbPathSource));
 				const row = await getRowByParentBasename(
@@ -1712,7 +1712,7 @@ function listTerastashKeyspaces() {
 			client,
 			`SELECT keyspace_name FROM System.schema_keyspaces;`
 		).then(function listTerastashKeyspaces$then(result) {
-			for(const row of result.rows) {
+			for (const row of result.rows) {
 				const name = row.keyspace_name;
 				if (name.startsWith(KEYSPACE_PREFIX)) {
 					console.log(name.replace(KEYSPACE_PREFIX, ""));
@@ -1724,7 +1724,7 @@ function listTerastashKeyspaces() {
 
 async function listChunkStores() {
 	const config = await getChunkStores();
-	for(const storeName of Object.keys(config.stores)) {
+	for (const storeName of Object.keys(config.stores)) {
 		console.log(storeName);
 	}
 }
@@ -2097,7 +2097,7 @@ class TransitToInsert extends Transform {
 		const extraCols = [];
 		const extraVals = [];
 		let totalChunksSize = 0;
-		for(const k of obj.keys()) {
+		for (const k of obj.keys()) {
 			if (k.startsWith("chunks_in_") && obj.get(k, null) !== null) {
 				if (!this._columnsCreated.has(k)) {
 					await tryCreateColumnOnStashTable(

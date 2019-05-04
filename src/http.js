@@ -52,7 +52,7 @@ class StashServer {
 				<td class="size">-</td>
 			</tr>
 		`);
-		for(const row of rows) {
+		for (const row of rows) {
 			const d = row.type === "d" ? "/" : "";
 			res.write(`
 				<tr>
@@ -78,7 +78,7 @@ class StashServer {
 		res.setHeader("X-UA-Compatible",        "IE=edge");
 		if(req.url === '/') {
 			res.setHeader("Content-Type", "text/html; charset=utf-8");
-			for(const stash of this.stashes) {
+			for (const stash of this.stashes) {
 				res.write(`<li><a href="${encodeURIComponent(stash)}/">${escape(stash)}</a>\n`);
 			}
 			res.end();
