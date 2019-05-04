@@ -100,7 +100,7 @@ describe('GDriver', function() {
 	});
 
 	it('readChunks does not hang forever when Google Drive reports 404 for a fileId', async function() {
-		this.timeout(6000);
+		this.timeout(60000);
 
 		const [gdriver, _chunkStore] = await doSetup();
 
