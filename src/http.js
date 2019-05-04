@@ -100,7 +100,14 @@ class StashServer {
 				parent = await terastash.getRowByPath(this.client, stashInfo.name, dbPath, ['type', 'uuid', 'size']);
 			}
 			if(parent.type === "d") {
-				this._writeListing(res, stashInfo, parent);
+				// If no trailing slash, redirect with trailing slash to avoid broken links
+				if (!req.url.endsWith("/")) {
+					res.statusCode = 302;
+					res.setHeader("Location", req.url + "/");
+					res.end();
+				} else {
+					this._writeListing(res, stashInfo, parent);
+				}
 			} else {
 				// streamFile only supports 1 range anyway
 				let firstRange = null;
