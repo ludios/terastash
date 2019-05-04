@@ -430,7 +430,7 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 	let idx = 0;
 	const chunkInfo = [];
 
-	while(true) {
+	while (true) {
 		const decayer = new retry.Decayer(5 * 1000, 1.5, 3600 * 1000);
 		let lastChunkAgain = false;
 		let crc32Hasher;

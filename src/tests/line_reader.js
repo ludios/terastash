@@ -16,7 +16,7 @@ function makeLines(lineLength, numLines) {
 	const bufs = [];
 	const buf = Buffer.from("X".repeat(lineLength));
 	const LF = Buffer.from("\n");
-	while(numLines--) {
+	while (numLines--) {
 		bufs.push(buf);
 		bufs.push(LF);
 	}

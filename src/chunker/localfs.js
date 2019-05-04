@@ -18,7 +18,7 @@ async function writeChunks(outCtx, directory, getChunkStream) {
 	let idx = 0;
 	const chunkInfo = [];
 
-	while(true) {
+	while (true) {
 		const chunkStream = await getChunkStream(false);
 		if(chunkStream === null) {
 			break;

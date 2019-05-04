@@ -161,7 +161,7 @@ class GCMReader extends Transform {
 			return;
 		}
 		let data = this._joined.joinPop();
-		while(data.length) {
+		while (data.length) {
 			//console.error(this._counter, data.length, this._mode);
 			if(this._mode === MODE_TAG) {
 				if(data.length >= 16) {

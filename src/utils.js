@@ -525,7 +525,7 @@ function pluralize(count, singular, plural) {
 function splitBuffer(buf, blockSize) {
 	let start = 0;
 	const bufs = [];
-	while(true) {
+	while (true) {
 		const block = buf.slice(start, start + blockSize);
 		if(block.length < blockSize) {
 			return [bufs, block];

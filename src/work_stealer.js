@@ -68,7 +68,7 @@ function makeWorkStealers(inputStream, quantity) {
 	T(inputStream, utils.StreamType, quantity, T.number);
 	utils.assertSafeNonNegativeInteger(quantity);
 	const instances = [];
-	while(quantity--) {
+	while (quantity--) {
 		instances.push(new WorkStealer(inputStream).init());
 	}
 	return instances;

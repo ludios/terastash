@@ -104,7 +104,7 @@ class CRCReader extends Transform {
 			return;
 		}
 		let data = this._joined.joinPop();
-		while(data.length) {
+		while (data.length) {
 			//console.error(this._counter, data.length, this._mode);
 			if(this._mode === MODE_CRC) {
 				if(data.length >= 4) {

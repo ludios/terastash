@@ -54,7 +54,7 @@ async function retryFunction(func, errorHandler, tries, decayer) {
 	T(func, T.function, errorHandler, T.function, tries, T.number, decayer, Decayer);
 	utils.assertSafeNonNegativeInteger(tries);
 	let caught = null;
-	while(tries) {
+	while (tries) {
 		try {
 			// Need the 'yield' here to make sure errors are caught
 			// in *this* function
