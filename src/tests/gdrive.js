@@ -24,6 +24,13 @@ async function doSetup() {
 	return [gdriver, chunkStore];
 }
 
+describe('obfuscateAccountName', function() {
+	it('works', function() {
+		A.eq(gdrive.obfuscateAccountName("test@example.com"), "G-585ECBC4");
+		A.eq(gdrive.obfuscateAccountName("test@something.gserviceaccount.com"), "S-DC9F0A61");
+	});
+});
+
 describe('GDriver', function() {
 	it('can upload a file, create folder, get file, delete both', async function() {
 		this.timeout(20000);

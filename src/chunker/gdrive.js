@@ -13,6 +13,8 @@ const chalk             = require('chalk');
 const path              = require('path');
 const fs                = require('../fs-promisified');
 const basedir           = require('xdg').basedir;
+const compile_require   = require('../compile_require');
+const sse4_crc32        = compile_require('sse4_crc32');
 
 
 function getTokenFiles() {
@@ -41,6 +43,22 @@ async function getAllCredentialsForAccount(account) {
 	const tokenFile = basedir.configPath(path.join("terastash", "google-tokens", `${account}.json`));
 	const buf       = await fs.readFileAsync(tokenFile);
 	return JSON.parse(buf);
+}
+
+function crc32cHexDigest(s) {
+	const digest = sse4_crc32.calculate(s);
+	const buf = Buffer.allocUnsafe(4);
+	buf.writeUIntBE(digest, 0, 4);
+	return buf.toString("hex");
+}
+
+// Used to prevent real emails from showing up on the grafana dashboard
+function obfuscateAccountName(account) {
+	let prefix = "G-";
+	if (account.endsWith(".gserviceaccount.com")) {
+		prefix = "S-";
+	}
+	return `${prefix}${crc32cHexDigest(account).toUpperCase()}`;
 }
 
 const idProp = utils.prop('id');
@@ -97,6 +115,7 @@ class GDriver {
 		this.clientSecret  = clientSecret;
 		const redirectUrl  = 'urn:ietf:wg:oauth:2.0:oob';
 		this._oauth2Client = new FixedOAuth2(clientId, clientSecret, redirectUrl);
+		this._account      = null;
 		this._drive        = google.drive({version: 'v2', auth: this._oauth2Client});
 	}
 
@@ -143,10 +162,8 @@ class GDriver {
 	async loadCredentials(account) {
 		const config = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
-		if (credentials) {
-			this._oauth2Client.setCredentials(credentials);
-		}
-		return account;
+		this._oauth2Client.setCredentials(credentials);
+		this._account = account;
 	}
 
 	refreshAccessToken() {
@@ -224,6 +241,7 @@ class GDriver {
 			};
 		}
 
+		const account = this._account;
 		return new Promise(function(resolve, reject) {
 			const requestObj = this._drive.files.insert(insertOpts, function(err, obj) {
 				if (err) {
@@ -279,6 +297,10 @@ class GDriver {
 						` but was ${inspect(obj.md5Checksum)}`
 					);
 				}
+
+				utils.statsdCounterIncrement(
+					"terastash_bytes_uploaded", hasher.length,
+					[`account:${obfuscateAccountName(account)}`]);
 			}
 			// obj.mimeType may not match what we wanted, so don't check it
 			return obj;
@@ -615,4 +637,4 @@ async function deleteChunks(gdriver, chunks) {
 	}
 }
 
-module.exports = {GDriver, writeChunks, readChunks, deleteChunks, pickRandomAccount, DownloadError};
+module.exports = {GDriver, writeChunks, readChunks, deleteChunks, pickRandomAccount, DownloadError, obfuscateAccountName};

@@ -10,6 +10,7 @@ const basedir         = require('xdg').basedir;
 const inspect         = require('util').inspect;
 const mkdirp          = require('mkdirp');
 const https           = require('https');
+const dgram           = require("dgram");
 const compile_require = require('./compile_require');
 const sse4_crc32      = compile_require('sse4_crc32');
 
@@ -620,6 +621,35 @@ function* zip(...iterables) {
 	}
 }
 
+function statsdSend(s) {
+	const host    = "127.0.0.1";
+	const port    = 8125;
+	const client  = dgram.createSocket("udp4");
+	const message = new Buffer.from(s);
+	return new Promise(function(resolve, reject) {
+		client.send(message, 0, message.length, port, host, function(err, bytes) {
+			try {
+				client.close();
+			} catch(_) {}
+
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+}
+
+function statsdCounterIncrement(name, value, tags) {
+	let s = `${name}:${value}|c`;
+	if (tags) {
+		s += "|#";
+		s += tags.join(",");
+	}
+	return statsdSend(s);
+}
+
 module.exports = {
 	OutputContextType, assertSafeNonNegativeInteger, assertSafeNonNegativeLong,
 	randInt, sameArrayValues, prop, shortISO, pad, commaify, getParentPath,
@@ -631,5 +661,6 @@ module.exports = {
 	makeChunkFilename, StreamType, ChunksType, allIdentical, filledArray,
 	PersistentCounter, WILDCARD, colsAsString, ColsType, utimesMilliseconds,
 	tryUnlink, JoinedBuffers, clearOrLF, pluralize, splitBuffer,
-	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip
+	splitString, rsplitString, RangeType, RangesType, checkRange, intersect, zip,
+	statsdCounterIncrement
 };
