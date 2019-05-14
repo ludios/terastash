@@ -17,22 +17,22 @@
     "chalk": "^2.3.2",
     "cli-table": "^0.3.1",
     "combine-streams": "^1.0.0",
-    "commander": "^2.19.0",
+    "commander": "^2.20.0",
     "deep-equal": "^1.0.1",
     "escape-html": "^1.0.3",
-    "googleapis": "^9.0.0",
+    "googleapis": "^39.2.0",
     "intreader": "^1.0.1",
     "mime-types": "^2.1.18",
     "mkdirp": "^0.5.1",
     "notmytype": "^2.0.0",
-    "sse4_crc32": "^5.2.0",
+    "sse4_crc32": "^5.3.0",
     "streamifier": "^0.1.1",
-    "transit-js": "^0.8.846",
+    "transit-js": "0.8.846",
     "xdg": "^0.1.1"
   },
   "devDependencies": {
-    "eslint": "^4.19.0",
-    "mocha": "^5.0.4",
+    "eslint": "^5.16.0",
+    "mocha": "^6.1.4",
     "require-times": "^1.1.0"
   },
   "engines": {
