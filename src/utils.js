@@ -627,7 +627,7 @@ function statsdSend(s) {
 	const client  = dgram.createSocket("udp4");
 	const message = new Buffer.from(s);
 	return new Promise(function(resolve, reject) {
-		client.send(message, 0, message.length, port, host, function(err, bytes) {
+		client.send(message, 0, message.length, port, host, function(err, _bytes) {
 			try {
 				client.close();
 			} catch(_) {}
