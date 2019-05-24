@@ -20,7 +20,7 @@
     "commander": "^2.20.0",
     "deep-equal": "^1.0.1",
     "escape-html": "^1.0.3",
-    "googleapis": "^39.2.0",
+    "googleapis": "^40.0.0",
     "intreader": "^1.0.1",
     "mime-types": "^2.1.18",
     "mkdirp": "^0.5.1",
