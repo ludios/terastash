@@ -281,14 +281,25 @@ function writableToBuffer(stream) {
 	});
 }
 
-function crc32$digest(encoding) {
-	T(encoding, T.optional(T.string));
-	const buf = Buffer.allocUnsafe(4);
-	buf.writeUIntBE(this.crc(), 0, 4);
-	if (encoding === undefined) {
-		return buf;
-	} else {
-		return buf.toString(encoding);
+class CRC32C {
+	constructor() {
+		this.crc = 0;
+	}
+
+	update(buf) {
+		T(buf, Buffer);
+		this.crc = sse4_crc32.calculate(buf, this.crc);
+	}
+
+	digest(encoding) {
+		T(encoding, T.optional(T.string));
+		const buf = Buffer.allocUnsafe(4);
+		buf.writeUIntBE(this.crc, 0, 4);
+		if (encoding === undefined) {
+			return buf;
+		} else {
+			return buf.toString(encoding);
+		}
 	}
 }
 
@@ -310,8 +321,7 @@ function streamHasher(inputStream, algoOrExistingHash, existingLength=0) {
 	if (typeof algoOrExistingHash === "string") {
 		const algo = algoOrExistingHash;
 		if (algo === "crc32c") {
-			hash = new sse4_crc32.CRC32();
-			hash.digest = crc32$digest;
+			hash = new CRC32C();
 		} else {
 			hash = crypto.createHash(algo);
 		}

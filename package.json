@@ -25,7 +25,7 @@
     "mime-types": "^2.1.18",
     "mkdirp": "^0.5.1",
     "notmytype": "^2.0.0",
-    "sse4_crc32": "^5.3.0",
+    "sse4_crc32": "ludios/sse4_crc32",
     "streamifier": "^0.1.1",
     "transit-js": "0.8.846",
     "xdg": "^0.1.1"
