@@ -501,7 +501,7 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 			// We try three times because sometimes the Google Drive backend returns
 			// spurious transient 404s.
 			let accountsToTry;
-			if (chunk.account) {
+			if (chunk.account && chunk.account !== "teamdrive") {
 				accountsToTry = [chunk.account, chunk.account, chunk.account];
 			} else {
 				const accounts = getAccounts();
@@ -573,7 +573,7 @@ async function deleteChunks(gdriver, chunks) {
 	for (const chunk of chunks) {
 		try {
 			const account = chunk.account;
-			if (account) {
+			if (account && account !== "teamdrive") {
 				T(account, T.string);
 				if (account.indexOf("/") != -1) {
 					throw new Error(`Illegal character in account=${inspect(account)}` +
