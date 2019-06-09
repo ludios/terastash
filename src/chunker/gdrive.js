@@ -44,6 +44,13 @@ async function getAllCredentialsForAccount(account) {
 	return JSON.parse(buf);
 }
 
+function getRandomServiceAccountFile() {
+	const dir = basedir.configPath(path.join("terastash", "service-accounts"));
+	const serviceAccounts = fs.readdirSync(dir);
+	const accountFile = serviceAccounts[Math.floor(Math.random() * serviceAccounts.length)];
+	return path.join(dir, accountFile);
+}
+
 function crc32cHexDigest(s) {
 	const digest = sse4_crc32.calculate(s);
 	const buf = Buffer.allocUnsafe(4);
@@ -79,17 +86,15 @@ class GDriver {
 		T(clientId, T.string, clientSecret, T.string);
 		this.clientId      = clientId;
 		this.clientSecret  = clientSecret;
-		const redirectUrl  = 'urn:ietf:wg:oauth:2.0:oob';
-		this._oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUrl);
 		this._account      = null;
-		this._drive        = google.drive({version: 'v2', auth: this._oauth2Client});
+		this._auth         = null;
+		this._drive        = null;
 	}
 
 	getAuthUrl() {
-		const scopes = ['https://www.googleapis.com/auth/drive'];
 		const url = this._oauth2Client.generateAuthUrl({
-			"access_type": 'offline', // 'online' (default) or 'offline' (gets refresh_token)
-			"scope": scopes
+			"access_type": "offline", // "online" (default) or "offline" (gets refresh_token)
+			"scope": ["https://www.googleapis.com/auth/drive"]
 		});
 		return url;
 	}
@@ -125,11 +130,23 @@ class GDriver {
 		}.bind(this));
 	}
 
-	async loadCredentials(account) {
+	async loadOAuth2Credentials(account) {
 		const config = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
-		this._oauth2Client.setCredentials(credentials);
+		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
+		this._auth = new google.auth.OAuth2(this.clientId, this.clientSecret, redirectUrl);
+		this._auth.setCredentials(credentials);
 		this._account = account;
+		this._drive = google.drive({version: 'v2', auth: this._auth});
+	}
+
+	async loadServiceAccountCredentials() {
+		this._auth = await google.auth.getClient({
+			keyFile: getRandomServiceAccountFile(),
+			scopes: "https://www.googleapis.com/auth/drive",
+		});
+		this._account = "teamdrive";
+		this._drive = google.drive({version: 'v2', auth: this._auth});
 	}
 
 	refreshAccessToken() {
@@ -144,6 +161,7 @@ class GDriver {
 		}.bind(this));
 	}
 
+	// Only needed for non-service-account operations
 	async _maybeRefreshAndSaveToken() {
 		// Typically, another process is responsible for updating the tokens and
 		// copying them to all the machines that might need them.
@@ -181,7 +199,7 @@ class GDriver {
 			requestCb, T.optional(T.object)
 		);
 
-		await this._maybeRefreshAndSaveToken();
+		await this.loadServiceAccountCredentials();
 
 		const parents = (opts.parents || []).concat().sort();
 		const mimeType = opts.mimeType || "application/octet-stream";
@@ -195,8 +213,9 @@ class GDriver {
 						"id": parentId
 					};
 				}),
-				mimeType: mimeType
-			}
+				mimeType: mimeType,
+			},
+			supportsAllDrives: true
 		};
 		let hasher;
 		if (stream !== null) {
@@ -294,7 +313,7 @@ class GDriver {
 		T(fileId, T.string);
 		await this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
-			this._drive.files.delete({fileId}, function(err, obj) {
+			this._drive.files.delete({fileId, supportsAllDrives: true}, function(err, obj) {
 				if (err) {
 					reject(err);
 				} else {
@@ -306,12 +325,12 @@ class GDriver {
 
 	async getMetadata(fileId) {
 		T(fileId, T.string);
-		await this._maybeRefreshAndSaveToken();
 		return new Promise(function(resolve, reject) {
 			this._drive.files.get(
 				{
 					fileId,
-					updateViewedDate: false
+					updateViewedDate: false,
+					supportsAllDrives: true
 				},
 				function(err, reply) {
 					if (err) {
@@ -322,20 +341,6 @@ class GDriver {
 				}
 			);
 		}.bind(this));
-	}
-
-	_getHeaders() {
-		const credentials = this._oauth2Client.credentials;
-		if (!credentials) {
-			throw new Error("Lack credentials");
-		}
-		if (!credentials.token_type) {
-			throw new Error("Credentials lack token_type");
-		}
-		if (!credentials.access_token) {
-			throw new Error("Credentials lack access_token");
-		}
-		return {"Authorization": `${credentials.token_type} ${credentials.access_token}`};
 	}
 
 	/**
@@ -351,8 +356,7 @@ class GDriver {
 		if (range) {
 			utils.checkRange(range);
 		}
-		await this._maybeRefreshAndSaveToken();
-		const reqHeaders = this._getHeaders();
+		const reqHeaders = await this._auth.getRequestHeaders();
 		if (range) {
 			reqHeaders["Range"] = `bytes=${range[0]}-${range[1] - 1}`;
 		}
@@ -423,7 +427,6 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 		const decayer = new retry.Decayer(5 * 1000, 1.5, 3600 * 1000);
 		let lastChunkAgain = false;
 		let crc32Hasher;
-		let account;
 		const response = await retry.retryFunction(async function writeChunks$retry() {
 			// Make a new filename each time, in case server reports error
 			// when it actually succeeded.
@@ -436,9 +439,6 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			if (Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
-			account = pickRandomAccount();
-			// Load credentials on every try because one account might be overloaded while others are not.
-			await gdriver.loadCredentials(account);
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}, function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;
@@ -460,7 +460,7 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			crc32c:  crc32Hasher.hash.digest(),
 			md5:     md5Digest,
 			size:    crc32Hasher.length,
-			account: account
+			account: gdriver._account
 		});
 		totalSize += crc32Hasher.length;
 		idx += 1;
@@ -510,8 +510,10 @@ function readChunks(gdriver, chunks, ranges, checkWholeChunkCRC32C) {
 
 			let getDataError, chunkStream, res;
 			for (const account of accountsToTry) {
+				// Use one of our regular accounts to read, because our non-Team Drive files can't be read
+				// with the service accounts.
+				await gdriver.loadOAuth2Credentials(account);
 				try {
-					await gdriver.loadCredentials(account);
 					[chunkStream, res] = await gdriver.getData(chunk.file_id, range, checkWholeChunkCRC32C);
 					break;
 				} catch(e) {
@@ -577,7 +579,7 @@ async function deleteChunks(gdriver, chunks) {
 					throw new Error(`Illegal character in account=${inspect(account)}` +
 						` in chunks=${inspect(chunks)}`);
 				}
-				await gdriver.loadCredentials(account);
+				await gdriver.loadOAuth2Credentials(account);
 				await gdriver.deleteFile(chunk.file_id);
 			} else {
 				// Even if we use Drive permissions to share files with multiple accounts,
@@ -588,7 +590,7 @@ async function deleteChunks(gdriver, chunks) {
 				// account.
 				for (const account_ of getAccounts()) {
 					try {
-						await gdriver.loadCredentials(account_);
+						await gdriver.loadOAuth2Credentials(account_);
 						await gdriver.deleteFile(chunk.file_id);
 						break;
 					} catch(_) {
