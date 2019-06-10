@@ -416,8 +416,8 @@ class GDriver {
 }
 
 
-async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
-	T(outCtx, OutputContextType, gdriver, GDriver, parents, T.list(T.string), getChunkStream, T.function);
+async function writeChunks(outCtx, gdriver, getParents, getChunkStream) {
+	T(outCtx, OutputContextType, gdriver, GDriver, getParents, T.function, getChunkStream, T.function);
 
 	let totalSize = 0;
 	let idx = 0;
@@ -439,6 +439,8 @@ async function writeChunks(outCtx, gdriver, parents, getChunkStream) {
 			if (Math.random() < Number(process.env.TERASTASH_UPLOAD_FAIL_RATIO)) {
 				throw new Error("Forcing a failure for testing (TERASTASH_UPLOAD_FAIL_RATIO is set)");
 			}
+			const parents = await getParents();
+			T(parents, T.list(T.string));
 			return gdriver.createFile(fname, {parents}, crc32Hasher.stream);
 		}, function writeChunks$errorHandler(e, triesLeft) {
 			lastChunkAgain = true;

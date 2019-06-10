@@ -966,6 +966,10 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 	}
 
 	const chunkStore = await getChunkStore(stashInfo);
+	const getParents = async function() {
+		const chunkStore = await getChunkStore(stashInfo);
+		return chunkStore.parents;
+	};
 	let content = null;
 	let chunkInfo;
 	let size;
@@ -1067,7 +1071,9 @@ async function addFile(outCtx, client, stashInfo, p, dbPath, dropOldIfDifferent=
 			_ = await localfs.writeChunks(outCtx, chunkStore.directory, getChunkStream);
 		} else if (chunkStore.type === "gdrive") {
 			const gdriver = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-			_ = await gdrive.writeChunks(outCtx, gdriver, chunkStore.parents, getChunkStream);
+			// Pass getParents instead of parents, because it may change during an upload
+			// by an external program that updates which team drive to use.
+			_ = await gdrive.writeChunks(outCtx, gdriver, getParents, getChunkStream);
 		} else {
 			throw new Error(`Unknown chunk store type ${inspect(chunkStore.type)}`);
 		}
