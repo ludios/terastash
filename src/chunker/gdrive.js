@@ -142,17 +142,32 @@ class GDriver {
 		this._drive = google.drive({version: 'v2', auth: this._auth});
 	}
 
-	async createTeamDrive(managerEmail, name) {
-		T(managerEmail, T.string, name, T.string);
+	async createTeamDrive(managerEmail, contentManagers, name) {
+		T(managerEmail, T.string, contentManagers, T.list(T.string), name, T.string);
 		await this.loadOAuth2Credentials(managerEmail);
-		const drivev3   = google.drive({version: 'v3', auth: this._auth});
+		this._drivev3   = google.drive({version: 'v3', auth: this._auth});
+
 		const requestId = crypto.randomBytes(128/8).toString('hex');
-		const params    = {requestId: requestId, resource: {name: name}};
-		const reply     = await drivev3.drives.create(params);
-		const data      = reply.data;
+		const params1   = {requestId: requestId, resource: {name: name}};
+		const reply1    = await this._drivev3.drives.create(params1);
+		const data      = reply1.data;
 		A.eq(data.kind, "drive#drive");
 		A.eq(data.name, name);
+		T(data.id, T.string);
+
+		for (const email of contentManagers) {
+			await this.addContentManager(data.id, email);
+		}
+
 		return data.id;
+	}
+
+	async addContentManager(teamDriveId, emailAddress) {
+		T(teamDriveId, T.string, emailAddress, T.string);
+		const body     = {kind: "drive#permission", type: "user", emailAddress: emailAddress, role: "fileOrganizer"};
+		const params   = {fileId: teamDriveId, supportsAllDrives: true, sendNotificationEmail: false, requestBody: body};
+		const reply    = await this._drivev3.permissions.create(params);
+		A.eq(reply.status, 200);
 	}
 
 	async loadServiceAccountCredentials() {

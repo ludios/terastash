@@ -1868,12 +1868,13 @@ async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
 	atomicWriteFileSync(tokensFilename, content, tempDirectory);
 }
 
-async function createTeamDrive(stashName, managerEmail, driveName, teamDriveFile) {
-	T(stashName, T.string, managerEmail, T.string, driveName, T.string, teamDriveFile, T.string);
-	const stashInfo  = await getStashInfoByName(stashName);
-	const chunkStore = await getChunkStore(stashInfo);
-	const gdriver    = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
-	const id         = await gdriver.createTeamDrive(managerEmail, driveName);
+async function createTeamDrive(stashName, managerEmail, contentManagerListFile, driveName, teamDriveFile) {
+	T(stashName, T.string, managerEmail, T.string, contentManagerListFile, T.string, driveName, T.string, teamDriveFile, T.string);
+	const contentManagers = fs.readFileSync(contentManagerListFile).toString("utf-8").trim().split("\n");
+	const stashInfo       = await getStashInfoByName(stashName);
+	const chunkStore      = await getChunkStore(stashInfo);
+	const gdriver         = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+	const id              = await gdriver.createTeamDrive(managerEmail, contentManagers, driveName);
 	fs.appendFileSync(teamDriveFile, `${driveName}\t${id}\n`);
 }
 

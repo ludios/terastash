@@ -473,13 +473,13 @@ program
 	}));
 
 program
-	.command('create-team-drive <stash-id> <owner-email> <drive-name> <team-drive-file>')
+	.command('create-team-drive <stash-id> <owner-email> <content-manager-list-file> <drive-name> <team-drive-file>')
 	.description(d(`
 		Create a new team drive and append its details to team-drive-file.
 		
 		stash-id is used only to get the Google client id and client secret.`))
-	.action(a(function(stashId, managerEmail, driveName, teamDriveFile) {
-		catchAndLog(terastash.createTeamDrive(stashId, managerEmail, driveName, teamDriveFile));
+	.action(a(function(stashId, managerEmail, contentManagerListFile, driveName, teamDriveFile) {
+		catchAndLog(terastash.createTeamDrive(stashId, managerEmail, contentManagerListFile, driveName, teamDriveFile));
 	}));
 
 program
