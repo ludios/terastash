@@ -20,6 +20,7 @@ module.exports = {
 
 	readFileSync:      fs.readFileSync,
 	writeFileSync:     fs.writeFileSync,
+	appendFileSync:    fs.appendFileSync,
 	existsSync:        fs.existsSync,
 	readdirSync:       fs.readdirSync,
 	renameSync:        fs.renameSync

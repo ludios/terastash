@@ -3,6 +3,7 @@
 const A                 = require('ayy');
 const T                 = require('notmytype');
 const Combine           = require('combine-streams');
+const crypto            = require('crypto');
 const { google }        = require('googleapis');
 const utils             = require('../utils');
 const OutputContextType = utils.OutputContextType;
@@ -131,6 +132,7 @@ class GDriver {
 	}
 
 	async loadOAuth2Credentials(account) {
+		T(account, T.string);
 		const config = await getAllCredentialsForAccount(account);
 		const credentials = config.credentials[this.clientId];
 		const redirectUrl = 'urn:ietf:wg:oauth:2.0:oob';
@@ -138,6 +140,19 @@ class GDriver {
 		this._auth.setCredentials(credentials);
 		this._account = account;
 		this._drive = google.drive({version: 'v2', auth: this._auth});
+	}
+
+	async createTeamDrive(managerEmail, name) {
+		T(managerEmail, T.string, name, T.string);
+		await this.loadOAuth2Credentials(managerEmail);
+		const drivev3   = google.drive({version: 'v3', auth: this._auth});
+		const requestId = crypto.randomBytes(128/8).toString('hex');
+		const params    = {requestId: requestId, resource: {name: name}};
+		const reply     = await drivev3.drives.create(params);
+		const data      = reply.data;
+		A.eq(data.kind, "drive#drive");
+		A.eq(data.name, name);
+		return data.id;
 	}
 
 	async loadServiceAccountCredentials() {

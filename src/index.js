@@ -1854,6 +1854,7 @@ function atomicWriteFileSync(fname, content, tempDirectory) {
 }
 
 async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
+	T(tokensFilename, T.string, clientId, T.string, clientSecret, T.string);
 	const gdriver     = new gdrive.GDriver(clientId, clientSecret);
 	const credentials = JSON.parse(fs.readFileSync(tokensFilename)).credentials[clientId];
 	gdriver._oauth2Client.setCredentials(credentials);
@@ -1865,6 +1866,15 @@ async function updateGoogleTokens(tokensFilename, clientId, clientSecret) {
 	await utils.mkdirpAsync(tempDirectory);
 	const content = JSON.stringify({credentials: {[clientId]: gdriver._oauth2Client.credentials}}, null, 2);
 	atomicWriteFileSync(tokensFilename, content, tempDirectory);
+}
+
+async function createTeamDrive(stashName, managerEmail, driveName, teamDriveFile) {
+	T(stashName, T.string, managerEmail, T.string, driveName, T.string, teamDriveFile, T.string);
+	const stashInfo  = await getStashInfoByName(stashName);
+	const chunkStore = await getChunkStore(stashInfo);
+	const gdriver    = new gdrive.GDriver(chunkStore.clientId, chunkStore.clientSecret);
+	const id         = await gdriver.createTeamDrive(managerEmail, driveName);
+	fs.appendFileSync(teamDriveFile, `${driveName}\t${id}\n`);
 }
 
 function assertName(name) {
@@ -2251,5 +2261,5 @@ module.exports = {
 	NotAFileError, PathAlreadyExistsError, KeyspaceMissingError,
 	DifferentStashesError, UnexpectedFileError, UsageError, FileChangedError,
 	checkChunkSize, chunksToBlockRanges, getChildrenForParent, getUuidForPath,
-	getRowByPath, getRowByParentBasename, getStashInfoByName
+	getRowByPath, getRowByParentBasename, getStashInfoByName, createTeamDrive
 };
