@@ -28,6 +28,7 @@
     "sse4_crc32": "ludios/sse4_crc32",
     "streamifier": "^0.1.1",
     "transit-js": "0.8.846",
+    "v8-compile-cache": "^2.0.3",
     "xdg": "^0.1.1"
   },
   "devDependencies": {

@@ -12,6 +12,8 @@ process.on("unhandledRejection", function(err) {
 	}
 });
 
+require('v8-compile-cache');
+
 // For testing the unhandledRejection handler
 //new Promise(function(){ throw new Error("boom"); });
 //new Promise(function(){ throw 3; });
