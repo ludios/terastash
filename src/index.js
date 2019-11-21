@@ -1461,9 +1461,26 @@ async function streamFile(client, stashInfo, parent, basename, ranges) {
 /**
  * Get a file or directory from the Cassandra database.
  */
-async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
-	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean);
+async function getFile(client, stashInfo, dbPath, outputFilename, fake, skipIfExists) {
+	T(client, cassandra.Client, stashInfo, T.object, dbPath, T.string, outputFilename, T.string, fake, T.boolean, skipIfExists, T.boolean);
 	await utils.mkdirpAsync(path.dirname(outputFilename));
+
+	const row = await getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
+
+	let stat;
+	try {
+		stat = await fs.statAsync(outputFilename);
+	} catch(err) {
+		if (err.code !== "ENOENT") {
+			throw err;
+		}
+		// file doesn't already exist locally, continue
+	} finally {
+		if (stat && stat.isFile() && stat.size === Number(row.size) && stat.mtime.getTime() === row.mtime.getTime()) {
+			console.log(`Notice: skipping ${inspect(dbPath)} because it already exists locally with same size and mtime`);
+			return;
+		}
+	}
 
 	// Delete the existing file because it may
 	// 1) have hard links
@@ -1472,11 +1489,10 @@ async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 	await utils.tryUnlink(outputFilename);
 
 	if (fake) {
-		const row               = await getRowByPath(client, stashInfo.name, dbPath, ['size', 'mtime']);
 		await makeFakeFile(outputFilename, Number(row.size), row.mtime);
 	} else {
-		const parent            = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
-		const [row, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
+		const parent = await getUuidForPath(client, stashInfo.name, utils.getParentPath(dbPath));
+		const [_, readStream] = await streamFile(client, stashInfo, parent, utils.getBaseName(dbPath));
 		const writeStream = fs.createWriteStream(outputFilename);
 		utils.pipeWithErrors(readStream, writeStream);
 		await new Promise(function getFiles$Promise(resolve, reject) {
@@ -1498,8 +1514,8 @@ async function getFile(client, stashInfo, dbPath, outputFilename, fake) {
 	}
 }
 
-function getFiles(stashName, paths, fake) {
-	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean);
+function getFiles(stashName, paths, fake, skipIfExists) {
+	T(stashName, T.maybe(T.string), paths, T.list(T.string), fake, T.boolean, skipIfExists, T.boolean);
 	return doWithClient(getNewClient(), async function getFiles$coro(client) {
 		const stashInfo = await getStashInfoForNameOrPaths(stashName, paths);
 		for (const p of paths) {
@@ -1514,7 +1530,7 @@ function getFiles(stashName, paths, fake) {
 				outputFilename = stashInfo.path + '/' + dbPath;
 			}
 
-			await getFile(client, stashInfo, dbPath, outputFilename, fake);
+			await getFile(client, stashInfo, dbPath, outputFilename, fake, skipIfExists);
 		}
 	});
 }
