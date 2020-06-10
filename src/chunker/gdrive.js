@@ -283,7 +283,7 @@ class GDriver {
 			const data = reply.data;
 			if (data.kind !== "drive#file") {
 				throw new UploadError(`Expected Google Drive to create an` +
-					` dataect with kind='drive#file' but was ${inspect(data.kind)}`
+					` object with kind='drive#file' but was ${inspect(data.kind)}`
 				);
 			}
 			if (typeof data.id !== "string") {
